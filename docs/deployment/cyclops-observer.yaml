@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cyclops-observer
+  namespace: kube-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cyclops-observer
+      role: cyclops-observer
+  template:
+    metadata:
+      labels:
+        app: cyclops-observer
+        role: cyclops-observer
+    spec:
+      serviceAccountName: cyclops
+      containers:
+        - name: cyclops-observer
+          image: atlassian/cyclops:latest
+          command:
+          - /bin/observer
+          - --namespace=kube-system             # namespace of CNRs to generate
+          - --namespaces=kube-system,monitoring # namespaces for daemonsets to watch for changes
+          - --check-interval=15m
+          - --wait-interval=3m
+          imagePullPolicy: Always
+          ports:
+          - containerPort: 8080
+          env:
+          - name: AWS_REGION
+            value: us-east-1
+          # Required for leader election
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    role: cyclops-observer
+    app: cyclops-observer
+  name: cyclops-observer
+  namespace: kube-system
+spec:
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    role: cyclops-observer

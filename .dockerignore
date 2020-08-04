@@ -1,0 +1,7 @@
+vendor/
+tmp/
+deploy/
+config/
+.idea/
+/cycle-operator
+/cyclops

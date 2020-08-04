@@ -1,0 +1,17 @@
+apiVersion: "atlassian.com/v1"
+kind: "CycleNodeRequest"
+metadata:
+  name: "example"
+  namespace: "kube-system"
+spec:
+  nodeGroupName: "nodes.my-nodegroup.my-site"
+  selector:
+    matchLabels:
+      role: node
+      customer: shared
+  nodeNames:
+    - "ip-10-149-142-218.us-west-2.compute.internal"
+    - "ip-10-149-141-227.us-west-2.compute.internal"
+  cycleSettings:
+    concurrency: 5
+    method: Drain

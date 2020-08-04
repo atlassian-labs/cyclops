@@ -1,0 +1,12 @@
+apiVersion: "atlassian.com/v1"
+kind: "CycleNodeRequest"
+metadata:
+  name: "example"
+  namespace: "kube-system"
+spec:
+  nodeGroupName: "nodes.my-nodegroup.my-site"
+  selector:
+    matchLabels:
+      role: node
+  cycleSettings:
+    method: Drain

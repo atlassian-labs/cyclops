@@ -1,0 +1,25 @@
+vendor/
+.idea/
+
+# Temporary Build Files
+tmp/_output
+tmp/_test
+
+### Go ###
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, build with 'go test -c'
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+/cyclops
+/cycle-operator
+
+build/
