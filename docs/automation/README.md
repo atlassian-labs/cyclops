@@ -57,7 +57,7 @@ Cyclops can use a `kubectl` plugin to cycle with `NodeGroup` CRDs.
 
 To install the CLI (to your `$GOPATH`) run `make install-cli`
 
-### Using CLI
+### Using CLI<a name="cli"></a>
 
 Use `kubectl plugin list` to verify that `kubectl-cycle` is recognised by `kubectl`
 Example:
@@ -173,7 +173,7 @@ example-system                        system.example-domain.com               Dr
 
 ![CLI Diagram](./cli.png)
 
-## Observer
+## Observer<a name="observer"></a>
 
 The Observer works by checking if a cloud provider's node configurations are out of date from the latest configurations, and if any `updateStrategy: OnDelete` daemonsets aren't on the latest revision. It will then use the NodeGroups in the cluster to generate CNRs for rotating only the out of date nodes. The reason for termiantion will be annotated on the CNR. The observer runs on a configurable timed loop for checking for outdated components. Once deployed and configured, there is nothing to do for automatically cycling nodes. CNRs will still go into the `Failed` state, which can be alerted on for manual intervention / investigation. 
 

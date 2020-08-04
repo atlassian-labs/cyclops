@@ -25,11 +25,11 @@
 
 ### kubectl-cycle CLI
 
-*TODO: before open sourcing)*
+[Automation CLI Usage](./automation/README.md#cli)
 
 ### Automated Cycling with Observer
 
-*TODO: before open sourcing)* 
+[Automation Observer Usage](./automation/README.md#observer)
 
 ### Everyday Usage
 
