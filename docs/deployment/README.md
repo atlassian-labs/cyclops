@@ -52,7 +52,7 @@ kubectl create -f deploy/crds/
 
 ### RBAC<a name="rbac"></a>
 
-To be able to function correctly, Escalator needs a service account with the following permissions:
+To be able to function correctly, Cyclops needs a service account with the following permissions:
 
 - **pods**:
   - watch
