@@ -60,7 +60,7 @@ Flags:
 ```
 
 ### Package Layout and Usage
-**TODO**: cyclops
+
 - `cmd/manager`
     - contains command function, setup, and config loading
 - `pkg/controller`
