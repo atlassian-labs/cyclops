@@ -4,16 +4,15 @@ import (
 	"fmt"
 	"time"
 
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	v1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
 	"github.com/atlassian-labs/cyclops/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 type transitionFunc func() (reconcile.Result, error)
 
 var (
 	transitionDuration = 10 * time.Second
-	requeueDuration    = 30 * time.Second
 )
 
 // CycleNodeStatusTransitioner takes a cycleNodeStatus and attempts to transition it to the next phase

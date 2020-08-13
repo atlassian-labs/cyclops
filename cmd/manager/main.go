@@ -17,14 +17,17 @@ import (
 	"gopkg.in/alecthomas/kingpin.v2"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
-	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
+	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 )
 
 var (
-	version = "undefined" // replaced by ldflags at buildtime
-	app     = kingpin.New("cyclops", "Kubernetes operator to rotate a group of nodes").DefaultEnvars().Version(version)
+	// replaced by ldflags at buildtime
+	version = "undefined" //nolint:golint,varcheck,deadcode,unused
+
+	app = kingpin.New("cyclops", "Kubernetes operator to rotate a group of nodes").DefaultEnvars().Version(version)
 
 	debug = app.Flag("debug", "Run with debug logging").Short('d').Bool()
 
@@ -41,7 +44,7 @@ var log = logf.Log.WithName("cmd")
 
 func main() {
 	kingpin.MustParse(app.Parse(os.Args[1:]))
-	logf.SetLogger(logf.ZapLogger(*debug))
+	logf.SetLogger(zap.Logger(*debug))
 	printVersion()
 
 	// Get a config to talk to the apiserver

@@ -105,7 +105,7 @@ func unionNodes(aa []*corev1.Node, bb []*corev1.Node) []*corev1.Node {
 
 // observeChanges iterates all observers in the controller and returns a combined list of changed node groups
 // nodegroups that have changes in one observer will be skipped by the subsequent observers in order to reduce unnecessary api calls
-// the order of observes is optimised each run by their runtime. This makes heavier unnecessary api calls less likely
+// the order of observers is optimised each run by their runtime. This makes heavier unnecessary api calls less likely
 func (c *controller) observeChanges(validNodeGroups v1.NodeGroupList) []*ListedNodeGroups {
 	if len(validNodeGroups.Items) == 0 {
 		klog.V(2).Infoln("no valid no groups to check for changes")
@@ -163,7 +163,7 @@ func (c *controller) observeChanges(validNodeGroups v1.NodeGroupList) []*ListedN
 
 	// sort new runtimes and update the controller for next run
 	sort.Slice(runTimes, func(i, j int) bool {
-		return runTimes[i].duration < runTimes[i].duration
+		return runTimes[i].duration < runTimes[j].duration
 	})
 	c.optimisedOrder = runTimes
 

@@ -6,10 +6,10 @@ import (
 
 	"strings"
 
+	v1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	v1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
 )
 
 var (
@@ -154,7 +154,7 @@ func (t *CycleNodeStatusTransitioner) transitionDraining() (reconcile.Result, er
 	}
 	// No serious errors were encountered. If we're done, move on.
 	if finished {
-		t.transitionObject(v1.CycleNodeStatusDeletingNode)
+		return t.transitionObject(v1.CycleNodeStatusDeletingNode)
 	}
 
 	// Fail if we've taken too long in this phase.

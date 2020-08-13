@@ -5,12 +5,12 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/atlassian-labs/cyclops/pkg/cloudprovider"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/go-logr/logr"
-	"github.com/atlassian-labs/cyclops/pkg/cloudprovider"
 )
 
 const (
@@ -22,7 +22,7 @@ const (
 	alreadyDetachingMessage = "is not in InService or Standby"
 )
 
-var providerIDRegex = regexp.MustCompile("aws:\\/\\/\\/[\\w-]+\\/([\\w-]+)")
+var providerIDRegex = regexp.MustCompile(`aws:\/\/\/[\w-]+\/([\w-]+)`)
 
 func convertProviderID(providerID string) (instanceID string, err error) {
 	res := providerIDRegex.FindStringSubmatch(providerID)

@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"time"
 
+	v1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
+	"github.com/atlassian-labs/cyclops/pkg/k8s"
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	v1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
-	"github.com/atlassian-labs/cyclops/pkg/k8s"
 )
 
 var (
@@ -60,6 +61,9 @@ func (t *CycleNodeRequestTransitioner) transitionPending() (reconcile.Result, er
 	}
 
 	existingProviderIDs, err := t.rm.CloudProvider.InstancesExist(nodeProviderIDs)
+	if err != nil {
+		return t.transitionToHealing(errors.Wrap(err, "failed to check instances that exist from cloud provider"))
+	}
 	var existingKubeNodes []corev1.Node
 
 	for _, node := range kubeNodes {
@@ -134,7 +138,9 @@ func (t *CycleNodeRequestTransitioner) transitionPending() (reconcile.Result, er
 	// Remove any children that may be left over from previous runs. Should most often be a no-op.
 	// We do this after all the other error checking to avoid changing cluster state unless we would actually
 	// be acting on this request.
-	t.removeOldChildrenFromCluster()
+	if err := t.removeOldChildrenFromCluster(); err != nil {
+		return t.transitionToHealing(err)
+	}
 	return t.transitionObject(v1.CycleNodeRequestInitialised)
 }
 
@@ -158,13 +164,6 @@ func (t *CycleNodeRequestTransitioner) transitionInitialised() (reconcile.Result
 	if transitioning, reconcileResult, err := t.checkIfTransitioning(len(nodes), numNodesInProgress); transitioning {
 		t.rm.Logger.Info("No more valid nodes in kube left to cycle")
 		return reconcileResult, err
-	}
-
-	// Filter the nodes to terminate to only include ready nodes from the asg
-	var currentNodeProviderIDs []string
-
-	for _, node := range nodes {
-		currentNodeProviderIDs = append(currentNodeProviderIDs, node.Spec.ProviderID)
 	}
 
 	nodeGroup, err := t.rm.CloudProvider.GetNodeGroup(t.cycleNodeRequest.Spec.NodeGroupName)

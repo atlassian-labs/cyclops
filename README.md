@@ -1,9 +1,9 @@
 # Cyclops
 
-[![Godoc](https://godoc.org/github.com/atlassian/cyclops?status.svg)](https://godoc.org/github.com/atlassian/cyclops)
-[![Build Status](https://travis-ci.org/atlassian/cyclops.svg?branch=master)](https://travis-ci.org/atlassian/cyclops)
-[![Go Report Card](https://goreportcard.com/badge/github.com/atlassian/cyclops)](https://goreportcard.com/report/github.com/atlassian/cyclops)
-[![license](https://img.shields.io/github/license/atlassian/cyclops.svg)](LICENSE)
+[![Godoc](https://godoc.org/github.com/atlassian-labs/cyclops?status.svg)](https://godoc.org/github.com/atlassian-labs/cyclops)
+[![Build](https://github.com/atlassian-labs/cyclops/workflows/Build/badge.svg)](https://github.com/cyclops-labs/workflows/actions)
+[![Go Report Card](https://goreportcard.com/badge/github.com/atlassian-labs/cyclops)](https://goreportcard.com/report/github.com/atlassian-labs/cyclops)
+[![license](https://img.shields.io/github/license/atlassian-labs/cyclops.svg)](LICENSE)
 
 Cyclops is a Kubernetes Operator that is able to terminate and create replacement nodes for a set of nodes in a cloud provider node group, e.g. AWS's Auto Scaling Group.
 

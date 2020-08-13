@@ -9,6 +9,72 @@ import (
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 )
 
+// Test_convertProviderID is checking that the regex used is correctly matching the providerID to instanceID format
+// rather than ensuring the correct instanceID format exactly
+func Test_convertProviderID(t *testing.T) {
+	tests := []struct {
+		name       string
+		providerID string
+		instanceID string
+		wantErr    bool
+	}{
+		{
+			"expected format",
+			"aws:///us-west-2b/i-0bdf741206dd9793c",
+			"i-0bdf741206dd9793c",
+			false,
+		},
+		{
+			"incorrect format. missing 3rd /",
+			"aws://us-west-2b/i-0bdf741206dd9793c",
+			"i-0bdf741206dd9793c",
+			true,
+		},
+		{
+			"incorrect format. missing id",
+			"aws://us-west-2b/",
+			"i-0bdf741206dd9793c",
+			true,
+		},
+		{
+			"incorrect format. missing numbers",
+			"aws://us-west-2b/i-",
+			"i-0bdf741206dd9793c",
+			true,
+		},
+		{
+			"incorrect format. missing i",
+			"aws://us-west-2b/0bdf741206dd9793c",
+			"i-0bdf741206dd9793c",
+			true,
+		},
+		{
+			"incorrect format. missing region",
+			"aws:///0bdf741206dd9793c",
+			"i-0bdf741206dd9793c",
+			true,
+		},
+		{
+			"incorrect format. missing aws",
+			"///i-0bdf741206dd9793c",
+			"i-0bdf741206dd9793c",
+			true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			instanceID, err := convertProviderID(tt.providerID)
+			if tt.wantErr {
+				assert.NotNil(t, err)
+				return
+			}
+			assert.Equal(t, tt.instanceID, instanceID)
+			assert.NoError(t, err)
+		})
+	}
+}
+
 func TestInstance_OutOfDate(t *testing.T) {
 	tests := []struct {
 		name     string
