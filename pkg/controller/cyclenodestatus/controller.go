@@ -3,20 +3,20 @@ package cyclenodestatus
 import (
 	"context"
 
+	v1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
+	"github.com/atlassian-labs/cyclops/pkg/cloudprovider"
+	cyclecontroller "github.com/atlassian-labs/cyclops/pkg/controller"
+	"github.com/atlassian-labs/cyclops/pkg/controller/cyclenodestatus/transitioner"
 	coreV1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-	v1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
-	"github.com/atlassian-labs/cyclops/pkg/cloudprovider"
-	cyclecontroller "github.com/atlassian-labs/cyclops/pkg/controller"
-	"github.com/atlassian-labs/cyclops/pkg/controller/cyclenodestatus/transitioner"
 )
 
 const (
@@ -32,7 +32,6 @@ type Reconciler struct {
 	mgr           manager.Manager
 	cloudProvider cloudprovider.CloudProvider
 	rawClient     kubernetes.Interface
-	namespace     string
 }
 
 // NewReconciler returns a new Reconciler for CycleNodeStatuses, which implements reconcile.Reconciler

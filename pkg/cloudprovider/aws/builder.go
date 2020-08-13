@@ -3,13 +3,13 @@ package aws
 import (
 	"fmt"
 
+	"github.com/atlassian-labs/cyclops/pkg/cloudprovider"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
-	"github.com/atlassian-labs/cyclops/pkg/cloudprovider"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var log = logf.Log.WithName("aws")

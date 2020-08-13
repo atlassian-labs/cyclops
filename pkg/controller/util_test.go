@@ -105,16 +105,12 @@ func TestNamespacePredicate(t *testing.T) {
 			switch e := tc.event.(type) {
 			case event.CreateEvent:
 				res = p.Create(e)
-				break
 			case event.DeleteEvent:
 				res = p.Delete(e)
-				break
 			case event.UpdateEvent:
 				res = p.Update(e)
-				break
 			case event.GenericEvent:
 				res = p.Generic(e)
-				break
 			}
 
 			assert.Equal(t, tc.allowed, res)

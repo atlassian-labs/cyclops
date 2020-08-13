@@ -4,14 +4,14 @@ import (
 	"fmt"
 	"strings"
 
+	atlassianv1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
+	"github.com/atlassian-labs/cyclops/pkg/k8s"
+	"github.com/atlassian-labs/cyclops/pkg/observer"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/klog"
-	atlassianv1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
-	"github.com/atlassian-labs/cyclops/pkg/k8s"
-	"github.com/atlassian-labs/cyclops/pkg/observer"
 )
 
 // controllerRevisionLabel is the label key on pods for their daemonset controller hash
@@ -47,6 +47,10 @@ func collectRevisions(crLister k8s.ControllerRevisionLister, daemonsets map[stri
 			continue
 		}
 		crs, err := crLister.List(selector)
+		if err != nil {
+			klog.Warningf("failed to list controller revisions %q for ds %q: %s", ds.Spec.Selector, name, err)
+			continue
+		}
 		collected[name] = crs
 		klog.V(7).Infoln("collected revisions", name, len(crs))
 	}

@@ -19,7 +19,7 @@ var runningPodList = []corev1.Pod{
 
 func pod(name string, namespace string, labels ...string) corev1.Pod {
 	// Label strings are of the format 'key=value'
-	podLabels := make(map[string]string, 0)
+	podLabels := make(map[string]string)
 	for _, s := range labels {
 		keyValue := strings.Split(s, "=")
 		podLabels[keyValue[0]] = keyValue[1]

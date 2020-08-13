@@ -25,7 +25,8 @@ import (
 )
 
 var (
-	version = "undefined" // replaced by ldflags at buildtime
+	// replaced by ldflags at buildtime
+	version = "undefined" //nolint:golint,varcheck,deadcode,unused
 )
 
 // app type holds options for the application from cobra

@@ -1,4 +1,4 @@
-FROM docker.atl-paas.net/sox/kube/kube-buildbase:latest as builder
+FROM golang:1.14 as builder
 WORKDIR /go/src/github.com/atlassian-labs/cyclops
 COPY go.mod go.sum Makefile ./
 COPY cmd cmd
