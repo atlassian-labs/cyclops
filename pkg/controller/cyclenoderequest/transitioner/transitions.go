@@ -53,7 +53,7 @@ func (t *CycleNodeRequestTransitioner) transitionPending() (reconcile.Result, er
 		return t.transitionToHealing(fmt.Errorf("no nodes matched selector"))
 	}
 
-	// Only retain nodes which still exist aws
+	// Only retain nodes which still exist inside cloud provider
 	var nodeProviderIDs []string
 
 	for _, node := range kubeNodes {
@@ -78,7 +78,7 @@ func (t *CycleNodeRequestTransitioner) transitionPending() (reconcile.Result, er
 	kubeNodes = existingKubeNodes
 
 	if len(kubeNodes) == 0 {
-		return t.transitionToHealing(fmt.Errorf("no existing nodes in aws matched selector"))
+		return t.transitionToHealing(fmt.Errorf("no existing nodes in cloud provider matched selector"))
 	}
 
 	// Describe the node group for the request
@@ -95,7 +95,7 @@ func (t *CycleNodeRequestTransitioner) transitionPending() (reconcile.Result, er
 			"Instances in node group: %v, nodes in kube: %v",
 			len(nodeGroup.Instances()), len(kubeNodes))
 
-		// If it doesn't then retry for a while in case something just scaled the cluster
+		// If it doesn't, then retry for a while in case something just scaled the node group
 		timedOut, err := t.equilibriumWaitTimedOut()
 		if err != nil {
 			return t.transitionToHealing(err)
@@ -109,7 +109,7 @@ func (t *CycleNodeRequestTransitioner) transitionPending() (reconcile.Result, er
 		return reconcile.Result{Requeue: true, RequeueAfter: requeueDuration}, nil
 	}
 
-	// We're all good to go, make a list of the nodes to terminate
+	// make a list of the nodes to terminate
 	if len(t.cycleNodeRequest.Spec.NodeNames) > 0 {
 		// If specific node names are provided, check they actually exist in the node group
 		t.rm.LogEvent(t.cycleNodeRequest, "SelectingNodes", "Adding named nodes to NodesToTerminate")
@@ -118,7 +118,7 @@ func (t *CycleNodeRequestTransitioner) transitionPending() (reconcile.Result, er
 			return t.transitionToHealing(err)
 		}
 	} else {
-		// Otherwise just add all the nodes in the group
+		// Otherwise just add all the nodes in the node group
 		t.rm.LogEvent(t.cycleNodeRequest, "SelectingNodes", "Adding all node group nodes to NodesToTerminate")
 		for _, kubeNode := range kubeNodes {
 			t.cycleNodeRequest.Status.NodesToTerminate = append(
@@ -182,10 +182,10 @@ func (t *CycleNodeRequestTransitioner) transitionInitialised() (reconcile.Result
 		}
 	}
 
-	// This is done a second time to account for a race condition where an instance on aws is no longer running but is still registered in kube
-	// If the check were performed before the transition to WaitingTermination above, cyclops would perform many aws requests and eventually get rate limited by aws
+	// This is done a second time to account for a race condition where an instance on cloud provider is no longer running but is still registered in kube
+	// If the check were performed before the transition to WaitingTermination above, cyclops would perform many requests and eventually get rate limited by cloud provider
 	if transitioning, reconcileResult, err := t.checkIfTransitioning(len(validProviderIDs), numNodesInProgress); transitioning {
-		t.rm.Logger.Info("No more valid nodes in aws left to cycle")
+		t.rm.Logger.Info("No more valid nodes inside cloud provider left to cycle")
 		return reconcileResult, err
 	}
 

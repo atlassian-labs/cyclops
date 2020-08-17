@@ -11,6 +11,10 @@ type CycleNodeRequestSpec struct {
 	// up replacement nodes.
 	NodeGroupName string `json:"nodeGroupName"`
 
+	// NodeGroupsList is a list of node groups in the cloud provider which include target nodes
+	// selected by node selector
+	NodeGroupsList []string `json:"nodeGroupsList,omitempty"`
+
 	// Selector is the label selector used to select the nodes that are to be terminated
 	Selector metav1.LabelSelector `json:"selector"`
 
