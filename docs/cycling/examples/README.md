@@ -176,3 +176,28 @@ This example shows the usage of the `Wait` method which opposed to `Drain` which
 ```
 
 Cyclops provides an option to ignore pods with specific labels in order to support nodes that may run pods that will never exit themselves. In this example, the pod with label `name=stickypod` would be ignore when waiting for all other pods to terminate. The node will be terminated while `name=stickypod` is running, and all others have finished.
+
+
+### Example 5 - Concurrency within multiple cloud provider node groups
+
+
+```yaml
+apiVersion: "atlassian.com/v1"
+kind: "CycleNodeRequest"
+metadata:
+  name: "example"
+  namespace: "kube-system"
+spec:
+  nodeGroupName: "az1-nodes.my-nodegroup.my-site"
+  nodeGroupsList:
+    ["az2-nodes.my-nodegroup.my-site", "az3-nodes.my-nodegroup.my-site"]
+  selector:
+    matchLabels:
+      role: node
+      customer: shared
+  cycleSettings:
+    concurrency: 1
+    method: Drain 
+```
+
+This example shows the usage of the `nodeGroupsList` optional field with concurrency. Cyclops maintains same concurrency for all the nodes inside those `nodeGroupName` and `nodeGroupsList` cloud provider node groups. This is useful for situations where you need to split a group of node into different cloud provider node groups, e.g. split by availability zones due to autoscaling issue, and also want to maintain same concurrency for nodes in those groups especially a lower concurrency which cannot be achieved by creating multiple `NodeGroup` objects.

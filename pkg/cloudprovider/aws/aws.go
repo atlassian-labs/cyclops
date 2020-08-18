@@ -24,12 +24,19 @@ const (
 
 var providerIDRegex = regexp.MustCompile(`aws:\/\/\/[\w-]+\/([\w-]+)`)
 
-func convertProviderID(providerID string) (instanceID string, err error) {
+func providerIDToInstanceID(providerID string) (instanceID string, err error) {
 	res := providerIDRegex.FindStringSubmatch(providerID)
 	if len(res) != 2 {
 		return "", fmt.Errorf("unable to extract instance ID from provider ID")
 	}
 	return res[1], nil
+}
+
+func instanceIDToProviderID(instanceID, availabilityZone string) (string, error) {
+	if len(instanceID) == 0 || len(availabilityZone) == 0 {
+		return "", fmt.Errorf("instanceID and availabilityZone cannot be empty")
+	}
+	return fmt.Sprintf("aws:///%s/%s", availabilityZone, instanceID), nil
 }
 
 func verifyIfErrorOccured(apiErr error, expectedMessage string) (bool, error) {
@@ -49,14 +56,16 @@ type provider struct {
 	logger             logr.Logger
 }
 
-type autoscalingGroup struct {
+type autoscalingGroups struct {
 	autoScalingService *autoscaling.AutoScaling
-	group              *autoscaling.Group
+	groups             []*autoscaling.Group
+	logger             logr.Logger
 }
 
 type instance struct {
-	instance  *autoscaling.Instance
-	outOfDate bool
+	instance      *autoscaling.Instance
+	nodeGroupName string
+	outOfDate     bool
 }
 
 // Name returns the name of the cloud provider
@@ -64,10 +73,10 @@ func (p *provider) Name() string {
 	return ProviderName
 }
 
-// GetNodeGroup gets a Autoscaling group
-func (p *provider) GetNodeGroup(name string) (cloudprovider.NodeGroup, error) {
+// GetNodeGroups gets a Autoscaling groups
+func (p *provider) GetNodeGroups(names []string) (cloudprovider.NodeGroups, error) {
 	result, err := p.autoScalingService.DescribeAutoScalingGroups(&autoscaling.DescribeAutoScalingGroupsInput{
-		AutoScalingGroupNames: aws.StringSlice([]string{name}),
+		AutoScalingGroupNames: aws.StringSlice(names),
 	})
 	if err != nil {
 		return nil, err
@@ -75,11 +84,11 @@ func (p *provider) GetNodeGroup(name string) (cloudprovider.NodeGroup, error) {
 
 	groups := result.AutoScalingGroups
 	if len(groups) == 0 {
-		return nil, fmt.Errorf("autoscaling group %v not found", name)
+		return nil, fmt.Errorf("autoscaling groups not found: %v", names)
 	}
 
-	return &autoscalingGroup{
-		group:              groups[0],
+	return &autoscalingGroups{
+		groups:             groups,
 		autoScalingService: p.autoScalingService,
 	}, nil
 }
@@ -90,7 +99,7 @@ func (p *provider) InstancesExist(providerIDs []string) (validProviderIDs []stri
 	instanceIDs := []string{}
 
 	for _, providerID := range providerIDs {
-		instanceID, err := convertProviderID(providerID)
+		instanceID, err := providerIDToInstanceID(providerID)
 		if err != nil {
 			return nil, err
 		}
@@ -122,7 +131,7 @@ func (p *provider) InstancesExist(providerIDs []string) (validProviderIDs []stri
 
 // TerminateInstance terminates an instance
 func (p *provider) TerminateInstance(providerID string) error {
-	instanceID, err := convertProviderID(providerID)
+	instanceID, err := providerIDToInstanceID(providerID)
 	if err != nil {
 		return err
 	}
@@ -133,58 +142,125 @@ func (p *provider) TerminateInstance(providerID string) error {
 	return err
 }
 
-// ID returns the ID for the Autoscaling group
-func (a *autoscalingGroup) ID() string {
-	return aws.StringValue(a.group.AutoScalingGroupName)
-}
-
-// Instances returns a slice of all instances in the Autoscaling group
-func (a *autoscalingGroup) Instances() (instances []cloudprovider.Instance) {
-	for _, i := range a.group.Instances {
-		instances = append(instances, &instance{
-			instance:  i,
-			outOfDate: a.instanceOutOfDate(i),
-		})
-	}
-	return instances
-}
-
-// ReadyInstances returns a slice of instances that are InService
-func (a *autoscalingGroup) ReadyInstances() (instances []cloudprovider.Instance) {
-	for _, i := range a.group.Instances {
-		if aws.StringValue(i.LifecycleState) != "InService" {
-			continue
-		}
-		instances = append(instances, &instance{
-			instance:  i,
-			outOfDate: a.instanceOutOfDate(i),
-		})
-	}
-	return instances
-}
-
-// NotReadyInstances returns a slice of instances that are not InService
-func (a *autoscalingGroup) NotReadyInstances() (instances []cloudprovider.Instance) {
-	for _, i := range a.group.Instances {
-		if aws.StringValue(i.LifecycleState) != "InService" {
-			instances = append(instances, &instance{
-				instance:  i,
-				outOfDate: a.instanceOutOfDate(i),
-			})
+// Instances returns a map of all instances in the Autoscaling group
+// with providerID as key and cloudprovider.Instance as value
+func (a *autoscalingGroups) Instances() map[string]cloudprovider.Instance {
+	instances := make(map[string]cloudprovider.Instance)
+	for _, group := range a.groups {
+		for _, i := range group.Instances {
+			providerID, err := instanceIDToProviderID(*i.InstanceId, *i.AvailabilityZone)
+			if err != nil {
+				a.logger.Info("[Instances] skip instance which failed instanceID to providerID conversion: %v", *i.InstanceId)
+				continue
+			}
+			instances[providerID] = &instance{
+				instance:      i,
+				outOfDate:     a.instanceOutOfDate(i),
+				nodeGroupName: *group.AutoScalingGroupName,
+			}
 		}
 	}
+
 	return instances
+}
+
+// ReadyInstances returns a map of instances that are InService
+// with providerID as key and cloudprovider.Instance as value
+func (a *autoscalingGroups) ReadyInstances() map[string]cloudprovider.Instance {
+	instances := make(map[string]cloudprovider.Instance)
+	for _, group := range a.groups {
+		for _, i := range group.Instances {
+			if aws.StringValue(i.LifecycleState) != "InService" {
+				continue
+			}
+			providerID, err := instanceIDToProviderID(*i.InstanceId, *i.AvailabilityZone)
+			if err != nil {
+				a.logger.Info("[ReadyInstances] skip instance which failed instanceID to providerID conversion: %v", *i.InstanceId)
+				continue
+			}
+			instances[providerID] = &instance{
+				instance:      i,
+				outOfDate:     a.instanceOutOfDate(i),
+				nodeGroupName: *group.AutoScalingGroupName,
+			}
+		}
+	}
+	return instances
+}
+
+// NotReadyInstances returns a map of instances that are not InService
+// with providerID as key and cloudprovider.Instance as value
+func (a *autoscalingGroups) NotReadyInstances() map[string]cloudprovider.Instance {
+	instances := make(map[string]cloudprovider.Instance)
+	for _, group := range a.groups {
+		for _, i := range group.Instances {
+			if aws.StringValue(i.LifecycleState) != "InService" {
+				providerID, err := instanceIDToProviderID(*i.InstanceId, *i.AvailabilityZone)
+				if err != nil {
+					a.logger.Info("[NotReadyInstances] skip instance which failed instanceID to providerID conversion: %v", *i.InstanceId)
+					continue
+				}
+				instances[providerID] = &instance{
+					instance:      i,
+					outOfDate:     a.instanceOutOfDate(i),
+					nodeGroupName: *group.AutoScalingGroupName,
+				}
+			}
+		}
+	}
+	return instances
+}
+
+// getInstanceNodeGroupByInstanceID finds the right autoscaling group for an instance based on
+// instance ID matches one instance ID from one of the node groups inside nodeGroupsList
+func (a *autoscalingGroups) getInstanceNodeGroupByInstanceID(instanceID string) (*autoscaling.Group, error) {
+	var targetNodeGroup *autoscaling.Group
+	foundNodeGroup := false
+	for _, group := range a.groups {
+		for _, i := range group.Instances {
+			if *i.InstanceId == instanceID {
+				targetNodeGroup = group
+				foundNodeGroup = true
+				break
+			}
+		}
+		if foundNodeGroup {
+			break
+		}
+	}
+	if foundNodeGroup {
+		return targetNodeGroup, nil
+	}
+	return nil, fmt.Errorf("failed to found target node group for instance with ID: %v", instanceID)
+}
+
+// getInstanceNodeGroupByGroupName finds the right autoscaling group for an instance based on
+// nodeGroup name passed in
+func (a *autoscalingGroups) getInstanceNodeGroupByGroupName(nodeGroup string) (*autoscaling.Group, error) {
+	if nodeGroup != "" {
+		for _, group := range a.groups {
+			if *group.AutoScalingGroupName == nodeGroup {
+				return group, nil
+			}
+		}
+	}
+	return nil, fmt.Errorf("failed to found target node group for instance with group: %v", nodeGroup)
 }
 
 // DetachInstance detaches the instance from the Autoscaling group
-func (a *autoscalingGroup) DetachInstance(providerID string) (alreadyDetaching bool, err error) {
-	instanceID, err := convertProviderID(providerID)
+func (a *autoscalingGroups) DetachInstance(providerID string) (alreadyDetaching bool, err error) {
+	instanceID, err := providerIDToInstanceID(providerID)
+	if err != nil {
+		return false, err
+	}
+
+	group, err := a.getInstanceNodeGroupByInstanceID(instanceID)
 	if err != nil {
 		return false, err
 	}
 
 	_, apiErr := a.autoScalingService.DetachInstances(&autoscaling.DetachInstancesInput{
-		AutoScalingGroupName:           a.group.AutoScalingGroupName,
+		AutoScalingGroupName:           group.AutoScalingGroupName,
 		InstanceIds:                    aws.StringSlice([]string{instanceID}),
 		ShouldDecrementDesiredCapacity: aws.Bool(false),
 	})
@@ -192,30 +268,39 @@ func (a *autoscalingGroup) DetachInstance(providerID string) (alreadyDetaching b
 	return verifyIfErrorOccured(apiErr, alreadyDetachingMessage)
 }
 
-// AttachInstances attaches the instance to the Autoscaling group
-func (a *autoscalingGroup) AttachInstance(providerID string) (alreadyAttached bool, err error) {
-	instanceID, err := convertProviderID(providerID)
+// AttachInstance attaches the instance to the Autoscaling group
+func (a *autoscalingGroups) AttachInstance(providerID, nodeGroup string) (alreadyAttached bool, err error) {
+	instanceID, err := providerIDToInstanceID(providerID)
+	if err != nil {
+		return false, err
+	}
+
+	group, err := a.getInstanceNodeGroupByGroupName(nodeGroup)
 	if err != nil {
 		return false, err
 	}
 
 	_, apiErr := a.autoScalingService.AttachInstances(&autoscaling.AttachInstancesInput{
-		AutoScalingGroupName: a.group.AutoScalingGroupName,
+		AutoScalingGroupName: group.AutoScalingGroupName,
 		InstanceIds:          aws.StringSlice([]string{instanceID}),
 	})
 
 	return verifyIfErrorOccured(apiErr, alreadyAttachedMessage)
 }
 
-func (a *autoscalingGroup) instanceOutOfDate(instance *autoscaling.Instance) bool {
+func (a *autoscalingGroups) instanceOutOfDate(instance *autoscaling.Instance) bool {
+	group, err := a.getInstanceNodeGroupByInstanceID(*instance.InstanceId)
+	if err != nil {
+		return false
+	}
 	var groupVersion string
 	switch {
-	case a.group.LaunchConfigurationName != nil:
-		groupVersion = aws.StringValue(a.group.LaunchConfigurationName)
-	case a.group.LaunchTemplate != nil:
-		groupVersion = aws.StringValue(a.group.LaunchTemplate.Version)
-	case a.group.MixedInstancesPolicy != nil:
-		if policy := a.group.MixedInstancesPolicy; policy.LaunchTemplate != nil && policy.LaunchTemplate.LaunchTemplateSpecification != nil {
+	case group.LaunchConfigurationName != nil:
+		groupVersion = aws.StringValue(group.LaunchConfigurationName)
+	case group.LaunchTemplate != nil:
+		groupVersion = aws.StringValue(group.LaunchTemplate.Version)
+	case group.MixedInstancesPolicy != nil:
+		if policy := group.MixedInstancesPolicy; policy.LaunchTemplate != nil && policy.LaunchTemplate.LaunchTemplateSpecification != nil {
 			groupVersion = aws.StringValue(policy.LaunchTemplate.LaunchTemplateSpecification.Version)
 		}
 	}
@@ -248,8 +333,13 @@ func (i *instance) OutOfDate() bool {
 
 // MatchesProviderID returns if the instance ID matches the providerID
 func (i *instance) MatchesProviderID(providerID string) bool {
-	if instanceID, err := convertProviderID(providerID); err == nil {
+	if instanceID, err := providerIDToInstanceID(providerID); err == nil {
 		return *i.instance.InstanceId == instanceID
 	}
 	return false
+}
+
+// NodeGroupName returns cloud provider node group name for the instance
+func (i *instance) NodeGroupName() string {
+	return i.nodeGroupName
 }

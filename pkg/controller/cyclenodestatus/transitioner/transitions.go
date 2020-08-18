@@ -29,7 +29,7 @@ func (t *CycleNodeStatusTransitioner) transitionUndefined() (reconcile.Result, e
 	}
 	// This CRD should only be created by the controller, so we don't validate the method any further
 
-	// Check to ensure nodeGroupName is set
+	// Check to ensure NodeName is set
 	if len(t.cycleNodeStatus.Spec.NodeName) == 0 {
 		return t.transitionToFailed(fmt.Errorf("nodeName cannot be empty"))
 	}

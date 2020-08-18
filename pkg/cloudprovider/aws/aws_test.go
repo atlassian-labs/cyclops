@@ -9,9 +9,9 @@ import (
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 )
 
-// Test_convertProviderID is checking that the regex used is correctly matching the providerID to instanceID format
+// Test_providerIDToInstanceID is checking that the regex used is correctly matching the providerID to instanceID format
 // rather than ensuring the correct instanceID format exactly
-func Test_convertProviderID(t *testing.T) {
+func Test_providerIDToInstanceID(t *testing.T) {
 	tests := []struct {
 		name       string
 		providerID string
@@ -64,7 +64,7 @@ func Test_convertProviderID(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			instanceID, err := convertProviderID(tt.providerID)
+			instanceID, err := providerIDToInstanceID(tt.providerID)
 			if tt.wantErr {
 				assert.NotNil(t, err)
 				return
@@ -75,7 +75,55 @@ func Test_convertProviderID(t *testing.T) {
 	}
 }
 
+func Test_instanceIDToProviderID(t *testing.T) {
+	tests := []struct {
+		name             string
+		instanceID       string
+		availabilityZone string
+		providerID       string
+		wantErr          bool
+	}{
+		{
+			"correct format",
+			"i-0bdf741206dd9793c",
+			"us-west-2",
+			"aws:///us-west-2/i-0bdf741206dd9793c",
+			false,
+		},
+		{
+			"wrong format empty instance ID",
+			"",
+			"us-west-2",
+			"aws:///us-west-2/",
+			true,
+		},
+		{
+			"wrong format empty availability zone",
+			"i-0bdf741206dd9793c",
+			"",
+			"aws:////i-0bdf741206dd9793c",
+			true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			providerID, err := instanceIDToProviderID(tt.instanceID, tt.availabilityZone)
+			if tt.wantErr {
+				assert.NotNil(t, err)
+				return
+			}
+			assert.Equal(t, tt.providerID, providerID)
+			assert.NoError(t, err)
+		})
+	}
+}
+
 func TestInstance_OutOfDate(t *testing.T) {
+	instanceID, anotherID := "i-abcdefghijklmn", "i-anotheridfortest"
+	okConfig, notOkConfig, emptyConfig := "ok-config-name", "not-ok-config-name", ""
+	configV2, configV3 := "2", "3"
+
 	tests := []struct {
 		name     string
 		group    *autoscaling.Group
@@ -85,164 +133,187 @@ func TestInstance_OutOfDate(t *testing.T) {
 		{
 			"test group config instance config ok",
 			&autoscaling.Group{
+				Instances:               []*autoscaling.Instance{buildInstance(&instanceID, &okConfig)},
 				LaunchConfigurationName: aws.String("ok-config-name"),
 			},
-			&autoscaling.Instance{
-				LaunchConfigurationName: aws.String("ok-config-name"),
-			},
+			buildInstance(&instanceID, &okConfig),
 			false,
+		},
+		{
+			"test group config instance config ok with another instance out of date",
+			&autoscaling.Group{
+				Instances:               []*autoscaling.Instance{buildInstance(&instanceID, &okConfig), buildInstance(&anotherID, &notOkConfig)},
+				LaunchConfigurationName: aws.String("ok-config-name"),
+			},
+			buildInstance(&instanceID, &okConfig),
+			false,
+		},
+		{
+			"test group config instance config not ok with another instance ok",
+			&autoscaling.Group{
+				Instances:               []*autoscaling.Instance{buildInstance(&instanceID, &notOkConfig), buildInstance(&anotherID, &okConfig)},
+				LaunchConfigurationName: aws.String("ok-config-name"),
+			},
+			buildInstance(&instanceID, &notOkConfig),
+			true,
 		},
 		{
 			"test group config instance config not ok",
 			&autoscaling.Group{
+				Instances:               []*autoscaling.Instance{buildInstance(&instanceID, &notOkConfig)},
 				LaunchConfigurationName: aws.String("ok-config-name"),
 			},
-			&autoscaling.Instance{
-				LaunchConfigurationName: aws.String("not-ok-config-name"),
-			},
+			buildInstance(&instanceID, &notOkConfig),
 			true,
 		},
 		{
 			"test group config instance config empty",
 			&autoscaling.Group{
+				Instances:               []*autoscaling.Instance{buildInstance(&instanceID, &emptyConfig)},
 				LaunchConfigurationName: aws.String("ok-config-name"),
 			},
-			&autoscaling.Instance{
-				LaunchConfigurationName: aws.String(""),
-			},
+			buildInstance(&instanceID, &emptyConfig),
 			true,
 		},
 		{
 			"test group config instance config nil",
 			&autoscaling.Group{
+				Instances:               []*autoscaling.Instance{buildInstance(&instanceID, nil)},
 				LaunchConfigurationName: aws.String("ok-config-name"),
 			},
-			&autoscaling.Instance{
-				LaunchConfigurationName: nil,
-			},
+			buildInstance(&instanceID, nil),
 			true,
 		},
 		{
 			"test group config empty instance config ok",
 			&autoscaling.Group{
+				Instances:               []*autoscaling.Instance{buildInstance(&instanceID, &okConfig)},
 				LaunchConfigurationName: aws.String(""),
 			},
-			&autoscaling.Instance{
-				LaunchConfigurationName: aws.String("ok-config-name"),
-			},
+			buildInstance(&instanceID, &okConfig),
 			true,
 		},
 		{
 			"test group config nil instance config ok",
 			&autoscaling.Group{
+				Instances:               []*autoscaling.Instance{buildInstance(&instanceID, &okConfig)},
 				LaunchConfigurationName: nil,
 			},
-			&autoscaling.Instance{
-				LaunchConfigurationName: aws.String("ok-config-name"),
-			},
+			buildInstance(&instanceID, &okConfig),
 			true,
 		},
 		{
 			"test group config nil instance config empty",
 			&autoscaling.Group{
+				Instances:               []*autoscaling.Instance{buildInstance(&instanceID, &emptyConfig)},
 				LaunchConfigurationName: nil,
 			},
-			&autoscaling.Instance{
-				LaunchConfigurationName: aws.String(""),
-			},
+			buildInstance(&instanceID, &emptyConfig),
 			false,
 		},
 		{
 			"test group config empty instance config empty",
 			&autoscaling.Group{
+				Instances:               []*autoscaling.Instance{buildInstance(&instanceID, &emptyConfig)},
 				LaunchConfigurationName: aws.String(""),
 			},
-			&autoscaling.Instance{
-				LaunchConfigurationName: aws.String(""),
-			},
+			buildInstance(&instanceID, &emptyConfig),
 			false,
 		},
 		{
 			"test group config nil instance config nil",
 			&autoscaling.Group{
+				Instances:               []*autoscaling.Instance{buildInstance(&instanceID, nil)},
 				LaunchConfigurationName: nil,
 			},
-			&autoscaling.Instance{
-				LaunchConfigurationName: nil,
-			},
+			buildInstance(&instanceID, nil),
 			false,
 		},
 		{
 			"test group template ok instance template ok",
 			&autoscaling.Group{
+				Instances: []*autoscaling.Instance{buildLTInstance(&instanceID, &configV3)},
 				LaunchTemplate: &autoscaling.LaunchTemplateSpecification{
 					Version: aws.String("3"),
 				},
 			},
-			&autoscaling.Instance{
-				LaunchTemplate: &autoscaling.LaunchTemplateSpecification{
-					Version: aws.String("3"),
-				},
-			},
+			buildLTInstance(&instanceID, &configV3),
 			false,
+		},
+		{
+			"test group template ok instance template ok with another instance not ok",
+			&autoscaling.Group{
+				Instances: []*autoscaling.Instance{buildLTInstance(&instanceID, &configV3), buildLTInstance(&anotherID, &configV2)},
+				LaunchTemplate: &autoscaling.LaunchTemplateSpecification{
+					Version: aws.String("3"),
+				},
+			},
+			buildLTInstance(&instanceID, &configV3),
+			false,
+		},
+		{
+			"test group template ok instance template not ok with another instance ok",
+			&autoscaling.Group{
+				Instances: []*autoscaling.Instance{buildLTInstance(&instanceID, &configV2), buildLTInstance(&anotherID, &configV3)},
+				LaunchTemplate: &autoscaling.LaunchTemplateSpecification{
+					Version: aws.String("3"),
+				},
+			},
+			buildLTInstance(&instanceID, &configV2),
+			true,
 		},
 		{
 			"test group template ok instance template out of date",
 			&autoscaling.Group{
+				Instances: []*autoscaling.Instance{buildLTInstance(&instanceID, &configV2)},
 				LaunchTemplate: &autoscaling.LaunchTemplateSpecification{
 					Version: aws.String("3"),
 				},
 			},
-			&autoscaling.Instance{
-				LaunchTemplate: &autoscaling.LaunchTemplateSpecification{
-					Version: aws.String("2"),
-				},
-			},
+			buildLTInstance(&instanceID, &configV2),
 			true,
 		},
 		{
 			"test group template ok instance template nil",
 			&autoscaling.Group{
+				Instances: []*autoscaling.Instance{buildLTInstance(&instanceID, nil)},
 				LaunchTemplate: &autoscaling.LaunchTemplateSpecification{
 					Version: aws.String("3"),
 				},
 			},
-			&autoscaling.Instance{
-				LaunchTemplate: &autoscaling.LaunchTemplateSpecification{},
-			},
+			buildLTInstance(&instanceID, nil),
 			true,
 		},
 		{
 			"test group template nil instance template ok",
 			&autoscaling.Group{
+				Instances:      []*autoscaling.Instance{buildLTInstance(&instanceID, &configV3)},
 				LaunchTemplate: &autoscaling.LaunchTemplateSpecification{},
 			},
-			&autoscaling.Instance{
-				LaunchTemplate: &autoscaling.LaunchTemplateSpecification{
-					Version: aws.String("3"),
-				},
-			},
+			buildLTInstance(&instanceID, &configV3),
 			true,
 		},
 		{
 			"test group template nil instance template nil",
 			&autoscaling.Group{
+				Instances:      []*autoscaling.Instance{buildLTInstance(&instanceID, nil)},
 				LaunchTemplate: &autoscaling.LaunchTemplateSpecification{},
 			},
-			&autoscaling.Instance{
-				LaunchTemplate: &autoscaling.LaunchTemplateSpecification{},
-			},
+			buildLTInstance(&instanceID, nil),
 			false,
 		},
 		{
 			"nil everything",
-			&autoscaling.Group{},
-			&autoscaling.Instance{},
+			&autoscaling.Group{
+				Instances: []*autoscaling.Instance{buildLTInstance(&instanceID, nil)},
+			},
+			buildLTInstance(&instanceID, nil),
 			false,
 		},
 		{
 			"test group template mixed ok instance template up to date",
 			&autoscaling.Group{
+				Instances: []*autoscaling.Instance{buildLTInstance(&instanceID, &configV3)},
 				MixedInstancesPolicy: &autoscaling.MixedInstancesPolicy{
 					LaunchTemplate: &autoscaling.LaunchTemplate{
 						LaunchTemplateSpecification: &autoscaling.LaunchTemplateSpecification{
@@ -251,16 +322,13 @@ func TestInstance_OutOfDate(t *testing.T) {
 					},
 				},
 			},
-			&autoscaling.Instance{
-				LaunchTemplate: &autoscaling.LaunchTemplateSpecification{
-					Version: aws.String("3"),
-				},
-			},
+			buildLTInstance(&instanceID, &configV3),
 			false,
 		},
 		{
 			"test group template mixed ok instance template out of date",
 			&autoscaling.Group{
+				Instances: []*autoscaling.Instance{buildLTInstance(&instanceID, &configV2)},
 				MixedInstancesPolicy: &autoscaling.MixedInstancesPolicy{
 					LaunchTemplate: &autoscaling.LaunchTemplate{
 						LaunchTemplateSpecification: &autoscaling.LaunchTemplateSpecification{
@@ -269,54 +337,44 @@ func TestInstance_OutOfDate(t *testing.T) {
 					},
 				},
 			},
-			&autoscaling.Instance{
-				LaunchTemplate: &autoscaling.LaunchTemplateSpecification{
-					Version: aws.String("2"),
-				},
-			},
+			buildLTInstance(&instanceID, &configV2),
 			true,
 		},
 		{
 			"test group template mixed nil instance template ok",
 			&autoscaling.Group{
+				Instances: []*autoscaling.Instance{buildLTInstance(&instanceID, &configV2)},
 				MixedInstancesPolicy: &autoscaling.MixedInstancesPolicy{
 					LaunchTemplate: &autoscaling.LaunchTemplate{
 						LaunchTemplateSpecification: &autoscaling.LaunchTemplateSpecification{},
 					},
 				},
 			},
-			&autoscaling.Instance{
-				LaunchTemplate: &autoscaling.LaunchTemplateSpecification{
-					Version: aws.String("2"),
-				},
-			},
+			buildLTInstance(&instanceID, &configV2),
 			true,
 		},
 		{
 			"test group template mixed early nil instance template ok",
 			&autoscaling.Group{
+				Instances:            []*autoscaling.Instance{buildLTInstance(&instanceID, &configV2)},
 				MixedInstancesPolicy: &autoscaling.MixedInstancesPolicy{},
 			},
-			&autoscaling.Instance{
-				LaunchTemplate: &autoscaling.LaunchTemplateSpecification{
-					Version: aws.String("2"),
-				},
-			},
+			buildLTInstance(&instanceID, &configV2),
 			true,
 		},
 		{
 			"test group template mixed early nil instance template nil",
 			&autoscaling.Group{
+				Instances:            []*autoscaling.Instance{buildLTInstance(&instanceID, nil)},
 				MixedInstancesPolicy: &autoscaling.MixedInstancesPolicy{},
 			},
-			&autoscaling.Instance{
-				LaunchTemplate: &autoscaling.LaunchTemplateSpecification{},
-			},
+			buildLTInstance(&instanceID, nil),
 			false,
 		},
 		{
 			"test group template mixed early ok instance config ok. should not match",
 			&autoscaling.Group{
+				Instances: []*autoscaling.Instance{buildInstance(&instanceID, &okConfig)},
 				MixedInstancesPolicy: &autoscaling.MixedInstancesPolicy{
 					LaunchTemplate: &autoscaling.LaunchTemplate{
 						LaunchTemplateSpecification: &autoscaling.LaunchTemplateSpecification{
@@ -325,20 +383,36 @@ func TestInstance_OutOfDate(t *testing.T) {
 					},
 				},
 			},
-			&autoscaling.Instance{
-				LaunchConfigurationName: aws.String("launch-config-uuid"),
-			},
+			buildInstance(&instanceID, &okConfig),
 			true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			asg := &autoscalingGroup{
-				group: tt.group,
+			asg := &autoscalingGroups{
+				groups: []*autoscaling.Group{tt.group},
 			}
 			outOfDate := asg.instanceOutOfDate(tt.instance)
 			assert.Equal(t, tt.expect, outOfDate)
 		})
+	}
+}
+
+// buildInstance creates a new *autoscaling.Instance with Launch Configuration
+func buildInstance(instanceID, launchConfigName *string) *autoscaling.Instance {
+	return &autoscaling.Instance{
+		InstanceId:              instanceID,
+		LaunchConfigurationName: launchConfigName,
+	}
+}
+
+// buildLTInstance creates a new *autoscaling.Instance with Luanch Template
+func buildLTInstance(instanceID, configVersion *string) *autoscaling.Instance {
+	return &autoscaling.Instance{
+		InstanceId: instanceID,
+		LaunchTemplate: &autoscaling.LaunchTemplateSpecification{
+			Version: configVersion,
+		},
 	}
 }

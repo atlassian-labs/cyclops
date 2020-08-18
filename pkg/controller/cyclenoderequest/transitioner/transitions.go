@@ -82,18 +82,20 @@ func (t *CycleNodeRequestTransitioner) transitionPending() (reconcile.Result, er
 	}
 
 	// Describe the node group for the request
-	t.rm.LogEvent(t.cycleNodeRequest, "FetchingNodeGroup", "Fetching node group: %v", t.cycleNodeRequest.Spec.NodeGroupName)
-	nodeGroup, err := t.rm.CloudProvider.GetNodeGroup(t.cycleNodeRequest.Spec.NodeGroupName)
+	t.rm.LogEvent(t.cycleNodeRequest, "FetchingNodeGroup", "Fetching node group: %v", t.cycleNodeRequest.GetNodeGroupNames())
+	nodeGroups, err := t.rm.CloudProvider.GetNodeGroups(t.cycleNodeRequest.GetNodeGroupNames())
 	if err != nil {
 		return t.transitionToHealing(err)
 	}
 
+	// get instances inside cloud provider node groups
+	nodeGroupInstances := nodeGroups.Instances()
 	// Do some sanity checking before we start filtering things
 	// Check the instance count of the node group matches the number of nodes found in Kubernetes
-	if len(kubeNodes) != len(nodeGroup.Instances()) {
+	if len(kubeNodes) != len(nodeGroupInstances) {
 		t.rm.LogEvent(t.cycleNodeRequest, "NodeCountMismatch",
 			"Instances in node group: %v, nodes in kube: %v",
-			len(nodeGroup.Instances()), len(kubeNodes))
+			len(nodeGroupInstances), len(kubeNodes))
 
 		// If it doesn't, then retry for a while in case something just scaled the node group
 		timedOut, err := t.equilibriumWaitTimedOut()
@@ -124,8 +126,9 @@ func (t *CycleNodeRequestTransitioner) transitionPending() (reconcile.Result, er
 			t.cycleNodeRequest.Status.NodesToTerminate = append(
 				t.cycleNodeRequest.Status.NodesToTerminate,
 				v1.CycleNodeRequestNode{
-					Name:       kubeNode.Name,
-					ProviderID: kubeNode.Spec.ProviderID,
+					Name:          kubeNode.Name,
+					ProviderID:    kubeNode.Spec.ProviderID,
+					NodeGroupName: nodeGroupInstances[kubeNode.Spec.ProviderID].NodeGroupName(),
 				})
 		}
 	}
@@ -166,12 +169,12 @@ func (t *CycleNodeRequestTransitioner) transitionInitialised() (reconcile.Result
 		return reconcileResult, err
 	}
 
-	nodeGroup, err := t.rm.CloudProvider.GetNodeGroup(t.cycleNodeRequest.Spec.NodeGroupName)
+	nodeGroups, err := t.rm.CloudProvider.GetNodeGroups(t.cycleNodeRequest.GetNodeGroupNames())
 	if err != nil {
 		return t.transitionToHealing(err)
 	}
 
-	readyInstances := nodeGroup.ReadyInstances()
+	readyInstances := nodeGroups.ReadyInstances()
 	validProviderIDs := map[string]bool{}
 
 	for _, node := range nodes {
@@ -198,8 +201,9 @@ func (t *CycleNodeRequestTransitioner) transitionInitialised() (reconcile.Result
 			t.cycleNodeRequest.Status.CurrentNodes = append(
 				t.cycleNodeRequest.Status.CurrentNodes,
 				v1.CycleNodeRequestNode{
-					Name:       node.Name,
-					ProviderID: node.Spec.ProviderID,
+					Name:          node.Name,
+					ProviderID:    node.Spec.ProviderID,
+					NodeGroupName: readyInstances[node.Spec.ProviderID].NodeGroupName(),
 				},
 			)
 		}
@@ -211,7 +215,7 @@ func (t *CycleNodeRequestTransitioner) transitionInitialised() (reconcile.Result
 	var validNodes []v1.CycleNodeRequestNode
 
 	for _, node := range t.cycleNodeRequest.Status.CurrentNodes {
-		alreadyDetaching, err := nodeGroup.DetachInstance(node.ProviderID)
+		alreadyDetaching, err := nodeGroups.DetachInstance(node.ProviderID)
 
 		if alreadyDetaching {
 			t.rm.LogEvent(t.cycleNodeRequest, "RaceCondition", "Node %v was already detaching from the ASG.", node.Name)
@@ -247,7 +251,7 @@ func (t *CycleNodeRequestTransitioner) transitionScalingUp() (reconcile.Result, 
 		return reconcile.Result{Requeue: true, RequeueAfter: requeueDuration}, nil
 	}
 
-	nodeGroup, err := t.rm.CloudProvider.GetNodeGroup(t.cycleNodeRequest.Spec.NodeGroupName)
+	nodeGroups, err := t.rm.CloudProvider.GetNodeGroups(t.cycleNodeRequest.GetNodeGroupNames())
 	if err != nil {
 		return t.transitionToHealing(err)
 	}
@@ -255,7 +259,7 @@ func (t *CycleNodeRequestTransitioner) transitionScalingUp() (reconcile.Result, 
 	if scaleUpStarted.Add(scaleUpLimit).Before(time.Now()) {
 		return t.transitionToHealing(
 			fmt.Errorf("all nodes failed to come up in time - instances not ready in cloud provider: %+v",
-				nodeGroup.NotReadyInstances()))
+				nodeGroups.NotReadyInstances()))
 	}
 
 	// Ensure all kubernetes nodes are ready
@@ -290,15 +294,15 @@ func (t *CycleNodeRequestTransitioner) transitionScalingUp() (reconcile.Result, 
 		}
 	}
 
-	requiredNumNodes := len(nodeGroup.Instances()) + len(t.cycleNodeRequest.Status.CurrentNodes)
-	allInstancesReady := len(nodeGroup.ReadyInstances()) >= len(nodeGroup.Instances())
+	requiredNumNodes := len(nodeGroups.Instances()) + len(t.cycleNodeRequest.Status.CurrentNodes)
+	allInstancesReady := len(nodeGroups.ReadyInstances()) >= len(nodeGroups.Instances())
 	allKubernetesNodesReady := numKubeNodesReady >= requiredNumNodes
 
 	// If something scales down/up right at this moment then the overall maths still works, because the
 	// instances we're working on are detached from the node group.
 	t.rm.Logger.Info("Waiting for new nodes to be ready",
-		"numReadyInstances", len(nodeGroup.ReadyInstances()),
-		"numInstances", len(nodeGroup.Instances()),
+		"numReadyInstances", len(nodeGroups.ReadyInstances()),
+		"numInstances", len(nodeGroups.Instances()),
 		"requiredNumNodes", requiredNumNodes,
 		"numKubeNodesReady", numKubeNodesReady,
 		"scalingUpBy", len(t.cycleNodeRequest.Status.CurrentNodes))
@@ -379,7 +383,7 @@ func (t *CycleNodeRequestTransitioner) transitionWaitingTermination() (reconcile
 
 // transitionFailed handles failed CycleNodeRequests
 func (t *CycleNodeRequestTransitioner) transitionHealing() (reconcile.Result, error) {
-	nodeGroup, err := t.rm.CloudProvider.GetNodeGroup(t.cycleNodeRequest.Spec.NodeGroupName)
+	nodeGroups, err := t.rm.CloudProvider.GetNodeGroups(t.cycleNodeRequest.GetNodeGroupNames())
 	if err != nil {
 		return t.transitionToFailed(err)
 	}
@@ -387,7 +391,7 @@ func (t *CycleNodeRequestTransitioner) transitionHealing() (reconcile.Result, er
 	// try and re-attach the nodes, if any were un-attached
 	for _, node := range t.cycleNodeRequest.Status.NodesToTerminate {
 		t.rm.LogEvent(t.cycleNodeRequest, "AttachingNodes", "Attaching instances to nodes group: %v", node.Name)
-		alreadyAttached, err := nodeGroup.AttachInstance(node.ProviderID)
+		alreadyAttached, err := nodeGroups.AttachInstance(node.ProviderID, node.NodeGroupName)
 		if alreadyAttached {
 			continue
 		}

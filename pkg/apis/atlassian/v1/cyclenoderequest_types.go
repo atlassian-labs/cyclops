@@ -11,7 +11,7 @@ type CycleNodeRequestSpec struct {
 	// up replacement nodes.
 	NodeGroupName string `json:"nodeGroupName"`
 
-	// NodeGroupsList is a list of node groups in the cloud provider which include target nodes
+	// NodeGroupsList is a list of node groups in the cloud provider which includes target nodes
 	// selected by node selector
 	NodeGroupsList []string `json:"nodeGroupsList,omitempty"`
 
@@ -67,6 +67,10 @@ type CycleNodeRequestNode struct {
 
 	// Cloud Provider ID of the node
 	ProviderID string `json:"providerId"`
+
+	// NodeGroupName stores current cloud provider node group name
+	// which this node belongs to
+	NodeGroupName string `json:"nodeGroupName"`
 }
 
 // CycleNodeRequestPhase is the phase that the cycleNodeRequest is in

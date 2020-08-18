@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"time"
 
+	v1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	v1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
 )
 
 // transitionToHealing transitions the current cycleNodeRequest to healing which will always transiting to failed

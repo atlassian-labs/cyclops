@@ -227,7 +227,7 @@ func (c *controller) dropInProgressNodeGroups(nodeGroups v1.NodeGroupList, cnrs 
 	for i, nodeGroup := range nodeGroups.Items {
 		var found bool
 		for _, cnr := range cnrs.Items {
-			if cnr.Spec.NodeGroupName == nodeGroup.Spec.NodeGroupName {
+			if sameNodeGroups(cnr.GetNodeGroupNames(), nodeGroup.GetNodeGroupNames()) {
 				found = true
 				break
 			}
@@ -344,4 +344,21 @@ func (c *controller) RunForever() {
 			return
 		}
 	}
+}
+
+func sameNodeGroups(groupA, groupB []string) bool {
+	if len(groupA) != len(groupB) {
+		return false
+	}
+
+	groupMap := make(map[string]struct{})
+	for _, group := range groupA {
+		groupMap[group] = struct{}{}
+	}
+	for _, group := range groupB {
+		if _, ok := groupMap[group]; !ok {
+			return false
+		}
+	}
+	return true
 }

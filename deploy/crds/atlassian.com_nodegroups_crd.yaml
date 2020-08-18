@@ -24,7 +24,7 @@ spec:
     shortNames:
     - ng
     singular: nodegroup
-  scope: Namespaced
+  scope: Cluster
   subresources: {}
   validation:
     openAPIV3Schema:
@@ -93,6 +93,12 @@ spec:
               description: NodeGroupName is the name of the node group in the cloud
                 provider that corresponds to this NodeGroup resource.
               type: string
+            nodeGroupsList:
+              description: NodeGroupsList is a list of cloud provider node groups
+                that corresponds to this NodeGroup resource.
+              items:
+                type: string
+              type: array
             nodeSelector:
               description: NodeSelector is the label selector used to select nodes
                 that belong to this NodeGroup.

@@ -10,6 +10,9 @@ type NodeGroupSpec struct {
 	// NodeGroupName is the name of the node group in the cloud provider that corresponds to this NodeGroup resource.
 	NodeGroupName string `json:"nodeGroupName"`
 
+	// NodeGroupsList is a list of cloud provider node groups that corresponds to this NodeGroup resource.
+	NodeGroupsList []string `json:"nodeGroupsList,omitempty"`
+
 	// NodeSelector is the label selector used to select nodes that belong to this NodeGroup.
 	NodeSelector metav1.LabelSelector `json:"nodeSelector"`
 
@@ -27,7 +30,7 @@ type NodeGroupStatus struct {
 // NodeGroup is the Schema for the nodegroups API
 // +k8s:openapi-gen=true
 // +genclient:nonNamespaced
-// +kubebuilder:resource:path=nodegroups,shortName=ng
+// +kubebuilder:resource:path=nodegroups,shortName=ng,scope=Cluster
 // +kubebuilder:printcolumn:name="Node Group Name",type="string",JSONPath=".spec.nodeGroupName",description="The name of the node group in the cloud provider"
 // +kubebuilder:printcolumn:name="Method",type="string",JSONPath=".spec.cycleSettings.method",description="The method to use when cycling nodes"
 // +kubebuilder:printcolumn:name="Concurrency",type="integer",JSONPath=".spec.cycleSettings.concurrency",description="The number of nodes to cycle in parallel"

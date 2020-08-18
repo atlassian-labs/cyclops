@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"strings"
 
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog"
 	atlassianv1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
 	"github.com/atlassian-labs/cyclops/pkg/cloudprovider"
 	"github.com/atlassian-labs/cyclops/pkg/k8s"
 	"github.com/atlassian-labs/cyclops/pkg/observer"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog"
 )
 
 // cloudObserver is an observer that detects changes in cloud provider instances from their ASG configuration
@@ -32,9 +32,9 @@ func (c *cloudObserver) Changed(nodeGroups *atlassianv1.NodeGroupList) []*observ
 		klog.V(4).Infoln("cloud observer: checking nodegroup", nodeGroup.Name)
 
 		// fetch the cloud provider node group and the nodes for that node group
-		cloudNodeGroup, err := c.cloudProvider.GetNodeGroup(nodeGroup.Spec.NodeGroupName)
+		cloudNodeGroups, err := c.cloudProvider.GetNodeGroups(nodeGroup.GetNodeGroupNames())
 		if err != nil {
-			klog.Errorln("could not find cloud provider nodegroup named", nodeGroup.Spec.NodeGroupName)
+			klog.Errorln("could not find cloud provider nodegroups named", nodeGroup.GetNodeGroupNames())
 			continue
 		}
 
@@ -52,7 +52,7 @@ func (c *cloudObserver) Changed(nodeGroups *atlassianv1.NodeGroupList) []*observ
 		// check if out of date and match to k8s node
 		var outOfDateNodes []*corev1.Node
 		var outOfDateInstanceReasons []string
-		for _, instance := range cloudNodeGroup.ReadyInstances() {
+		for _, instance := range cloudNodeGroups.ReadyInstances() {
 			for _, node := range nodes {
 				if instance.MatchesProviderID(node.Spec.ProviderID) {
 					if instance.OutOfDate() {

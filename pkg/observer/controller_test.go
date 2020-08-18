@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"testing"
 
+	atlassianv1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
+	"github.com/atlassian-labs/cyclops/pkg/test"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	atlassianv1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
-	"github.com/atlassian-labs/cyclops/pkg/test"
 )
 
 func Test_unionNodes(t *testing.T) {
@@ -274,6 +274,47 @@ func Test_dropInProgressNodeGroups(t *testing.T) {
 
 			got := c.dropInProgressNodeGroups(tt.ng, tt.cnrs)
 			assert.ElementsMatch(t, tt.expect.Items, got.Items)
+		})
+	}
+}
+
+func Test_sameNodeGroups(t *testing.T) {
+	tests := []struct {
+		name   string
+		groupA []string
+		groupB []string
+		expect bool
+	}{
+		{
+			"pass case with same order",
+			[]string{"ingress-us-west-2a", "ingress-us-west-2b", "ingress-us-west-2c"},
+			[]string{"ingress-us-west-2a", "ingress-us-west-2b", "ingress-us-west-2c"},
+			true,
+		},
+		{
+			"pass case with different order",
+			[]string{"ingress-us-west-2a", "ingress-us-west-2b", "ingress-us-west-2c"},
+			[]string{"ingress-us-west-2b", "ingress-us-west-2c", "ingress-us-west-2a"},
+			true,
+		},
+		{
+			"failure case with different length",
+			[]string{"ingress-us-west-2a", "ingress-us-west-2b", "ingress-us-west-2c"},
+			[]string{"ingress-us-west-2b", "ingress-us-west-2c"},
+			false,
+		},
+		{
+			"failure case with different items",
+			[]string{"ingress-us-west-2a", "ingress-us-west-2b", "ingress-us-west-2c"},
+			[]string{"ingress-us-west-2b", "ingress-us-west-2c", "system"},
+			false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := sameNodeGroups(tt.groupA, tt.groupB)
+			assert.Equal(t, tt.expect, got)
 		})
 	}
 }
