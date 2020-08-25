@@ -3,6 +3,7 @@ package transitioner
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	v1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
@@ -93,9 +94,22 @@ func (t *CycleNodeRequestTransitioner) transitionPending() (reconcile.Result, er
 	// Do some sanity checking before we start filtering things
 	// Check the instance count of the node group matches the number of nodes found in Kubernetes
 	if len(kubeNodes) != len(nodeGroupInstances) {
+		nodesNotInCPNodeGroup, nodesNotInKube := findOffendingNodes(kubeNodes, nodeGroupInstances)
+		var offendingNodesInfo string
+		if len(nodesNotInCPNodeGroup) > 0 {
+			offendingNodesInfo += "nodes not in node group: "
+			offendingNodesInfo += strings.Join(nodesNotInCPNodeGroup, ",")
+		}
+		if len(nodesNotInKube) > 0 {
+			if offendingNodesInfo != "" {
+				offendingNodesInfo += ";"
+			}
+			offendingNodesInfo += "nodes not inside cluster: "
+			offendingNodesInfo += strings.Join(nodesNotInKube, ",")
+		}
 		t.rm.LogEvent(t.cycleNodeRequest, "NodeCountMismatch",
-			"Instances in node group: %v, nodes in kube: %v",
-			len(nodeGroupInstances), len(kubeNodes))
+			"node group: %v, kube: %v. %v",
+			len(nodeGroupInstances), len(kubeNodes), offendingNodesInfo)
 
 		// If it doesn't, then retry for a while in case something just scaled the node group
 		timedOut, err := t.equilibriumWaitTimedOut()

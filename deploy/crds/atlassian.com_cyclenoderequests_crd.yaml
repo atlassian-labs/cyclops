@@ -103,7 +103,7 @@ spec:
               type: string
             nodeGroupsList:
               description: NodeGroupsList is a list of node groups in the cloud provider
-                which include target nodes selected by node selector
+                which includes target nodes selected by node selector
               items:
                 type: string
               type: array
@@ -186,8 +186,8 @@ spec:
                     description: Name of the node
                     type: string
                   nodeGroupName:
-                    description: NodeGroupName stores current cloud node group name
-                      which this node belongs to
+                    description: NodeGroupName stores current cloud provider node
+                      group name which this node belongs to
                     type: string
                   providerId:
                     description: Cloud Provider ID of the node
@@ -222,8 +222,8 @@ spec:
                     description: Name of the node
                     type: string
                   nodeGroupName:
-                    description: NodeGroupName stores current cloud node group name
-                      which this node belongs to
+                    description: NodeGroupName stores current cloud provider node
+                      group name which this node belongs to
                     type: string
                   providerId:
                     description: Cloud Provider ID of the node
