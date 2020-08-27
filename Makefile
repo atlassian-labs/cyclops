@@ -64,5 +64,5 @@ generate-crds:
 	mkdir -p build deploy/crds
 	touch build/Dockerfile
 	operator-sdk generate k8s
-	operator-sdk generate crds
+	operator-sdk generate crds --crd-version v1
 	rm -rf build/
