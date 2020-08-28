@@ -8,9 +8,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	atlassianv1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	atlassianv1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
 )
 
 func TestGiveReason(t *testing.T) {
@@ -45,6 +45,14 @@ func TestApplyCNR(t *testing.T) {
 		Method:      "Drain",
 		Concurrency: 1,
 	}
+	var ingressGroup atlassianv1.NodeGroup
+	ingressGroup.Name = "ingress"
+	ingressGroup.Spec.NodeGroupsList = []string{"ingress-us-west-2a", "ingress-us-west-2b", "ingress-us-west-2c"}
+	ingressGroup.Spec.NodeSelector = *selector
+	ingressGroup.Spec.CycleSettings = atlassianv1.CycleSettings{
+		Method:      "Drain",
+		Concurrency: 1,
+	}
 
 	tests := []struct {
 		testName  string
@@ -67,6 +75,13 @@ func TestApplyCNR(t *testing.T) {
 			"",
 			"kube-system",
 		},
+		{
+			"without name using node group list test",
+			nodeGroup,
+			[]string{"test node1", "test node2"},
+			"",
+			"kube-system",
+		},
 	}
 
 	for _, tt := range tests {
@@ -83,7 +98,7 @@ func TestApplyCNR(t *testing.T) {
 			assert.Equal(t, tt.namespace, cnr.Namespace)
 			assert.Equal(t, tt.nodes, cnr.Spec.NodeNames)
 			assert.Equal(t, tt.nodeGroup.Spec.NodeSelector, cnr.Spec.Selector)
-			assert.Equal(t, tt.nodeGroup.Spec.NodeGroupName, cnr.Spec.NodeGroupName)
+			assert.ElementsMatch(t, tt.nodeGroup.GetNodeGroupNames(), cnr.GetNodeGroupNames())
 			assert.Equal(t, tt.nodeGroup.Spec.CycleSettings, cnr.Spec.CycleSettings)
 		})
 	}

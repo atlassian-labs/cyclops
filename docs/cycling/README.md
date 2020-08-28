@@ -82,6 +82,19 @@ spec:
   # NodeGroupName is the name of the node group in the cloud provider.
   nodeGroupName: "<fully_qualified_node_group_name>"
 
+  # Optional field - nodeGroupsList is a list of cloud provider node groups which have those instances
+  # select by the label selector described below
+  # use case for this would be a group of nodes with same label selector are managed by multiple cloud
+  # provider node groups, like split by availability zone for autoscaling purpose and you also want to 
+  # control the concurrency of the cycling between these node groups as those nodes are basically same 
+  # type of nodes inside the cluster. To make it work, you need to specify all those cloud provider node
+  # groups in this list. It can work with `nodeGroupName` and automatically de-duplicate node groups 
+  # specified inside `nodeGroupName` and `nodeGroupsList`.
+  nodeGroupsList:
+    - nodeGroupA
+    - nodeGroupB
+    - nodeGroupC
+
   # Selector is a Kubernetes style selector. Used to select the nodes in the node group.
   selector:
     matchLabels:

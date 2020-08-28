@@ -5,13 +5,15 @@ import (
 	"fmt"
 	"time"
 
+	v1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
+	"github.com/atlassian-labs/cyclops/pkg/cloudprovider"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	v1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
 )
 
 // transitionToHealing transitions the current cycleNodeRequest to healing which will always transiting to failed
@@ -241,4 +243,27 @@ func (t *CycleNodeRequestTransitioner) checkIfTransitioning(numNodesToCycle, num
 	}
 
 	return false, reconcile.Result{}, nil
+}
+
+// findOffendingNodes finds the offending nodes information which cause number of nodes mismatch between
+// cloud provider node group and nodes inside kubernetes cluster using label selector
+func findOffendingNodes(kubeNodes []corev1.Node, cloudProviderNodes map[string]cloudprovider.Instance) ([]string, []string) {
+	kubeNodesMap := make(map[string]corev1.Node)
+	var nodesNotInCPNodeGroup []string
+	var nodesNotInKube []string
+	for _, kubeNode := range kubeNodes {
+		kubeNodesMap[kubeNode.Spec.ProviderID] = kubeNode
+		if _, ok := cloudProviderNodes[kubeNode.Spec.ProviderID]; !ok {
+			nodesNotInCPNodeGroup = append(nodesNotInCPNodeGroup, fmt.Sprintf("id %q", kubeNode.Spec.ProviderID))
+		}
+	}
+	for cpNode := range cloudProviderNodes {
+		if _, ok := kubeNodesMap[cpNode]; !ok {
+			nodesNotInKube = append(nodesNotInKube, fmt.Sprintf("id %q in %q",
+				cpNode,
+				cloudProviderNodes[cpNode].NodeGroupName()))
+		}
+	}
+
+	return nodesNotInCPNodeGroup, nodesNotInKube
 }

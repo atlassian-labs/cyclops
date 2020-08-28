@@ -145,7 +145,7 @@ func (c *cycle) listNodeGroupsWithOptions() (*atlassianv1.NodeGroupList, error) 
 	if len(c.plug.Args) > 0 {
 		nodeGroupList, err := generation.GetNodeGroups(c.plug.Client, c.plug.Args...)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to get node groups.")
+			return nil, errors.Wrap(err, "failed to get node groups")
 		}
 		return nodeGroupList, nil
 	}
@@ -153,7 +153,7 @@ func (c *cycle) listNodeGroupsWithOptions() (*atlassianv1.NodeGroupList, error) 
 	// list: by selector - empty selector will get all
 	labelSelector, err := labels.Parse(c.labelSelector())
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse list options for node groups.")
+		return nil, errors.Wrap(err, "failed to parse list options for node groups")
 	}
 
 	listOptions := &client.ListOptions{
@@ -162,7 +162,7 @@ func (c *cycle) listNodeGroupsWithOptions() (*atlassianv1.NodeGroupList, error) 
 
 	nodeGroupList, err := generation.ListNodeGroups(c.plug.Client, listOptions)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to list node groups.")
+		return nil, errors.Wrap(err, "failed to list node groups")
 	}
 
 	return nodeGroupList, nil

@@ -4,13 +4,13 @@ import (
 	"strings"
 	"testing"
 
-	v1 "k8s.io/api/core/v1"
 	"github.com/atlassian-labs/cyclops/pkg/test"
+	v1 "k8s.io/api/core/v1"
 
 	"github.com/stretchr/testify/assert"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	atlassianv1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestValidateNodeGroup(t *testing.T) {

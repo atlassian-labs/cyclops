@@ -3,6 +3,7 @@ package transitioner
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	v1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
@@ -53,7 +54,7 @@ func (t *CycleNodeRequestTransitioner) transitionPending() (reconcile.Result, er
 		return t.transitionToHealing(fmt.Errorf("no nodes matched selector"))
 	}
 
-	// Only retain nodes which still exist aws
+	// Only retain nodes which still exist inside cloud provider
 	var nodeProviderIDs []string
 
 	for _, node := range kubeNodes {
@@ -78,24 +79,39 @@ func (t *CycleNodeRequestTransitioner) transitionPending() (reconcile.Result, er
 	kubeNodes = existingKubeNodes
 
 	if len(kubeNodes) == 0 {
-		return t.transitionToHealing(fmt.Errorf("no existing nodes in aws matched selector"))
+		return t.transitionToHealing(fmt.Errorf("no existing nodes in cloud provider matched selector"))
 	}
 
 	// Describe the node group for the request
-	t.rm.LogEvent(t.cycleNodeRequest, "FetchingNodeGroup", "Fetching node group: %v", t.cycleNodeRequest.Spec.NodeGroupName)
-	nodeGroup, err := t.rm.CloudProvider.GetNodeGroup(t.cycleNodeRequest.Spec.NodeGroupName)
+	t.rm.LogEvent(t.cycleNodeRequest, "FetchingNodeGroup", "Fetching node group: %v", t.cycleNodeRequest.GetNodeGroupNames())
+	nodeGroups, err := t.rm.CloudProvider.GetNodeGroups(t.cycleNodeRequest.GetNodeGroupNames())
 	if err != nil {
 		return t.transitionToHealing(err)
 	}
 
+	// get instances inside cloud provider node groups
+	nodeGroupInstances := nodeGroups.Instances()
 	// Do some sanity checking before we start filtering things
 	// Check the instance count of the node group matches the number of nodes found in Kubernetes
-	if len(kubeNodes) != len(nodeGroup.Instances()) {
+	if len(kubeNodes) != len(nodeGroupInstances) {
+		nodesNotInCPNodeGroup, nodesNotInKube := findOffendingNodes(kubeNodes, nodeGroupInstances)
+		var offendingNodesInfo string
+		if len(nodesNotInCPNodeGroup) > 0 {
+			offendingNodesInfo += "nodes not in node group: "
+			offendingNodesInfo += strings.Join(nodesNotInCPNodeGroup, ",")
+		}
+		if len(nodesNotInKube) > 0 {
+			if offendingNodesInfo != "" {
+				offendingNodesInfo += ";"
+			}
+			offendingNodesInfo += "nodes not inside cluster: "
+			offendingNodesInfo += strings.Join(nodesNotInKube, ",")
+		}
 		t.rm.LogEvent(t.cycleNodeRequest, "NodeCountMismatch",
-			"Instances in node group: %v, nodes in kube: %v",
-			len(nodeGroup.Instances()), len(kubeNodes))
+			"node group: %v, kube: %v. %v",
+			len(nodeGroupInstances), len(kubeNodes), offendingNodesInfo)
 
-		// If it doesn't then retry for a while in case something just scaled the cluster
+		// If it doesn't, then retry for a while in case something just scaled the node group
 		timedOut, err := t.equilibriumWaitTimedOut()
 		if err != nil {
 			return t.transitionToHealing(err)
@@ -109,7 +125,7 @@ func (t *CycleNodeRequestTransitioner) transitionPending() (reconcile.Result, er
 		return reconcile.Result{Requeue: true, RequeueAfter: requeueDuration}, nil
 	}
 
-	// We're all good to go, make a list of the nodes to terminate
+	// make a list of the nodes to terminate
 	if len(t.cycleNodeRequest.Spec.NodeNames) > 0 {
 		// If specific node names are provided, check they actually exist in the node group
 		t.rm.LogEvent(t.cycleNodeRequest, "SelectingNodes", "Adding named nodes to NodesToTerminate")
@@ -118,14 +134,15 @@ func (t *CycleNodeRequestTransitioner) transitionPending() (reconcile.Result, er
 			return t.transitionToHealing(err)
 		}
 	} else {
-		// Otherwise just add all the nodes in the group
+		// Otherwise just add all the nodes in the node group
 		t.rm.LogEvent(t.cycleNodeRequest, "SelectingNodes", "Adding all node group nodes to NodesToTerminate")
 		for _, kubeNode := range kubeNodes {
 			t.cycleNodeRequest.Status.NodesToTerminate = append(
 				t.cycleNodeRequest.Status.NodesToTerminate,
 				v1.CycleNodeRequestNode{
-					Name:       kubeNode.Name,
-					ProviderID: kubeNode.Spec.ProviderID,
+					Name:          kubeNode.Name,
+					ProviderID:    kubeNode.Spec.ProviderID,
+					NodeGroupName: nodeGroupInstances[kubeNode.Spec.ProviderID].NodeGroupName(),
 				})
 		}
 	}
@@ -166,12 +183,12 @@ func (t *CycleNodeRequestTransitioner) transitionInitialised() (reconcile.Result
 		return reconcileResult, err
 	}
 
-	nodeGroup, err := t.rm.CloudProvider.GetNodeGroup(t.cycleNodeRequest.Spec.NodeGroupName)
+	nodeGroups, err := t.rm.CloudProvider.GetNodeGroups(t.cycleNodeRequest.GetNodeGroupNames())
 	if err != nil {
 		return t.transitionToHealing(err)
 	}
 
-	readyInstances := nodeGroup.ReadyInstances()
+	readyInstances := nodeGroups.ReadyInstances()
 	validProviderIDs := map[string]bool{}
 
 	for _, node := range nodes {
@@ -182,10 +199,10 @@ func (t *CycleNodeRequestTransitioner) transitionInitialised() (reconcile.Result
 		}
 	}
 
-	// This is done a second time to account for a race condition where an instance on aws is no longer running but is still registered in kube
-	// If the check were performed before the transition to WaitingTermination above, cyclops would perform many aws requests and eventually get rate limited by aws
+	// This is done a second time to account for a race condition where an instance on cloud provider is no longer running but is still registered in kube
+	// If the check were performed before the transition to WaitingTermination above, cyclops would perform many requests and eventually get rate limited by cloud provider
 	if transitioning, reconcileResult, err := t.checkIfTransitioning(len(validProviderIDs), numNodesInProgress); transitioning {
-		t.rm.Logger.Info("No more valid nodes in aws left to cycle")
+		t.rm.Logger.Info("No more valid nodes inside cloud provider left to cycle")
 		return reconcileResult, err
 	}
 
@@ -198,8 +215,9 @@ func (t *CycleNodeRequestTransitioner) transitionInitialised() (reconcile.Result
 			t.cycleNodeRequest.Status.CurrentNodes = append(
 				t.cycleNodeRequest.Status.CurrentNodes,
 				v1.CycleNodeRequestNode{
-					Name:       node.Name,
-					ProviderID: node.Spec.ProviderID,
+					Name:          node.Name,
+					ProviderID:    node.Spec.ProviderID,
+					NodeGroupName: readyInstances[node.Spec.ProviderID].NodeGroupName(),
 				},
 			)
 		}
@@ -211,7 +229,7 @@ func (t *CycleNodeRequestTransitioner) transitionInitialised() (reconcile.Result
 	var validNodes []v1.CycleNodeRequestNode
 
 	for _, node := range t.cycleNodeRequest.Status.CurrentNodes {
-		alreadyDetaching, err := nodeGroup.DetachInstance(node.ProviderID)
+		alreadyDetaching, err := nodeGroups.DetachInstance(node.ProviderID)
 
 		if alreadyDetaching {
 			t.rm.LogEvent(t.cycleNodeRequest, "RaceCondition", "Node %v was already detaching from the ASG.", node.Name)
@@ -247,7 +265,7 @@ func (t *CycleNodeRequestTransitioner) transitionScalingUp() (reconcile.Result, 
 		return reconcile.Result{Requeue: true, RequeueAfter: requeueDuration}, nil
 	}
 
-	nodeGroup, err := t.rm.CloudProvider.GetNodeGroup(t.cycleNodeRequest.Spec.NodeGroupName)
+	nodeGroups, err := t.rm.CloudProvider.GetNodeGroups(t.cycleNodeRequest.GetNodeGroupNames())
 	if err != nil {
 		return t.transitionToHealing(err)
 	}
@@ -255,7 +273,7 @@ func (t *CycleNodeRequestTransitioner) transitionScalingUp() (reconcile.Result, 
 	if scaleUpStarted.Add(scaleUpLimit).Before(time.Now()) {
 		return t.transitionToHealing(
 			fmt.Errorf("all nodes failed to come up in time - instances not ready in cloud provider: %+v",
-				nodeGroup.NotReadyInstances()))
+				nodeGroups.NotReadyInstances()))
 	}
 
 	// Ensure all kubernetes nodes are ready
@@ -290,15 +308,15 @@ func (t *CycleNodeRequestTransitioner) transitionScalingUp() (reconcile.Result, 
 		}
 	}
 
-	requiredNumNodes := len(nodeGroup.Instances()) + len(t.cycleNodeRequest.Status.CurrentNodes)
-	allInstancesReady := len(nodeGroup.ReadyInstances()) >= len(nodeGroup.Instances())
+	requiredNumNodes := len(nodeGroups.Instances()) + len(t.cycleNodeRequest.Status.CurrentNodes)
+	allInstancesReady := len(nodeGroups.ReadyInstances()) >= len(nodeGroups.Instances())
 	allKubernetesNodesReady := numKubeNodesReady >= requiredNumNodes
 
 	// If something scales down/up right at this moment then the overall maths still works, because the
 	// instances we're working on are detached from the node group.
 	t.rm.Logger.Info("Waiting for new nodes to be ready",
-		"numReadyInstances", len(nodeGroup.ReadyInstances()),
-		"numInstances", len(nodeGroup.Instances()),
+		"numReadyInstances", len(nodeGroups.ReadyInstances()),
+		"numInstances", len(nodeGroups.Instances()),
 		"requiredNumNodes", requiredNumNodes,
 		"numKubeNodesReady", numKubeNodesReady,
 		"scalingUpBy", len(t.cycleNodeRequest.Status.CurrentNodes))
@@ -379,7 +397,7 @@ func (t *CycleNodeRequestTransitioner) transitionWaitingTermination() (reconcile
 
 // transitionFailed handles failed CycleNodeRequests
 func (t *CycleNodeRequestTransitioner) transitionHealing() (reconcile.Result, error) {
-	nodeGroup, err := t.rm.CloudProvider.GetNodeGroup(t.cycleNodeRequest.Spec.NodeGroupName)
+	nodeGroups, err := t.rm.CloudProvider.GetNodeGroups(t.cycleNodeRequest.GetNodeGroupNames())
 	if err != nil {
 		return t.transitionToFailed(err)
 	}
@@ -387,7 +405,7 @@ func (t *CycleNodeRequestTransitioner) transitionHealing() (reconcile.Result, er
 	// try and re-attach the nodes, if any were un-attached
 	for _, node := range t.cycleNodeRequest.Status.NodesToTerminate {
 		t.rm.LogEvent(t.cycleNodeRequest, "AttachingNodes", "Attaching instances to nodes group: %v", node.Name)
-		alreadyAttached, err := nodeGroup.AttachInstance(node.ProviderID)
+		alreadyAttached, err := nodeGroups.AttachInstance(node.ProviderID, node.NodeGroupName)
 		if alreadyAttached {
 			continue
 		}

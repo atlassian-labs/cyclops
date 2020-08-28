@@ -1,0 +1,16 @@
+apiVersion: "atlassian.com/v1"
+kind: "CycleNodeRequest"
+metadata:
+  name: "example"
+  namespace: "kube-system"
+spec:
+  nodeGroupName: "az1-nodes.my-nodegroup.my-site"
+  nodeGroupsList:
+    ["az2-nodes.my-nodegroup.my-site", "az3-nodes.my-nodegroup.my-site"]
+  selector:
+    matchLabels:
+      role: node
+      customer: shared
+  cycleSettings:
+    concurrency: 1
+    method: Drain

@@ -116,11 +116,16 @@ spec:
                   name:
                     description: Name of the node
                     type: string
+                  nodeGroupName:
+                    description: NodeGroupName stores current cloud provider node
+                      group name which this node belongs to
+                    type: string
                   providerId:
                     description: Cloud Provider ID of the node
                     type: string
                 required:
                 - name
+                - nodeGroupName
                 - providerId
                 type: object
               message:

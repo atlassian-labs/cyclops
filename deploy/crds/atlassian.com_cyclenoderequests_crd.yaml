@@ -1,35 +1,43 @@
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: nodegroups.atlassian.com
+  name: cyclenoderequests.atlassian.com
 spec:
   group: atlassian.com
   names:
-    kind: NodeGroup
-    listKind: NodeGroupList
-    plural: nodegroups
+    kind: CycleNodeRequest
+    listKind: CycleNodeRequestList
+    plural: cyclenoderequests
     shortNames:
-    - ng
-    singular: nodegroup
+    - cnr
+    singular: cyclenoderequest
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - description: The name of the node group in the cloud provider
+    - description: The node group being cycled
       jsonPath: .spec.nodeGroupName
       name: Node Group Name
       type: string
-    - description: The method to use when cycling nodes
+    - description: The method being used for the cycle operation
       jsonPath: .spec.cycleSettings.method
       name: Method
       type: string
-    - description: The number of nodes to cycle in parallel
+    - description: Max nodes the request is cycling at once
       jsonPath: .spec.cycleSettings.concurrency
       name: Concurrency
       type: integer
+    - description: The status of the request
+      jsonPath: .status.phase
+      name: Status
+      type: string
+    - description: Age of the request
+      jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
     name: v1
     schema:
       openAPIV3Schema:
-        description: NodeGroup is the Schema for the nodegroups API
+        description: CycleNodeRequest is the Schema for the cyclenoderequests API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -44,7 +52,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: NodeGroupSpec defines the desired state of NodeGroup
+            description: CycleNodeRequestSpec defines the desired state of CycleNodeRequest
             properties:
               cycleSettings:
                 description: CycleSettings stores the settings to use for cycling
@@ -92,11 +100,25 @@ spec:
                 type: object
               nodeGroupName:
                 description: NodeGroupName is the name of the node group in the cloud
-                  provider that corresponds to this NodeGroup resource.
+                  provider that will be increased to bring up replacement nodes.
                 type: string
-              nodeSelector:
-                description: NodeSelector is the label selector used to select nodes
-                  that belong to this NodeGroup.
+              nodeGroupsList:
+                description: NodeGroupsList is a list of node groups in the cloud
+                  provider which includes target nodes selected by node selector
+                items:
+                  type: string
+                type: array
+              nodeNames:
+                description: NodeNames is an optional list of the names of nodes to
+                  rotate. This is used to only rotate specific nodes belonging to
+                  the NodeGroup, rather than every node in the group. If no node names
+                  are provided in NodeNames then the entire node group will be rotated.
+                items:
+                  type: string
+                type: array
+              selector:
+                description: Selector is the label selector used to select the nodes
+                  that are to be terminated
                 properties:
                   matchExpressions:
                     description: matchExpressions is a list of label selector requirements.
@@ -142,10 +164,90 @@ spec:
             required:
             - cycleSettings
             - nodeGroupName
-            - nodeSelector
+            - selector
             type: object
           status:
-            description: NodeGroupStatus defines the observed state of NodeGroup
+            description: CycleNodeRequestStatus defines the observed state of CycleNodeRequest
+            properties:
+              activeChildren:
+                description: ActiveChildren is the active number of CycleNodeStatuses
+                  that this CycleNodeRequest was aware of when it last checked for
+                  progress in the cycle operation.
+                format: int64
+                type: integer
+              currentNodes:
+                description: CurrentNodes stores the current nodes that are being
+                  "worked on". Used to batch operations against the node group in
+                  the cloud provider. Once a node is passed off to a CycleNodeStatus
+                  CRD, it is no longer listed here.
+                items:
+                  description: CycleNodeRequestNode stores a current node that is
+                    being worked on
+                  properties:
+                    name:
+                      description: Name of the node
+                      type: string
+                    nodeGroupName:
+                      description: NodeGroupName stores current cloud provider node
+                        group name which this node belongs to
+                      type: string
+                    providerId:
+                      description: Cloud Provider ID of the node
+                      type: string
+                  required:
+                  - name
+                  - nodeGroupName
+                  - providerId
+                  type: object
+                type: array
+              equilibriumWaitStarted:
+                description: EquilibriumWaitStarted stores the time when we started
+                  waiting for equilibrium of Kube nodes and node group instances.
+                  This is used to give some leeway if we start a request at the same
+                  time as a cluster scaling event. If we breach the time limit we
+                  fail the request.
+                format: date-time
+                type: string
+              message:
+                description: A human readable message indicating details about why
+                  the CycleNodeRequest is in this condition.
+                type: string
+              nodesToTerminate:
+                description: NodesToTerminate stores the old nodes that will be terminated.
+                  The cycling of nodes is considered successful when all of these
+                  nodes no longer exist in the cluster.
+                items:
+                  description: CycleNodeRequestNode stores a current node that is
+                    being worked on
+                  properties:
+                    name:
+                      description: Name of the node
+                      type: string
+                    nodeGroupName:
+                      description: NodeGroupName stores current cloud provider node
+                        group name which this node belongs to
+                      type: string
+                    providerId:
+                      description: Cloud Provider ID of the node
+                      type: string
+                  required:
+                  - name
+                  - nodeGroupName
+                  - providerId
+                  type: object
+                type: array
+              phase:
+                description: Phase stores the current phase of the CycleNodeRequest
+                type: string
+              scaleUpStarted:
+                description: ScaleUpStarted stores the time when the scale up started
+                  This is used to track the time limit of the scale up. If we breach
+                  the time limit we fail the request.
+                format: date-time
+                type: string
+            required:
+            - message
+            - phase
             type: object
         type: object
     served: true
