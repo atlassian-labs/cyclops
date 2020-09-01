@@ -1,4 +1,4 @@
-VERSION = 0.0.3
+VERSION = 0.0.4
 IMAGE = cyclops:$(VERSION)
 
 MANAGER_BIN = cyclops
@@ -59,10 +59,10 @@ install-operator-sdk:
 	$(MAKE) -C $(GOPATH)/src/github.com/operator-framework/operator-sdk tidy
 	$(MAKE) -C $(GOPATH)/src/github.com/operator-framework/operator-sdk install
 
-# See https://github.com/operator-framework/operator-sdk/blob/master/doc/user-guide.md
+# See https://sdk.operatorframework.io/docs/golang/quickstart/
 generate-crds:
 	mkdir -p build deploy/crds
 	touch build/Dockerfile
-	operator-sdk generate k8s
-	operator-sdk generate crds --crd-version v1
+	/usr/local/bin/operator-sdk generate k8s
+	/usr/local/bin/operator-sdk generate crds --crd-version v1
 	rm -rf build/

@@ -7,6 +7,7 @@ import (
 	"github.com/atlassian-labs/cyclops/pkg/cloudprovider"
 	cyclecontroller "github.com/atlassian-labs/cyclops/pkg/controller"
 	"github.com/atlassian-labs/cyclops/pkg/controller/cyclenodestatus/transitioner"
+	"github.com/atlassian-labs/cyclops/pkg/notifications"
 	coreV1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -31,6 +32,7 @@ var log = logf.Log.WithName(controllerName)
 type Reconciler struct {
 	mgr           manager.Manager
 	cloudProvider cloudprovider.CloudProvider
+	notifier      notifications.Notifier
 	rawClient     kubernetes.Interface
 }
 
@@ -39,6 +41,7 @@ type Reconciler struct {
 func NewReconciler(
 	mgr manager.Manager,
 	cloudProvider cloudprovider.CloudProvider,
+	notifier notifications.Notifier,
 	namespace string,
 ) (reconcile.Reconciler, error) {
 	rawClient := kubernetes.NewForConfigOrDie(mgr.GetConfig())
@@ -47,6 +50,7 @@ func NewReconciler(
 	reconciler := &Reconciler{
 		mgr:           mgr,
 		cloudProvider: cloudProvider,
+		notifier:      notifier,
 		rawClient:     rawClient,
 	}
 
@@ -109,6 +113,7 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 		r.rawClient,
 		r.mgr.GetEventRecorderFor(eventName),
 		logger,
+		r.notifier,
 		r.cloudProvider)
 	result, err := transitioner.NewCycleNodeStatusTransitioner(cycleNodeStatus, rm).Run()
 	return result, err

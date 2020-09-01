@@ -6,7 +6,7 @@
   - [Common issues, caveats and gotchas](#common-issues-caveats-and-gotchas)
 
 
-Current the only cloud provider Cyclops supports is AWS, so it will be enabled automatically
+Currently the only cloud provider Cyclops supports is AWS, so it will be enabled automatically.
 
 ## Permissions
 
@@ -32,8 +32,7 @@ Cyclops requires the following IAM policy to be able to properly integrate with 
 
 ## AWS Credentials
 
-Cyclops makes use of [aws-sdk-go](https://github.com/aws/aws-sdk-go) for communicating with the AWS API to perform
-scaling of auto scaling groups and terminating of instances.
+Cyclops makes use of [aws-sdk-go](https://github.com/aws/aws-sdk-go) for communicating with the AWS API to perform scaling of auto scaling groups and terminating of instances.
 
 To initiate the session, Cyclops uses the [session](https://docs.aws.amazon.com/sdk-for-go/api/aws/session/) package:
 
@@ -41,11 +40,9 @@ To initiate the session, Cyclops uses the [session](https://docs.aws.amazon.com/
 sess, err := session.NewSession()
 ```
 
-This will use the [default credential chain](https://docs.aws.amazon.com/sdk-for-go/api/aws/defaults/#CredChain)
-for obtaining access.
+This will use the [default credential chain](https://docs.aws.amazon.com/sdk-for-go/api/aws/defaults/#CredChain) for obtaining access.
 
-See [Configuring the AWS SDK for Go](https://docs.aws.amazon.com/sdk-for-go/v1/developer-guide/configuring-sdk.html)
-for more information on how the SDK obtains access.
+See [Configuring the AWS SDK for Go](https://docs.aws.amazon.com/sdk-for-go/v1/developer-guide/configuring-sdk.html) for more information on how the SDK obtains access.
 
 It is highly recommended to use IAM roles for Cyclops access, using the above IAM policy.
 

@@ -34,6 +34,12 @@ func (t *CycleNodeRequestTransitioner) transitionUndefined() (reconcile.Result, 
 		return t.transitionToHealing(fmt.Errorf("selector cannot be empty"))
 	}
 
+	if t.rm.Notifier != nil {
+		if err := t.rm.Notifier.CyclingStarted(t.cycleNodeRequest); err != nil {
+			t.rm.Logger.Error(err, "Unable to post message to messaging provider", "phase", t.cycleNodeRequest.Status.Phase)
+		}
+	}
+
 	// Transition the object to pending
 	return t.transitionObject(v1.CycleNodeRequestPending)
 }
@@ -223,6 +229,17 @@ func (t *CycleNodeRequestTransitioner) transitionInitialised() (reconcile.Result
 		}
 	}
 
+	// Post a notification showing the new nodes selected for cycling
+	if t.rm.Notifier != nil {
+		if err := t.rm.Notifier.NodesSelected(t.cycleNodeRequest); err != nil {
+			t.rm.Logger.Error(err, "Unable to post message to messaging provider", "phase", t.cycleNodeRequest.Status.Phase)
+		}
+
+		if err := t.rm.UpdateObject(t.cycleNodeRequest); err != nil {
+			return t.transitionToHealing(err)
+		}
+	}
+
 	// Detach the nodes from the nodes group - this will trigger a replacement, and start the scale up
 	// Detach each node independently so that valid nodes are not affected by invalid nodes
 	t.rm.LogEvent(t.cycleNodeRequest, "DetachingNodes", "Detaching instances from nodes group: %v", t.cycleNodeRequest.Status.CurrentNodes)
@@ -380,8 +397,7 @@ func (t *CycleNodeRequestTransitioner) transitionWaitingTermination() (reconcile
 
 	// While there are CycleNodeStatus objects not in Failed or Successful, stay in this phase and wait for them
 	// to finish.
-	var err error
-	t.cycleNodeRequest.Status.Phase, err = t.reapChildren()
+	desiredPhase, err := t.reapChildren()
 	// If any are in Failed phase then this CycleNodeRequest will be sent to the Failed phase, where it will
 	// continue to reap it's children.
 	if err != nil {
@@ -392,7 +408,7 @@ func (t *CycleNodeRequestTransitioner) transitionWaitingTermination() (reconcile
 		return t.transitionToHealing(err)
 	}
 
-	return reconcile.Result{Requeue: true, RequeueAfter: transitionDuration}, nil
+	return t.transitionObject(desiredPhase)
 }
 
 // transitionFailed handles failed CycleNodeRequests

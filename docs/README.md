@@ -55,8 +55,13 @@ Flags:
       --version                  Show application version.
   -d, --debug                    Run with debug logging
       --cloud-provider="aws"     Which cloud provider to use, options: [aws]
+      --messaging-provider="slack"  
+                                 Which message provider to use, options: [slack]
       --address=":8080"          Address to listen on for /metrics
       --namespace="kube-system"  Namespace to watch for cycle request objects
+      --delete-cnr               Whether or not to automatically delete CNRs
+      --delete-cnr-expiry=168h   Delete the CNR this long after it was created and is successful
+      --delete-cnr-requeue=24h   How often to check if a CNR can be deleted
 ```
 
 ### Package Layout and Usage
@@ -71,6 +76,10 @@ Flags:
     - provides everything related to cloud providers
     - `pkg/cloudprovider/aws`
       - provides the aws implementation of cloudprovider
+- `pkg/notifications`
+    - provides everything related to notifiers
+    - `pkg/notifications/slack`
+      - provides the slack implementation of notifier
 - `pkg/metrics`
     - provides a place for all metric setup to live
 - `pkg/apis`

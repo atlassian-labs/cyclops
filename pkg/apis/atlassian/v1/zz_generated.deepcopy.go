@@ -134,6 +134,18 @@ func (in *CycleNodeRequestStatus) DeepCopyInto(out *CycleNodeRequestStatus) {
 		in, out := &in.EquilibriumWaitStarted, &out.EquilibriumWaitStarted
 		*out = (*in).DeepCopy()
 	}
+	if in.SelectedNodes != nil {
+		in, out := &in.SelectedNodes, &out.SelectedNodes
+		*out = make(map[string]bool, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
+	if in.NodesAvailable != nil {
+		in, out := &in.NodesAvailable, &out.NodesAvailable
+		*out = make([]CycleNodeRequestNode, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

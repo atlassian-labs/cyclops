@@ -12,6 +12,7 @@ import (
 	cnrTransitioner "github.com/atlassian-labs/cyclops/pkg/controller/cyclenoderequest/transitioner"
 	"github.com/atlassian-labs/cyclops/pkg/controller/cyclenodestatus"
 	"github.com/atlassian-labs/cyclops/pkg/metrics"
+	"github.com/atlassian-labs/cyclops/pkg/notifications/notifierbuilder"
 	"github.com/operator-framework/operator-sdk/pkg/leader"
 	sdkVersion "github.com/operator-framework/operator-sdk/version"
 	"gopkg.in/alecthomas/kingpin.v2"
@@ -31,9 +32,11 @@ var (
 
 	debug = app.Flag("debug", "Run with debug logging").Short('d').Bool()
 
-	cloudProviderName = app.Flag("cloud-provider", "Which cloud provider to use, options: [aws]").Default("aws").String()
-	addr              = app.Flag("address", "Address to listen on for /metrics").Default(":8080").String()
-	namespace         = app.Flag("namespace", "Namespace to watch for cycle request objects").Default("kube-system").String()
+	cloudProviderName     = app.Flag("cloud-provider", "Which cloud provider to use, options: [aws]").Default("aws").String()
+	messagingProviderName = app.Flag("messaging-provider", "Which message provider to use, options: [slack]").Default("slack").String()
+
+	addr      = app.Flag("address", "Address to listen on for /metrics").Default(":8080").String()
+	namespace = app.Flag("namespace", "Namespace to watch for cycle request objects").Default("kube-system").String()
 
 	deleteCNR        = app.Flag("delete-cnr", "Whether or not to automatically delete CNRs").Default("false").Bool()
 	deleteCNRExpiry  = app.Flag("delete-cnr-expiry", "Delete the CNR this long after it was created and is successful").Default("168h").Duration()
@@ -92,6 +95,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Setup the notifier
+	notifier, err := notifierbuilder.BuildNotifier(*messagingProviderName)
+	if err != nil {
+		log.Error(err, "Unable to build notifier")
+		os.Exit(1)
+	}
+
 	// Configure the CNR transitioner options
 	cnrOptions := cnrTransitioner.Options{
 		DeleteCNR:        *deleteCNR,
@@ -100,12 +110,12 @@ func main() {
 	}
 
 	// Set up and register the controllers that will share resources between them
-	_, err = cyclenoderequest.NewReconciler(mgr, cloudProvider, *namespace, cnrOptions)
+	_, err = cyclenoderequest.NewReconciler(mgr, cloudProvider, notifier, *namespace, cnrOptions)
 	if err != nil {
 		log.Error(err, "Unable to add cycleNodeRequest controller")
 		os.Exit(1)
 	}
-	_, err = cyclenodestatus.NewReconciler(mgr, cloudProvider, *namespace)
+	_, err = cyclenodestatus.NewReconciler(mgr, cloudProvider, notifier, *namespace)
 	if err != nil {
 		log.Error(err, "Unable to add cycleNodeStatus controller")
 		os.Exit(1)

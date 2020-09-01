@@ -66,7 +66,7 @@ const (
 
 // CycleNodeStatus is the Schema for the cyclenodestatus API
 // +k8s:openapi-gen=true
-// +kubebuilder:resource:path=cyclenodestatuses,shortName=cns
+// +kubebuilder:resource:path=cyclenodestatuses,shortName=cns,scope=Namespaced
 // +kubebuilder:printcolumn:name="Node",type="string",JSONPath=".status.currentNode.name",description="The name of the node"
 // +kubebuilder:printcolumn:name="Provider ID",type="string",JSONPath=".status.currentNode.providerId",description="The provider ID of the node"
 // +kubebuilder:printcolumn:name="Method",type="string",JSONPath=".spec.cycleSettings.method",description="The method being used for the cycle operation"

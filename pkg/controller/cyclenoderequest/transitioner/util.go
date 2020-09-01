@@ -18,51 +18,44 @@ import (
 
 // transitionToHealing transitions the current cycleNodeRequest to healing which will always transiting to failed
 func (t *CycleNodeRequestTransitioner) transitionToHealing(err error) (reconcile.Result, error) {
-	t.cycleNodeRequest.Status.Phase = v1.CycleNodeRequestHealing
-	// don't try to set the message if it's nil
-	if err != nil {
-		t.cycleNodeRequest.Status.Message = err.Error()
-	}
-
-	// handle conflicts before complaining
-	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		return t.rm.UpdateObject(t.cycleNodeRequest)
-	}); err != nil {
-		t.rm.Logger.Error(err, "unable to update cycleNodeRequest")
-	}
-	return reconcile.Result{}, err
+	return t.transitionToUnsuccessful(v1.CycleNodeRequestHealing, err)
 }
 
 // transitionToFailed transitions the current cycleNodeRequest to failed
 func (t *CycleNodeRequestTransitioner) transitionToFailed(err error) (reconcile.Result, error) {
-	t.cycleNodeRequest.Status.Phase = v1.CycleNodeRequestFailed
-	// don't try to append message if it's nil
-	if err != nil {
-		t.cycleNodeRequest.Status.Message += err.Error()
-	}
-
-	// handle conflicts before complaining
-	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		return t.rm.UpdateObject(t.cycleNodeRequest)
-	}); err != nil {
-		t.rm.Logger.Error(err, "unable to update cycleNodeRequest")
-	}
-	return reconcile.Result{}, err
+	return t.transitionToUnsuccessful(v1.CycleNodeRequestFailed, err)
 }
 
 // transitionToSuccessful transitions the current cycleNodeRequest to successful
 func (t *CycleNodeRequestTransitioner) transitionToSuccessful() (reconcile.Result, error) {
 	t.rm.LogEvent(t.cycleNodeRequest, "Successful", "Successfully cycled nodes")
 	t.cycleNodeRequest.Status.Phase = v1.CycleNodeRequestSuccessful
+
+	// Notify that the cycling has succeeded
+	if t.rm.Notifier != nil {
+		if err := t.rm.Notifier.PhaseTransitioned(t.cycleNodeRequest); err != nil {
+			t.rm.Logger.Error(err, "Unable to post message to messaging provider", "phase", t.cycleNodeRequest.Status.Phase)
+		}
+	}
+
 	return reconcile.Result{}, t.rm.UpdateObject(t.cycleNodeRequest)
 }
 
 // transitionObject transitions the current cycleNodeRequest to the specified phase
 func (t *CycleNodeRequestTransitioner) transitionObject(desiredPhase v1.CycleNodeRequestPhase) (reconcile.Result, error) {
+	currentPhase := t.cycleNodeRequest.Status.Phase
 	t.cycleNodeRequest.Status.Phase = desiredPhase
 	if err := t.rm.UpdateObject(t.cycleNodeRequest); err != nil {
 		return reconcile.Result{}, err
 	}
+
+	// Notify that the cycling has transitioned to a new phase
+	if t.rm.Notifier != nil && currentPhase != desiredPhase {
+		if err := t.rm.Notifier.PhaseTransitioned(t.cycleNodeRequest); err != nil {
+			t.rm.Logger.Error(err, "Unable to post message to messaging provider", "phase", t.cycleNodeRequest.Status.Phase)
+		}
+	}
+
 	return reconcile.Result{
 		Requeue:      true,
 		RequeueAfter: transitionDuration,
@@ -135,6 +128,11 @@ func (t *CycleNodeRequestTransitioner) reapChildren() (v1.CycleNodeRequestPhase,
 	// to schedule at a time.
 	if int64(inProgressCount) != t.cycleNodeRequest.Status.ActiveChildren {
 		t.cycleNodeRequest.Status.ActiveChildren = int64(inProgressCount)
+	}
+
+	// Stay in the WaitingTermination phase if there are no nodes left to pick up for cycling but still nodes being cycled
+	if len(t.cycleNodeRequest.Status.NodesAvailable) == 0 && t.cycleNodeRequest.Status.ActiveChildren > 0 {
+		return nextPhase, nil
 	}
 
 	// If we've finished most of our children, go back to Initialised to add some more nodes
@@ -266,4 +264,29 @@ func findOffendingNodes(kubeNodes []corev1.Node, cloudProviderNodes map[string]c
 	}
 
 	return nodesNotInCPNodeGroup, nodesNotInKube
+}
+
+// transitionToUnsuccessful transitions the current cycleNodeRequest to healing/failed
+func (t *CycleNodeRequestTransitioner) transitionToUnsuccessful(phase v1.CycleNodeRequestPhase, err error) (reconcile.Result, error) {
+	t.cycleNodeRequest.Status.Phase = phase
+	// don't try to append message if it's nil
+	if err != nil {
+		t.cycleNodeRequest.Status.Message += err.Error()
+	}
+
+	// handle conflicts before complaining
+	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		return t.rm.UpdateObject(t.cycleNodeRequest)
+	}); err != nil {
+		t.rm.Logger.Error(err, "unable to update cycleNodeRequest")
+	}
+
+	// Notify that the cycling has transitioned phase
+	if t.rm.Notifier != nil {
+		if err := t.rm.Notifier.PhaseTransitioned(t.cycleNodeRequest); err != nil {
+			t.rm.Logger.Error(err, "Unable to post message to messaging provider", "phase", t.cycleNodeRequest.Status.Phase)
+		}
+	}
+
+	return reconcile.Result{}, err
 }

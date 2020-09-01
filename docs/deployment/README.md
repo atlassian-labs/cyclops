@@ -15,11 +15,20 @@
 
 Cyclops provides integration for the following cloud providers:
 
- - **AWS** - [see documentation](./aws/README.md)
-   - Permissions
-   - AWS Credentials
-   - Node Group Configuration
-   - Common issues, caveats and gotchas
+- **AWS** - [see documentation](./cloud-providers/aws/README.md)
+  - Permissions
+  - AWS Credentials
+  - Node Group Configuration
+  - Common issues, caveats and gotchas
+
+## Messaging Providers<a name="messaging-provider"></a>
+
+Cyclops provides integration for the following messaging providers:
+
+- **Slack** - [see documentation](./messaging-providers/slack/README.md)
+  - Installation
+  - Slack Credentials
+  - Common issues, caveats and gotchas
 
 ## Setup
 

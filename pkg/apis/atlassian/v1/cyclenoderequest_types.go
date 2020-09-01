@@ -58,6 +58,15 @@ type CycleNodeRequestStatus struct {
 	// ActiveChildren is the active number of CycleNodeStatuses that this CycleNodeRequest was aware of
 	// when it last checked for progress in the cycle operation.
 	ActiveChildren int64 `json:"activeChildren,omitempty"`
+
+	// ThreadTimestamp is the timestamp of the thread in the messaging provider
+	ThreadTimestamp string `json:"threadTimestamp,omitempty"`
+
+	// SelectedNodes stores all selected nodes so that new nodes which are selected are only posted in a notification once
+	SelectedNodes map[string]bool `json:"selectedNodes,omitempty"`
+
+	// NodesAvailable stores the nodes still available to pick up for cycling from the list of nodes to terminate
+	NodesAvailable []CycleNodeRequestNode `json:"nodesAvailable,omitempty"`
 }
 
 // CycleNodeRequestNode stores a current node that is being worked on
@@ -109,7 +118,7 @@ const (
 
 // CycleNodeRequest is the Schema for the cyclenoderequests API
 // +k8s:openapi-gen=true
-// +kubebuilder:resource:path=cyclenoderequests,shortName=cnr
+// +kubebuilder:resource:path=cyclenoderequests,shortName=cnr,scope=Namespaced
 // +kubebuilder:printcolumn:name="Node Group Name",type="string",JSONPath=".spec.nodeGroupName",description="The node group being cycled"
 // +kubebuilder:printcolumn:name="Method",type="string",JSONPath=".spec.cycleSettings.method",description="The method being used for the cycle operation"
 // +kubebuilder:printcolumn:name="Concurrency",type="integer",JSONPath=".spec.cycleSettings.concurrency",description="Max nodes the request is cycling at once"
