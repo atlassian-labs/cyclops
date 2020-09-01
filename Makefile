@@ -63,6 +63,6 @@ install-operator-sdk:
 generate-crds:
 	mkdir -p build deploy/crds
 	touch build/Dockerfile
-	/usr/local/bin/operator-sdk generate k8s
-	/usr/local/bin/operator-sdk generate crds --crd-version v1
+	operator-sdk generate k8s
+	operator-sdk generate crds --crd-version v1
 	rm -rf build/
