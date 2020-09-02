@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	v1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
+	"github.com/atlassian-labs/cyclops/pkg/cloudprovider"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -93,7 +94,7 @@ func (t *CycleNodeRequestTransitioner) getNodesToTerminate(numNodes int64) (node
 
 // addNamedNodesToTerminate adds the named nodes for this CycleNodeRequest to the list of nodes to terminate.
 // Returns an error if any named node does not exist in the node group for this CycleNodeRequest.
-func (t *CycleNodeRequestTransitioner) addNamedNodesToTerminate(kubeNodes []corev1.Node) error {
+func (t *CycleNodeRequestTransitioner) addNamedNodesToTerminate(kubeNodes []corev1.Node, nodeGroupInstances map[string]cloudprovider.Instance) error {
 	for _, namedNode := range t.cycleNodeRequest.Spec.NodeNames {
 		foundNode := false
 		for _, kubeNode := range kubeNodes {
@@ -103,15 +104,17 @@ func (t *CycleNodeRequestTransitioner) addNamedNodesToTerminate(kubeNodes []core
 				t.cycleNodeRequest.Status.NodesAvailable = append(
 					t.cycleNodeRequest.Status.NodesAvailable,
 					v1.CycleNodeRequestNode{
-						Name:       kubeNode.Name,
-						ProviderID: kubeNode.Spec.ProviderID,
+						Name:          kubeNode.Name,
+						ProviderID:    kubeNode.Spec.ProviderID,
+						NodeGroupName: nodeGroupInstances[kubeNode.Spec.ProviderID].NodeGroupName(),
 					})
 
 				t.cycleNodeRequest.Status.NodesToTerminate = append(
 					t.cycleNodeRequest.Status.NodesToTerminate,
 					v1.CycleNodeRequestNode{
-						Name:       kubeNode.Name,
-						ProviderID: kubeNode.Spec.ProviderID,
+						Name:          kubeNode.Name,
+						ProviderID:    kubeNode.Spec.ProviderID,
+						NodeGroupName: nodeGroupInstances[kubeNode.Spec.ProviderID].NodeGroupName(),
 					})
 				break
 			}

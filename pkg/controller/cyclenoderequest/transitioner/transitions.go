@@ -135,7 +135,7 @@ func (t *CycleNodeRequestTransitioner) transitionPending() (reconcile.Result, er
 	if len(t.cycleNodeRequest.Spec.NodeNames) > 0 {
 		// If specific node names are provided, check they actually exist in the node group
 		t.rm.LogEvent(t.cycleNodeRequest, "SelectingNodes", "Adding named nodes to NodesToTerminate")
-		err := t.addNamedNodesToTerminate(kubeNodes)
+		err := t.addNamedNodesToTerminate(kubeNodes, nodeGroupInstances)
 		if err != nil {
 			return t.transitionToHealing(err)
 		}
