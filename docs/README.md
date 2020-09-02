@@ -55,8 +55,7 @@ Flags:
       --version                  Show application version.
   -d, --debug                    Run with debug logging
       --cloud-provider="aws"     Which cloud provider to use, options: [aws]
-      --messaging-provider="slack"  
-                                 Which message provider to use, options: [slack]
+      --messaging-provider=""    Which message provider to use, options: [slack] (Optional)
       --address=":8080"          Address to listen on for /metrics
       --namespace="kube-system"  Namespace to watch for cycle request objects
       --delete-cnr               Whether or not to automatically delete CNRs

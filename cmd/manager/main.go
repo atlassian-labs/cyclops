@@ -12,6 +12,7 @@ import (
 	cnrTransitioner "github.com/atlassian-labs/cyclops/pkg/controller/cyclenoderequest/transitioner"
 	"github.com/atlassian-labs/cyclops/pkg/controller/cyclenodestatus"
 	"github.com/atlassian-labs/cyclops/pkg/metrics"
+	"github.com/atlassian-labs/cyclops/pkg/notifications"
 	"github.com/atlassian-labs/cyclops/pkg/notifications/notifierbuilder"
 	"github.com/operator-framework/operator-sdk/pkg/leader"
 	sdkVersion "github.com/operator-framework/operator-sdk/version"
@@ -33,7 +34,7 @@ var (
 	debug = app.Flag("debug", "Run with debug logging").Short('d').Bool()
 
 	cloudProviderName     = app.Flag("cloud-provider", "Which cloud provider to use, options: [aws]").Default("aws").String()
-	messagingProviderName = app.Flag("messaging-provider", "Which message provider to use, options: [slack]").Default("slack").String()
+	messagingProviderName = app.Flag("messaging-provider", "Which message provider to use, options: [slack] (Optional)").Default("").String()
 
 	addr      = app.Flag("address", "Address to listen on for /metrics").Default(":8080").String()
 	namespace = app.Flag("namespace", "Namespace to watch for cycle request objects").Default("kube-system").String()
@@ -95,11 +96,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Setup the notifier
-	notifier, err := notifierbuilder.BuildNotifier(*messagingProviderName)
-	if err != nil {
-		log.Error(err, "Unable to build notifier")
-		os.Exit(1)
+	var notifier notifications.Notifier
+
+	// Setup the notifier if it is enabled
+	if *messagingProviderName != "" {
+		notifier, err = notifierbuilder.BuildNotifier(*messagingProviderName)
+		if err != nil {
+			log.Error(err, "Unable to build notifier")
+			os.Exit(1)
+		}
 	}
 
 	// Configure the CNR transitioner options

@@ -13,13 +13,12 @@ func NewNotifier() (notifications.Notifier, error) {
 	channelID := os.Getenv("SLACK_CHANNEL_ID")
 	token := os.Getenv("SLACK_BOT_USER_OAUTH_ACCESS_TOKEN")
 
-	// Return nil without an error if both tokens are missing since this is an optional feature
+	// Return an error is no slack oauth token is provided
 	if token == "" {
-		return nil, nil
+		return nil, fmt.Errorf("missing slack oauth token")
 	}
 
-	// If both auth tokens are provided but not a slack channel id, it is assumed that the feature
-	// is being used and returns an error
+	// Return an error if no slack channel is specified
 	if channelID == "" {
 		return nil, fmt.Errorf("missing slack channel id")
 	}

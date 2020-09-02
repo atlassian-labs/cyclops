@@ -2,6 +2,7 @@ package cyclenoderequest
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	v1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
@@ -110,8 +111,7 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 			clusterName := os.Getenv(clusterNameEnv)
 
 			if clusterName == "" {
-				log.Error(err, "Missing cluster name")
-				os.Exit(1)
+				return reconcile.Result{}, fmt.Errorf("Missing cluster name")
 			}
 
 			cycleNodeRequest.ClusterName = clusterName
