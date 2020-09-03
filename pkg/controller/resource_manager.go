@@ -3,13 +3,14 @@ package controller
 import (
 	"context"
 
+	"github.com/atlassian-labs/cyclops/pkg/cloudprovider"
+	"github.com/atlassian-labs/cyclops/pkg/notifications"
 	"github.com/go-logr/logr"
 	coreV1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"github.com/atlassian-labs/cyclops/pkg/cloudprovider"
 )
 
 // ResourceManager is a struct which provides some consistency across controllers.
@@ -20,6 +21,7 @@ type ResourceManager struct {
 	RawClient     kubernetes.Interface
 	Recorder      record.EventRecorder
 	Logger        logr.Logger
+	Notifier      notifications.Notifier
 	CloudProvider cloudprovider.CloudProvider
 	Namespace     string
 }
@@ -30,6 +32,7 @@ func NewResourceManager(
 	rawClient kubernetes.Interface,
 	recorder record.EventRecorder,
 	logger logr.Logger,
+	notifier notifications.Notifier,
 	cloudProvider cloudprovider.CloudProvider,
 ) *ResourceManager {
 	return &ResourceManager{
@@ -37,6 +40,7 @@ func NewResourceManager(
 		RawClient:     rawClient,
 		Recorder:      recorder,
 		Logger:        logger,
+		Notifier:      notifier,
 		CloudProvider: cloudProvider,
 	}
 }

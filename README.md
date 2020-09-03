@@ -16,13 +16,14 @@ It also contains optional controller Cyclops Observer for full automation of rot
 
 - Cycles entire node groups safely with configurable concurrency
 - Has a CLI to trigger cycling of specific node groups.
-- A change observer to automatically cycle nodes when NodeGroups and DaemonSets become out of date  
+- A change observer to automatically cycle nodes when NodeGroups and DaemonSets become out of date
 - Uses a Kubernetes Custom Resource Definition and Operator to enable reproducible and verifiable cycling that be be deployed safely from deployment platforms
 - Halt whenever any issues are faced, preventing further damage to the cluster
 - Support for full automation with an Observer controller
 - Detection of out of date CloudProvider configurations
 - Detection of out of date OnDelete lifecycle Kubernetes daemosnets
-- CLI tool to abstract away CRD managment 
+- CLI tool to abstract away CRD managment
+- Pushing progress notifications to a messaging provider
 
 ## Planned Features & Development Roadmap
 
@@ -34,8 +35,7 @@ See [Docs](docs/README.md)
 
 ## Requirements
 
-- [Kubernetes](https://kubernetes.io/) version 1.13+. Cyclops has been tested and deployed on 1.13+ and newer. Older 
-versions of Kubernetes may have bugs or issues that will prevent it from functioning properly.
+- [Kubernetes](https://kubernetes.io/) version 1.13+. Cyclops has been tested and deployed on 1.13+ and newer. Older versions of Kubernetes may have bugs or issues that will prevent it from functioning properly.
 - [Go](https://golang.org/) version 1.13+. Newer versions of Go are highly recommended.
 - Dependencies and their locked versions can be found in `go.mod` and `go.sum`.
 
@@ -86,7 +86,7 @@ See below headers for each section
 
 **This is the simplest way of getting cycling after deploying the Cyclops manager without using the automation components.**
 
-A CycleNodeRequest or _cnr_ is a CRD which is the method of providing the Cyclops operator with requests to cycle node groups based on the configuration on of the request. 
+A CycleNodeRequest or _cnr_ is a CRD which is the method of providing the Cyclops operator with requests to cycle node groups based on the configuration on of the request.
 
 ```bash
 # Create a request to cycle a node group with a premade CycleNodeRequestObject.
@@ -128,7 +128,7 @@ Status:
   Current Nodes:
     Name:         ip-10-149-72-60.us-west-2.compute.internal
     Provider Id:  aws:///us-west-2b/i-0119f6aa6b63ce0ce
-  Message:        
+  Message:
   Nodes To Terminate:
     Name:            ip-10-149-72-94.us-west-2.compute.internal
     Provider Id:     aws:///us-west-2c/i-0f4c087f7a7e9a20c
@@ -157,6 +157,12 @@ The CLI is a kubectl plugin.
 After deploying and configuring the Observer, nodes will cycle on their own when they become out of date.
 
 [See Docs for details](./docs/automation/README.md)
+
+### Pushing notifications
+
+Cyclops can optionally push progress notifications to a messaging provider.
+
+[See Docs for details](./docs/deployment/messaging-providers/slack/README.md)
 
 ## Contributors
 

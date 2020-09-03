@@ -212,6 +212,29 @@ spec:
                 description: A human readable message indicating details about why
                   the CycleNodeRequest is in this condition.
                 type: string
+              nodesAvailable:
+                description: NodesAvailable stores the nodes still available to pick
+                  up for cycling from the list of nodes to terminate
+                items:
+                  description: CycleNodeRequestNode stores a current node that is
+                    being worked on
+                  properties:
+                    name:
+                      description: Name of the node
+                      type: string
+                    nodeGroupName:
+                      description: NodeGroupName stores current cloud provider node
+                        group name which this node belongs to
+                      type: string
+                    providerId:
+                      description: Cloud Provider ID of the node
+                      type: string
+                  required:
+                  - name
+                  - nodeGroupName
+                  - providerId
+                  type: object
+                type: array
               nodesToTerminate:
                 description: NodesToTerminate stores the old nodes that will be terminated.
                   The cycling of nodes is considered successful when all of these
@@ -244,6 +267,16 @@ spec:
                   This is used to track the time limit of the scale up. If we breach
                   the time limit we fail the request.
                 format: date-time
+                type: string
+              selectedNodes:
+                additionalProperties:
+                  type: boolean
+                description: SelectedNodes stores all selected nodes so that new nodes
+                  which are selected are only posted in a notification once
+                type: object
+              threadTimestamp:
+                description: ThreadTimestamp is the timestamp of the thread in the
+                  messaging provider
                 type: string
             required:
             - message

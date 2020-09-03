@@ -3,8 +3,9 @@ package transitioner
 import (
 	"fmt"
 
-	corev1 "k8s.io/api/core/v1"
 	v1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
+	"github.com/atlassian-labs/cyclops/pkg/cloudprovider"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // listReadyNodes lists nodes that are "ready". By default lists nodes that have also not been touched by Cyclops.
@@ -64,6 +65,20 @@ func (t *CycleNodeRequestTransitioner) getNodesToTerminate(numNodes int64) (node
 			// Add nodes that need to be terminated but have not yet been actioned
 			if kubeNode.Name == nodeToTerminate.Name && kubeNode.Spec.ProviderID == nodeToTerminate.ProviderID {
 				nodes = append(nodes, &kubeNode)
+
+				for i := 0; i < len(t.cycleNodeRequest.Status.NodesAvailable); i++ {
+					if kubeNode.Name == t.cycleNodeRequest.Status.NodesAvailable[i].Name {
+						// Remove nodes from available if they are also scheduled for termination
+						// Slice syntax removes this node at `i` from the array
+						t.cycleNodeRequest.Status.NodesAvailable = append(
+							t.cycleNodeRequest.Status.NodesAvailable[:i],
+							t.cycleNodeRequest.Status.NodesAvailable[i+1:]...,
+						)
+
+						break
+					}
+				}
+
 				break
 			}
 		}
@@ -79,17 +94,27 @@ func (t *CycleNodeRequestTransitioner) getNodesToTerminate(numNodes int64) (node
 
 // addNamedNodesToTerminate adds the named nodes for this CycleNodeRequest to the list of nodes to terminate.
 // Returns an error if any named node does not exist in the node group for this CycleNodeRequest.
-func (t *CycleNodeRequestTransitioner) addNamedNodesToTerminate(kubeNodes []corev1.Node) error {
+func (t *CycleNodeRequestTransitioner) addNamedNodesToTerminate(kubeNodes []corev1.Node, nodeGroupInstances map[string]cloudprovider.Instance) error {
 	for _, namedNode := range t.cycleNodeRequest.Spec.NodeNames {
 		foundNode := false
 		for _, kubeNode := range kubeNodes {
 			if kubeNode.Name == namedNode {
 				foundNode = true
+
+				t.cycleNodeRequest.Status.NodesAvailable = append(
+					t.cycleNodeRequest.Status.NodesAvailable,
+					v1.CycleNodeRequestNode{
+						Name:          kubeNode.Name,
+						ProviderID:    kubeNode.Spec.ProviderID,
+						NodeGroupName: nodeGroupInstances[kubeNode.Spec.ProviderID].NodeGroupName(),
+					})
+
 				t.cycleNodeRequest.Status.NodesToTerminate = append(
 					t.cycleNodeRequest.Status.NodesToTerminate,
 					v1.CycleNodeRequestNode{
-						Name:       kubeNode.Name,
-						ProviderID: kubeNode.Spec.ProviderID,
+						Name:          kubeNode.Name,
+						ProviderID:    kubeNode.Spec.ProviderID,
+						NodeGroupName: nodeGroupInstances[kubeNode.Spec.ProviderID].NodeGroupName(),
 					})
 				break
 			}

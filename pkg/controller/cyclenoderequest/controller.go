@@ -2,11 +2,14 @@ package cyclenoderequest
 
 import (
 	"context"
+	"fmt"
+	"os"
 
 	v1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
 	"github.com/atlassian-labs/cyclops/pkg/cloudprovider"
 	cyclecontroller "github.com/atlassian-labs/cyclops/pkg/controller"
 	"github.com/atlassian-labs/cyclops/pkg/controller/cyclenoderequest/transitioner"
+	"github.com/atlassian-labs/cyclops/pkg/notifications"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -21,6 +24,7 @@ const (
 	controllerName       = "cyclenoderequest.controller"
 	eventName            = "cyclops"
 	reconcileConcurrency = 1
+	clusterNameEnv       = "CLUSTER_NAME"
 )
 
 var log = logf.Log.WithName(controllerName)
@@ -29,6 +33,7 @@ var log = logf.Log.WithName(controllerName)
 type Reconciler struct {
 	mgr           manager.Manager
 	cloudProvider cloudprovider.CloudProvider
+	notifier      notifications.Notifier
 	rawClient     kubernetes.Interface
 	options       transitioner.Options
 }
@@ -38,6 +43,7 @@ type Reconciler struct {
 func NewReconciler(
 	mgr manager.Manager,
 	cloudProvider cloudprovider.CloudProvider,
+	notifier notifications.Notifier,
 	namespace string,
 	options transitioner.Options,
 ) (reconcile.Reconciler, error) {
@@ -47,6 +53,7 @@ func NewReconciler(
 	reconciler := &Reconciler{
 		mgr:           mgr,
 		cloudProvider: cloudProvider,
+		notifier:      notifier,
 		rawClient:     rawClient,
 		options:       options,
 	}
@@ -93,12 +100,31 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 		return reconcile.Result{}, err
 	}
 
+	if r.notifier != nil {
+		// Initialise the map which will hold the unique selected nodes
+		if cycleNodeRequest.Status.SelectedNodes == nil {
+			cycleNodeRequest.Status.SelectedNodes = map[string]bool{}
+		}
+
+		// Extract the cluster name and add it to the cycleNodeRequest
+		if cycleNodeRequest.ClusterName == "" {
+			clusterName := os.Getenv(clusterNameEnv)
+
+			if clusterName == "" {
+				return reconcile.Result{}, fmt.Errorf("Missing cluster name")
+			}
+
+			cycleNodeRequest.ClusterName = clusterName
+		}
+	}
+
 	logger = log.WithValues("name", request.Name, "namespace", request.Namespace, "phase", cycleNodeRequest.Status.Phase)
 	rm := cyclecontroller.NewResourceManager(
 		r.mgr.GetClient(),
 		r.rawClient,
 		r.mgr.GetEventRecorderFor(eventName),
 		logger,
+		r.notifier,
 		r.cloudProvider)
 	result, err := transitioner.NewCycleNodeRequestTransitioner(cycleNodeRequest, rm, r.options).Run()
 	return result, err

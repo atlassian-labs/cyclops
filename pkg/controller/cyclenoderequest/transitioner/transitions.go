@@ -34,6 +34,12 @@ func (t *CycleNodeRequestTransitioner) transitionUndefined() (reconcile.Result, 
 		return t.transitionToHealing(fmt.Errorf("selector cannot be empty"))
 	}
 
+	if t.rm.Notifier != nil {
+		if err := t.rm.Notifier.CyclingStarted(t.cycleNodeRequest); err != nil {
+			t.rm.Logger.Error(err, "Unable to post message to messaging provider", "phase", t.cycleNodeRequest.Status.Phase)
+		}
+	}
+
 	// Transition the object to pending
 	return t.transitionObject(v1.CycleNodeRequestPending)
 }
@@ -129,7 +135,7 @@ func (t *CycleNodeRequestTransitioner) transitionPending() (reconcile.Result, er
 	if len(t.cycleNodeRequest.Spec.NodeNames) > 0 {
 		// If specific node names are provided, check they actually exist in the node group
 		t.rm.LogEvent(t.cycleNodeRequest, "SelectingNodes", "Adding named nodes to NodesToTerminate")
-		err := t.addNamedNodesToTerminate(kubeNodes)
+		err := t.addNamedNodesToTerminate(kubeNodes, nodeGroupInstances)
 		if err != nil {
 			return t.transitionToHealing(err)
 		}
@@ -220,6 +226,17 @@ func (t *CycleNodeRequestTransitioner) transitionInitialised() (reconcile.Result
 					NodeGroupName: readyInstances[node.Spec.ProviderID].NodeGroupName(),
 				},
 			)
+		}
+	}
+
+	// Post a notification showing the new nodes selected for cycling
+	if t.rm.Notifier != nil {
+		if err := t.rm.Notifier.NodesSelected(t.cycleNodeRequest); err != nil {
+			t.rm.Logger.Error(err, "Unable to post message to messaging provider", "phase", t.cycleNodeRequest.Status.Phase)
+		}
+
+		if err := t.rm.UpdateObject(t.cycleNodeRequest); err != nil {
+			return t.transitionToHealing(err)
 		}
 	}
 
@@ -380,8 +397,7 @@ func (t *CycleNodeRequestTransitioner) transitionWaitingTermination() (reconcile
 
 	// While there are CycleNodeStatus objects not in Failed or Successful, stay in this phase and wait for them
 	// to finish.
-	var err error
-	t.cycleNodeRequest.Status.Phase, err = t.reapChildren()
+	desiredPhase, err := t.reapChildren()
 	// If any are in Failed phase then this CycleNodeRequest will be sent to the Failed phase, where it will
 	// continue to reap it's children.
 	if err != nil {
@@ -392,7 +408,7 @@ func (t *CycleNodeRequestTransitioner) transitionWaitingTermination() (reconcile
 		return t.transitionToHealing(err)
 	}
 
-	return reconcile.Result{Requeue: true, RequeueAfter: transitionDuration}, nil
+	return t.transitionObject(desiredPhase)
 }
 
 // transitionFailed handles failed CycleNodeRequests
