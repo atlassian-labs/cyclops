@@ -9,8 +9,9 @@
     - [What happens](#what-happens)
   - [Example 2 - Concurrency and Multiple Selectors](#example-2---concurrency-and-multiple-selectors)
     - [What happens](#what-happens-1)
-    - [Example 3 - Specific Nodes](#example-3---specific-nodes)
-    - [Example 4 - Wait method](#example-4---wait-method)
+  - [Example 3 - Specific Nodes](#example-3---specific-nodes)
+  - [Example 4 - Wait method](#example-4---wait-method)
+  - [Example 5 - Concurrency within multiple cloud provider node groups](#example-5---concurrency-within-multiple-cloud-provider-node-groups)
 
 See directory [examples](./examples) for all example CRDs
 
@@ -113,7 +114,7 @@ Matches against the hypothetical `role` **and** `customer` node selectors.
 
 Cyclops will follow the same process as in Example 1, but 5 nodes at a time until all nodes have been cycled.
 
-### Example 3 - Specific Nodes
+## Example 3 - Specific Nodes
 
 ```yaml
 apiVersion: "atlassian.com/v1"
@@ -143,7 +144,7 @@ This example will perform the same as **Example 2**, except it will limit the sc
   - "my-node-2"
 ```
 
-### Example 4 - Wait method
+## Example 4 - Wait method
 
 
 ```yaml
@@ -178,7 +179,7 @@ This example shows the usage of the `Wait` method which opposed to `Drain` which
 Cyclops provides an option to ignore pods with specific labels in order to support nodes that may run pods that will never exit themselves. In this example, the pod with label `name=stickypod` would be ignore when waiting for all other pods to terminate. The node will be terminated while `name=stickypod` is running, and all others have finished.
 
 
-### Example 5 - Concurrency within multiple cloud provider node groups
+## Example 5 - Concurrency within multiple cloud provider node groups
 
 
 ```yaml
