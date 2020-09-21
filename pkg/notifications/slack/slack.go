@@ -47,7 +47,7 @@ func newSelectedNodeNames(cnr *v1.CycleNodeRequest) []string {
 
 // Generates the structure for the cycle status notification
 func (n *notifier) generateThreadMessage(cnr *v1.CycleNodeRequest) slackapi.Attachment {
-	var statusColor string
+	var statusColor, progressText string
 
 	// Determines the colour of the LHS status bar
 	switch cnr.Status.Phase {
@@ -59,17 +59,31 @@ func (n *notifier) generateThreadMessage(cnr *v1.CycleNodeRequest) slackapi.Atta
 		statusColor = blueColor
 	}
 
+	// Wait until all nodes to terminate have been added to the cnr before displaying
+	// This is useful when no node names are specified and all nodes in the cnr as to be cycled
+	if len(cnr.Status.NodesToTerminate) > 0 {
+		progressText = fmt.Sprintf("%d/%d (%d%%)", cnr.Status.NumNodesCycled, len(cnr.Status.NodesToTerminate), int(float64(cnr.Status.NumNodesCycled)/float64(len(cnr.Status.NodesToTerminate))*100))
+	}
+
+	nodeGroupTitle := "Nodegroup"
+	nodeGroupList := append([]string{cnr.Spec.NodeGroupName}, cnr.Spec.NodeGroupsList...)
+
+	// If there are multiple nodegroups, adjust the title
+	if (cnr.Spec.NodeGroupName != "" && len(cnr.Spec.NodeGroupsList) > 0) || len(cnr.Spec.NodeGroupsList) > 1 {
+		nodeGroupTitle = "Nodegroups"
+	}
+
 	return slackapi.Attachment{
 		Color: statusColor,
 		Blocks: slackapi.Blocks{
 			BlockSet: []slackapi.Block{
 				slackapi.NewSectionBlock(nil, []*slackapi.TextBlockObject{
 					slackapi.NewTextBlockObject(markdownType, fmt.Sprintf("*Name:*\n%s", cnr.Name), false, false),
-					slackapi.NewTextBlockObject(markdownType, fmt.Sprintf("*Nodegroup:*\n%s", cnr.Spec.NodeGroupName), false, false),
+					slackapi.NewTextBlockObject(markdownType, fmt.Sprintf("*Progress:*\n%s", progressText), false, false),
 					slackapi.NewTextBlockObject(markdownType, fmt.Sprintf("*Cluster:*\n%s", cnr.ClusterName), false, false),
-					slackapi.NewTextBlockObject(markdownType, fmt.Sprintf("*Concurrency:*\n%d", cnr.Spec.CycleSettings.Concurrency), false, false),
 					slackapi.NewTextBlockObject(markdownType, fmt.Sprintf("*Method:*\n%s", cnr.Spec.CycleSettings.Method), false, false),
-					slackapi.NewTextBlockObject(markdownType, fmt.Sprintf("*Progress:*\n%d/%d (%d%%)", len(cnr.Status.SelectedNodes), len(cnr.Spec.NodeNames), int(float64(len(cnr.Status.SelectedNodes))/float64(len(cnr.Spec.NodeNames))*100)), false, false),
+					slackapi.NewTextBlockObject(markdownType, fmt.Sprintf("*%s:*\n%s", nodeGroupTitle, strings.Join(nodeGroupList, "\n")), false, false),
+					slackapi.NewTextBlockObject(markdownType, fmt.Sprintf("*Concurrency:*\n%d", cnr.Spec.CycleSettings.Concurrency), false, false),
 				}, nil),
 			},
 		},

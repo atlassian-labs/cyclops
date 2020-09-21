@@ -259,6 +259,10 @@ spec:
                   - providerId
                   type: object
                 type: array
+              numNodesCycled:
+                description: NumNodesCycled counts how many nodes have finished being
+                  cycled
+                type: integer
               phase:
                 description: Phase stores the current phase of the CycleNodeRequest
                 type: string

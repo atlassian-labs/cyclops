@@ -65,6 +65,9 @@ type CycleNodeRequestStatus struct {
 	// SelectedNodes stores all selected nodes so that new nodes which are selected are only posted in a notification once
 	SelectedNodes map[string]bool `json:"selectedNodes,omitempty"`
 
+	// NumNodesCycled counts how many nodes have finished being cycled
+	NumNodesCycled int `json:"numNodesCycled,omitempty"`
+
 	// NodesAvailable stores the nodes still available to pick up for cycling from the list of nodes to terminate
 	NodesAvailable []CycleNodeRequestNode `json:"nodesAvailable,omitempty"`
 }

@@ -143,6 +143,14 @@ func (t *CycleNodeRequestTransitioner) transitionPending() (reconcile.Result, er
 		// Otherwise just add all the nodes in the node group
 		t.rm.LogEvent(t.cycleNodeRequest, "SelectingNodes", "Adding all node group nodes to NodesToTerminate")
 		for _, kubeNode := range kubeNodes {
+			t.cycleNodeRequest.Status.NodesAvailable = append(
+				t.cycleNodeRequest.Status.NodesAvailable,
+				v1.CycleNodeRequestNode{
+					Name:          kubeNode.Name,
+					ProviderID:    kubeNode.Spec.ProviderID,
+					NodeGroupName: nodeGroupInstances[kubeNode.Spec.ProviderID].NodeGroupName(),
+				})
+
 			t.cycleNodeRequest.Status.NodesToTerminate = append(
 				t.cycleNodeRequest.Status.NodesToTerminate,
 				v1.CycleNodeRequestNode{
@@ -183,6 +191,8 @@ func (t *CycleNodeRequestTransitioner) transitionInitialised() (reconcile.Result
 		return t.transitionToHealing(err)
 	}
 
+	t.cycleNodeRequest.Status.NumNodesCycled = len(t.cycleNodeRequest.Status.NodesToTerminate) - len(t.cycleNodeRequest.Status.NodesAvailable) - numNodesInProgress - len(nodes)
+
 	// Check if we can transition to WaitingTermination or Successful
 	if transitioning, reconcileResult, err := t.checkIfTransitioning(len(nodes), numNodesInProgress); transitioning {
 		t.rm.Logger.Info("No more valid nodes in kube left to cycle")
@@ -205,10 +215,12 @@ func (t *CycleNodeRequestTransitioner) transitionInitialised() (reconcile.Result
 		}
 	}
 
+	t.cycleNodeRequest.Status.NumNodesCycled = len(t.cycleNodeRequest.Status.NodesToTerminate) - len(t.cycleNodeRequest.Status.NodesAvailable) - numNodesInProgress - len(validProviderIDs)
+
 	// This is done a second time to account for a race condition where an instance on cloud provider is no longer running but is still registered in kube
 	// If the check were performed before the transition to WaitingTermination above, cyclops would perform many requests and eventually get rate limited by cloud provider
 	if transitioning, reconcileResult, err := t.checkIfTransitioning(len(validProviderIDs), numNodesInProgress); transitioning {
-		t.rm.Logger.Info("No more valid nodes inside cloud provider left to cycle")
+		t.rm.Logger.Info("No more valid nodes in the cloud provider left to cycle")
 		return reconcileResult, err
 	}
 
