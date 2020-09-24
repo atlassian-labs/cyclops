@@ -2,7 +2,7 @@ name: Docker
 
 on:
   push:
-    # Publish `master` as Docker `latest` image.
+    # Publish `master` as Docker `it's short sha commit id` image.
     branches:
       - master
 
@@ -20,6 +20,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
+        
+      - name: Set short sha variable
+        id: vars
+        run: echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
 
       - name: Build image
         run: docker build . --file Dockerfile --tag $IMAGE_NAME
@@ -39,8 +43,8 @@ jobs:
           # Strip git ref prefix from version
           VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
 
-          # Use Docker `latest` tag convention
-          [ "$VERSION" == "master" ] && VERSION=latest
+          # Use Docker `short_sha` tag convention
+          [ "$VERSION" == "master" ] && VERSION="${{ steps.vars.outputs.sha_short }}"
 
           echo IMAGE_ID=$IMAGE_ID
           echo VERSION=$VERSION
