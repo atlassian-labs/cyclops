@@ -125,9 +125,11 @@ func (n *notifier) PhaseTransitioned(cnr *v1.CycleNodeRequest) error {
 	if cnr.Status.Phase == v1.CycleNodeRequestFailed {
 		message := n.generateThreadMessage(cnr)
 
-		message.Blocks.BlockSet = append(message.Blocks.BlockSet, []slackapi.Block{
-			slackapi.NewSectionBlock(slackapi.NewTextBlockObject(markdownType, fmt.Sprintf("```%v```", cnr.Status.Message), false, false), nil, nil),
-		}...)
+		if cnr.Status.Message != "" {
+			message.Blocks.BlockSet = append(message.Blocks.BlockSet, []slackapi.Block{
+				slackapi.NewSectionBlock(slackapi.NewTextBlockObject(markdownType, fmt.Sprintf("```%v```", cnr.Status.Message), false, false), nil, nil),
+			}...)
+		}
 
 		if _, _, _, err := n.client.UpdateMessage(n.channelID, cnr.Status.ThreadTimestamp, slackapi.MsgOptionAttachments(message)); err != nil {
 			return err

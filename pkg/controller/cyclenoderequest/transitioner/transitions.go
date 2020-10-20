@@ -40,6 +40,12 @@ func (t *CycleNodeRequestTransitioner) transitionUndefined() (reconcile.Result, 
 		return t.transitionToHealing(fmt.Errorf("selector cannot be empty"))
 	}
 
+	// Protect against failure case where cyclops checks for leftover CycleNodeStatus objects using the CycleNodeRequest name in the label selector
+	// Label values must be no more than 63 characters long
+	if len(t.cycleNodeRequest.Name) > 63 {
+		return t.transitionToFailed(fmt.Errorf("cycleNodeRequest name must be no more than 63 characters"))
+	}
+
 	// Transition the object to pending
 	return t.transitionObject(v1.CycleNodeRequestPending)
 }

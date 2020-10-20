@@ -23,6 +23,11 @@ func (t *CycleNodeRequestTransitioner) transitionToHealing(err error) (reconcile
 
 // transitionToFailed transitions the current cycleNodeRequest to failed
 func (t *CycleNodeRequestTransitioner) transitionToFailed(err error) (reconcile.Result, error) {
+	// Block transitioning to Failed twice in a row
+	if t.cycleNodeRequest.Status.Phase == v1.CycleNodeRequestFailed {
+		return reconcile.Result{}, nil
+	}
+
 	return t.transitionToUnsuccessful(v1.CycleNodeRequestFailed, err)
 }
 
