@@ -66,7 +66,11 @@ func (n *notifier) generateThreadMessage(cnr *v1.CycleNodeRequest) slackapi.Atta
 	}
 
 	nodeGroupTitle := "Nodegroup"
-	nodeGroupList := append([]string{cnr.Spec.NodeGroupName}, cnr.Spec.NodeGroupsList...)
+	nodeGroupList := cnr.Spec.NodeGroupsList
+
+	if cnr.Spec.NodeGroupName != "" {
+		nodeGroupList = append([]string{cnr.Spec.NodeGroupName}, nodeGroupList...)
+	}
 
 	// If there are multiple nodegroups, adjust the title
 	if (cnr.Spec.NodeGroupName != "" && len(cnr.Spec.NodeGroupsList) > 0) || len(cnr.Spec.NodeGroupsList) > 1 {

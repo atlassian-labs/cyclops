@@ -26,18 +26,18 @@ var (
 func (t *CycleNodeRequestTransitioner) transitionUndefined() (reconcile.Result, error) {
 	t.rm.LogEvent(t.cycleNodeRequest, "Initialising", "Initialising cycleNodeRequest")
 
+	if t.rm.Notifier != nil {
+		if err := t.rm.Notifier.CyclingStarted(t.cycleNodeRequest); err != nil {
+			t.rm.Logger.Error(err, "Unable to post message to messaging provider", "phase", t.cycleNodeRequest.Status.Phase)
+		}
+	}
+
 	// Check fields on the cycleNodeRequest for validity. We rely on the CRD validation rules
 	// to do most of the work here for us.
 
 	// Check to ensure a label selector has been provided
 	if t.cycleNodeRequest.Spec.Selector.Size() == 0 {
 		return t.transitionToHealing(fmt.Errorf("selector cannot be empty"))
-	}
-
-	if t.rm.Notifier != nil {
-		if err := t.rm.Notifier.CyclingStarted(t.cycleNodeRequest); err != nil {
-			t.rm.Logger.Error(err, "Unable to post message to messaging provider", "phase", t.cycleNodeRequest.Status.Phase)
-		}
 	}
 
 	// Transition the object to pending

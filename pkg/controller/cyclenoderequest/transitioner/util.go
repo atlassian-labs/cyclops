@@ -136,7 +136,8 @@ func (t *CycleNodeRequestTransitioner) reapChildren() (v1.CycleNodeRequestPhase,
 	}
 
 	// If we've finished most of our children, go back to Initialised to add some more nodes
-	if t.cycleNodeRequest.Status.ActiveChildren <= t.cycleNodeRequest.Spec.CycleSettings.Concurrency/2 {
+	// If the next phase should be failed, skip this since transitioning back to initialised would be flip-flopping behaviour
+	if nextPhase != v1.CycleNodeRequestFailed && t.cycleNodeRequest.Status.ActiveChildren <= t.cycleNodeRequest.Spec.CycleSettings.Concurrency/2 {
 		t.rm.Logger.Info("Transition back to Initialised to grab more child nodes", "ActiveChildren", t.cycleNodeRequest.Status.ActiveChildren, "Concurrency", t.cycleNodeRequest.Spec.CycleSettings.Concurrency)
 		nextPhase = v1.CycleNodeRequestInitialised
 	}

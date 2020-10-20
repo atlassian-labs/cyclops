@@ -25,6 +25,12 @@ func ListCNRs(c client.Client, options *client.ListOptions) (*atlassianv1.CycleN
 
 // ApplyCNR takes a cnr and optionally uses dry mode in the create request
 func ApplyCNR(c client.Client, drymode bool, cnr atlassianv1.CycleNodeRequest) error {
+	// Protect against failure case where cyclops checks for leftover CycleNodeStatuses using the CycleNodeRequest name in the label selector
+	// Label values must be no more than 63 characters long
+	if len(cnr.Name) > 63 {
+		return fmt.Errorf("cnr name must be no more than 63 characters")
+	}
+
 	var dryruns []string
 	if drymode {
 		dryruns = []string{"All"}
