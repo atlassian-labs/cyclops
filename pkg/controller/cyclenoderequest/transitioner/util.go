@@ -141,6 +141,8 @@ func (t *CycleNodeRequestTransitioner) reapChildren() (v1.CycleNodeRequestPhase,
 	}
 
 	// If we've finished most of our children, go back to Initialised to add some more nodes
+	// It is assumed that nodes selected for cycling will take roughly the same time to finish
+	// Bringing up multiple nodes together will speed up the whole process as well as spread out pods properly across the new nodes
 	// If the next phase should be failed, skip this since transitioning back to initialised would be flip-flopping behaviour
 	if nextPhase != v1.CycleNodeRequestFailed && t.cycleNodeRequest.Status.ActiveChildren <= t.cycleNodeRequest.Spec.CycleSettings.Concurrency/2 {
 		t.rm.Logger.Info("Transition back to Initialised to grab more child nodes", "ActiveChildren", t.cycleNodeRequest.Status.ActiveChildren, "Concurrency", t.cycleNodeRequest.Spec.CycleSettings.Concurrency)

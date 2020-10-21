@@ -3,8 +3,10 @@ package generation
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	atlassianv1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
@@ -27,8 +29,10 @@ func ListCNRs(c client.Client, options *client.ListOptions) (*atlassianv1.CycleN
 func ApplyCNR(c client.Client, drymode bool, cnr atlassianv1.CycleNodeRequest) error {
 	// Protect against failure case where cyclops checks for leftover CycleNodeStatus objects using the CycleNodeRequest name in the label selector
 	// Label values must be no more than 63 characters long
-	if len(cnr.Name) > 63 {
-		return fmt.Errorf("cnr name must be no more than 63 characters")
+	validationErrors := validation.IsDNS1035Label(cnr.Name)
+
+	if len(validationErrors) > 0 {
+		return fmt.Errorf(strings.Join(validationErrors, ","))
 	}
 
 	var dryruns []string

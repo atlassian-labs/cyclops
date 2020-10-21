@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -42,8 +43,10 @@ func (t *CycleNodeRequestTransitioner) transitionUndefined() (reconcile.Result, 
 
 	// Protect against failure case where cyclops checks for leftover CycleNodeStatus objects using the CycleNodeRequest name in the label selector
 	// Label values must be no more than 63 characters long
-	if len(t.cycleNodeRequest.Name) > 63 {
-		return t.transitionToFailed(fmt.Errorf("cycleNodeRequest name must be no more than 63 characters"))
+	validationErrors := validation.IsDNS1035Label(t.cycleNodeRequest.Name)
+
+	if len(validationErrors) > 0 {
+		return t.transitionToFailed(fmt.Errorf(strings.Join(validationErrors, ",")))
 	}
 
 	// Transition the object to pending
