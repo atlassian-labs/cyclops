@@ -23,6 +23,11 @@ func (t *CycleNodeRequestTransitioner) transitionToHealing(err error) (reconcile
 
 // transitionToFailed transitions the current cycleNodeRequest to failed
 func (t *CycleNodeRequestTransitioner) transitionToFailed(err error) (reconcile.Result, error) {
+	// Block transitioning to Failed twice in a row
+	if t.cycleNodeRequest.Status.Phase == v1.CycleNodeRequestFailed {
+		return reconcile.Result{}, nil
+	}
+
 	return t.transitionToUnsuccessful(v1.CycleNodeRequestFailed, err)
 }
 
@@ -136,7 +141,10 @@ func (t *CycleNodeRequestTransitioner) reapChildren() (v1.CycleNodeRequestPhase,
 	}
 
 	// If we've finished most of our children, go back to Initialised to add some more nodes
-	if t.cycleNodeRequest.Status.ActiveChildren <= t.cycleNodeRequest.Spec.CycleSettings.Concurrency/2 {
+	// It is assumed that nodes selected for cycling will take roughly the same time to finish
+	// Bringing up multiple nodes together will speed up the whole process as well as spread out pods properly across the new nodes
+	// If the next phase should be failed, skip this since transitioning back to initialised would be flip-flopping behaviour
+	if nextPhase != v1.CycleNodeRequestFailed && t.cycleNodeRequest.Status.ActiveChildren <= t.cycleNodeRequest.Spec.CycleSettings.Concurrency/2 {
 		t.rm.Logger.Info("Transition back to Initialised to grab more child nodes", "ActiveChildren", t.cycleNodeRequest.Status.ActiveChildren, "Concurrency", t.cycleNodeRequest.Spec.CycleSettings.Concurrency)
 		nextPhase = v1.CycleNodeRequestInitialised
 	}

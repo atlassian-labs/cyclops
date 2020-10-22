@@ -66,7 +66,11 @@ func (n *notifier) generateThreadMessage(cnr *v1.CycleNodeRequest) slackapi.Atta
 	}
 
 	nodeGroupTitle := "Nodegroup"
-	nodeGroupList := append([]string{cnr.Spec.NodeGroupName}, cnr.Spec.NodeGroupsList...)
+	nodeGroupList := cnr.Spec.NodeGroupsList
+
+	if cnr.Spec.NodeGroupName != "" {
+		nodeGroupList = append([]string{cnr.Spec.NodeGroupName}, nodeGroupList...)
+	}
 
 	// If there are multiple nodegroups, adjust the title
 	if (cnr.Spec.NodeGroupName != "" && len(cnr.Spec.NodeGroupsList) > 0) || len(cnr.Spec.NodeGroupsList) > 1 {
@@ -121,9 +125,11 @@ func (n *notifier) PhaseTransitioned(cnr *v1.CycleNodeRequest) error {
 	if cnr.Status.Phase == v1.CycleNodeRequestFailed {
 		message := n.generateThreadMessage(cnr)
 
-		message.Blocks.BlockSet = append(message.Blocks.BlockSet, []slackapi.Block{
-			slackapi.NewSectionBlock(slackapi.NewTextBlockObject(markdownType, fmt.Sprintf("```%v```", cnr.Status.Message), false, false), nil, nil),
-		}...)
+		if cnr.Status.Message != "" {
+			message.Blocks.BlockSet = append(message.Blocks.BlockSet, []slackapi.Block{
+				slackapi.NewSectionBlock(slackapi.NewTextBlockObject(markdownType, fmt.Sprintf("```%v```", cnr.Status.Message), false, false), nil, nil),
+			}...)
+		}
 
 		if _, _, _, err := n.client.UpdateMessage(n.channelID, cnr.Status.ThreadTimestamp, slackapi.MsgOptionAttachments(message)); err != nil {
 			return err

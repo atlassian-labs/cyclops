@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -26,6 +27,12 @@ var (
 func (t *CycleNodeRequestTransitioner) transitionUndefined() (reconcile.Result, error) {
 	t.rm.LogEvent(t.cycleNodeRequest, "Initialising", "Initialising cycleNodeRequest")
 
+	if t.rm.Notifier != nil {
+		if err := t.rm.Notifier.CyclingStarted(t.cycleNodeRequest); err != nil {
+			t.rm.Logger.Error(err, "Unable to post message to messaging provider", "phase", t.cycleNodeRequest.Status.Phase)
+		}
+	}
+
 	// Check fields on the cycleNodeRequest for validity. We rely on the CRD validation rules
 	// to do most of the work here for us.
 
@@ -34,10 +41,12 @@ func (t *CycleNodeRequestTransitioner) transitionUndefined() (reconcile.Result, 
 		return t.transitionToHealing(fmt.Errorf("selector cannot be empty"))
 	}
 
-	if t.rm.Notifier != nil {
-		if err := t.rm.Notifier.CyclingStarted(t.cycleNodeRequest); err != nil {
-			t.rm.Logger.Error(err, "Unable to post message to messaging provider", "phase", t.cycleNodeRequest.Status.Phase)
-		}
+	// Protect against failure case where cyclops checks for leftover CycleNodeStatus objects using the CycleNodeRequest name in the label selector
+	// Label values must be no more than 63 characters long
+	validationErrors := validation.IsDNS1035Label(t.cycleNodeRequest.Name)
+
+	if len(validationErrors) > 0 {
+		return t.transitionToFailed(fmt.Errorf(strings.Join(validationErrors, ",")))
 	}
 
 	// Transition the object to pending
