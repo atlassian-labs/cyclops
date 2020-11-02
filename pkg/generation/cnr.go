@@ -27,14 +27,6 @@ func ListCNRs(c client.Client, options *client.ListOptions) (*atlassianv1.CycleN
 
 // ApplyCNR takes a cnr and optionally uses dry mode in the create request
 func ApplyCNR(c client.Client, drymode bool, cnr atlassianv1.CycleNodeRequest) error {
-	// Protect against failure case where cyclops checks for leftover CycleNodeStatus objects using the CycleNodeRequest name in the label selector
-	// Label values must be no more than 63 characters long
-	validationErrors := validation.IsDNS1035Label(cnr.Name)
-
-	if len(validationErrors) > 0 {
-		return fmt.Errorf(strings.Join(validationErrors, ","))
-	}
-
 	var dryruns []string
 	if drymode {
 		dryruns = []string{"All"}
@@ -53,6 +45,15 @@ func ValidateCNR(nodeLister k8s.NodeLister, cnr atlassianv1.CycleNodeRequest) (b
 
 	if ok, reason := validateCycleSettings(cnr.Spec.CycleSettings); !ok {
 		return ok, reason
+	}
+
+	// Protect against failure case where cyclops checks for leftover CycleNodeStatus objects using the CycleNodeRequest name in the label selector
+	// Label values must be no more than 63 characters long
+	name, suffix := GetNameExample(cnr.ObjectMeta)
+	validationErrors := validation.IsDNS1035Label(name + suffix)
+
+	if len(validationErrors) > 0 {
+		return false, strings.Join(validationErrors, ",")
 	}
 
 	// validate against nodes in api
