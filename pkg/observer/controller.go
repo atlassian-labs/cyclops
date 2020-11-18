@@ -274,11 +274,11 @@ func (c *controller) safeToStartCycle() bool {
 	result, warnings, err := v1api.Query(ctx, "cluster_autoscaler_last_activity{activity='scaleUp'}", time.Now())
 	if err != nil {
 		// cluster-autoscaler might not be installed in the cluster. return true if it can't find the metrics of run the query
-		klog.Errorln("Error querying Prometheus: %v", err)
+		klog.Errorln("Error querying Prometheus: ", err)
 		return safeToStart
 	}
 	if len(warnings) > 0 {
-		klog.Errorln("Warnings: %v", warnings)
+		klog.Errorln("Warnings: ", warnings)
 	}
 
 	v := result.(model.Vector)
@@ -291,13 +291,13 @@ func (c *controller) safeToStartCycle() bool {
 	scaleUpTime := v[v.Len()-1].Value.String()
 	t, err := stringToTime(scaleUpTime)
 	if err != nil {
-		klog.Fatalln("Error converting the time: %v", err)
+		klog.Fatalln("Error converting the time: ", err)
 	}
 
 	lastScaleEvent := time.Now().Sub(t)
 	if lastScaleEvent <= c.NodeStartupTime {
 		safeToStart = false
-		klog.Infoln("Scale up event happened less than %v ago", c.NodeStartupTime)
+		klog.Infoln("Scale up event recently happened", c.NodeStartupTime)
 		return safeToStart
 	}
 
@@ -376,7 +376,7 @@ func (c *controller) Run() {
 			time.Sleep(10 * time.Second)
 			timeout++
 			if timeout >= retries {
-				klog.Fatalf("Not safe to start CNR. %v retries exceeded", retries)
+				klog.Fatalf("Not safe to start CNR. Retries exceeded", retries)
 			}
 		}
 		klog.V(3).Infof("applying %d CNRs", len(changedNodeGroups))
