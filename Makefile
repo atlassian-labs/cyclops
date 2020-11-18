@@ -1,4 +1,4 @@
-VERSION = 1.1.2
+VERSION = 1.1.1
 IMAGE = cyclops:$(VERSION)
 
 MANAGER_BIN = cyclops
