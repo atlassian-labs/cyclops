@@ -21,16 +21,18 @@ type Controller interface {
 
 // Options contains the options config for a controller
 type Options struct {
-	CNRPrefix     string
-	Namespace     string
-	CheckSchedule string
+	CNRPrefix         string
+	Namespace         string
+	CheckSchedule     string
+	PrometheusAddress string
 
 	DryMode        bool
 	RunImmediately bool
 	RunOnce        bool
 
-	CheckInterval time.Duration
-	WaitInterval  time.Duration
+	CheckInterval   time.Duration
+	WaitInterval    time.Duration
+	NodeStartupTime time.Duration
 }
 
 // ListedNodeGroups defines a type that contains a NodeGroup, a List of Nodes for that NodeGroup, and an optional Reason for why they are there
