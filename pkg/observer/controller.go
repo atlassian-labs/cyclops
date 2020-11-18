@@ -264,7 +264,7 @@ func (c *controller) safeToStartCycle() bool {
 	})
 	if err != nil {
 		// Prometheus might not be installed in the cluster. return true if it can't connect
-		klog.Errorln("Error creating client: %v\n", err)
+		klog.Errorln("Error creating client:", err)
 		return safeToStart
 	}
 
@@ -294,7 +294,7 @@ func (c *controller) safeToStartCycle() bool {
 		klog.Fatalln("Error converting the time: ", err)
 	}
 
-	lastScaleEvent := time.Now().Sub(t)
+	lastScaleEvent := time.Since(t)
 	if lastScaleEvent <= c.NodeStartupTime {
 		safeToStart = false
 		klog.Infoln("Scale up event recently happened", c.NodeStartupTime)
@@ -372,7 +372,7 @@ func (c *controller) Run() {
 	case <-time.After(c.WaitInterval):
 		timeout := 0
 		retries := 20
-		for c.safeToStartCycle() == false {
+		for !c.safeToStartCycle() {
 			time.Sleep(10 * time.Second)
 			timeout++
 			if timeout >= retries {
