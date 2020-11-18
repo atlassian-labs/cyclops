@@ -376,7 +376,7 @@ func (c *controller) Run() {
 			time.Sleep(10 * time.Second)
 			timeout++
 			if timeout >= retries {
-				klog.Fatalf("Not safe to start CNR. Retries exceeded", retries)
+				klog.Fatalln("Not safe to start CNR. Retries exceeded", retries)
 			}
 		}
 		klog.V(3).Infof("applying %d CNRs", len(changedNodeGroups))
