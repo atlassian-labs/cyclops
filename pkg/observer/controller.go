@@ -2,11 +2,13 @@ package observer
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"sort"
 	"strconv"
 	"time"
 
+	"github.com/cenkalti/backoff"
 	"github.com/prometheus/client_golang/api"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/model"
@@ -258,14 +260,13 @@ func stringToTime(s string) (time.Time, error) {
 
 // query cluster-autoscaler metrics to figure out if it's safe to start a new CNR
 func (c *controller) safeToStartCycle() bool {
-	safeToStart := true
 	client, err := api.NewClient(api.Config{
 		Address: c.PrometheusAddress,
 	})
 	if err != nil {
 		// Prometheus might not be installed in the cluster. return true if it can't connect
 		klog.Errorln("Error creating client:", err)
-		return safeToStart
+		return true
 	}
 
 	v1api := promv1.NewAPI(client)
@@ -274,34 +275,34 @@ func (c *controller) safeToStartCycle() bool {
 	result, warnings, err := v1api.Query(ctx, "cluster_autoscaler_last_activity{activity='scaleUp'}", time.Now())
 	if err != nil {
 		// cluster-autoscaler might not be installed in the cluster. return true if it can't find the metrics of run the query
-		klog.Errorln("Error querying Prometheus: ", err)
-		return safeToStart
+		klog.Errorln("Error querying Prometheus:", err)
+		return true
 	}
 	if len(warnings) > 0 {
-		klog.Errorln("Warnings: ", warnings)
+		klog.Errorln("Warnings:", warnings)
 	}
 
 	v := result.(model.Vector)
 	// consider safe if there isn't any scaleUp event yet
 	if v.Len() == 0 {
 		klog.Infoln("No scaleUp events")
-		return safeToStart
+		return true
 	}
 
 	scaleUpTime := v[v.Len()-1].Value.String()
 	t, err := stringToTime(scaleUpTime)
 	if err != nil {
-		klog.Fatalln("Error converting the time: ", err)
+		klog.Errorln("Error converting the time:", err)
+		return false
 	}
 
 	lastScaleEvent := time.Since(t)
 	if lastScaleEvent <= c.NodeStartupTime {
-		safeToStart = false
-		klog.Infoln("Scale up event recently happened", c.NodeStartupTime)
-		return safeToStart
+		klog.Infoln("Scale up event recently happened")
+		return false
 	}
 
-	return safeToStart
+	return true
 }
 
 // createCNRs generates and applies CNRs from the changedNodeGroups
@@ -337,6 +338,26 @@ func (c *controller) nextRunTime() time.Time {
 	return time.Now().UTC().Add(c.CheckInterval)
 }
 
+func (c *controller) checkIfSafeToStartCycle() bool {
+	b := backoff.NewExponentialBackOff()
+	b.MaxElapsedTime = 120 * time.Second
+
+	err := backoff.Retry(func() error {
+		if !c.safeToStartCycle() {
+			klog.Error("Cluster autoscaler scaleUp event in progress. Retry...")
+			return errors.New("cluster-autoscaler event in progress")
+		}
+		return nil
+	}, b)
+
+	if err != nil {
+		klog.Errorln("there are stll cluster-autoscaler scaleUp events")
+		return false
+	}
+
+	return true
+}
+
 // Run runs the controller loops once. detecting lock, changes, and applying CNRs
 // implements cron.Job interface
 func (c *controller) Run() {
@@ -366,19 +387,15 @@ func (c *controller) Run() {
 		}
 	}
 
+	// query cluster-autoscaler to check if it's safe to start a new CNR
+	if !c.checkIfSafeToStartCycle() {
+		return
+	}
+
 	// wait for the desired amount to allow any in progress changes to batch up
 	klog.V(3).Infof("waiting for %v to allow changes to settle", c.WaitInterval)
 	select {
 	case <-time.After(c.WaitInterval):
-		timeout := 0
-		retries := 20
-		for !c.safeToStartCycle() {
-			time.Sleep(10 * time.Second)
-			timeout++
-			if timeout >= retries {
-				klog.Fatalln("Not safe to start CNR. Retries exceeded", retries)
-			}
-		}
 		klog.V(3).Infof("applying %d CNRs", len(changedNodeGroups))
 		c.createCNRs(changedNodeGroups)
 		if c.RunOnce {

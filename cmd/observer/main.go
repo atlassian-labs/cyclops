@@ -54,10 +54,10 @@ func newApp(rootCmd *cobra.Command) *app {
 		dryMode:           rootCmd.PersistentFlags().Bool("dry", false, "api-server drymode for applying CNRs"),
 		waitInterval:      rootCmd.PersistentFlags().Duration("wait-interval", 2*time.Minute, "duration to wait after detecting changes before creating CNR objects. The window for letting changes on nodegroups settle before starting rotation"),
 		checkInterval:     rootCmd.PersistentFlags().Duration("check-interval", 5*time.Minute, `duration interval to check for changes. e.g. run the loop every 5 minutes"`),
-		nodeStartupTime:   rootCmd.PersistentFlags().Duration("node-startup-time", 2*time.Minute, "duration to wait after a scaleUp event is detected"),
+		nodeStartupTime:   rootCmd.PersistentFlags().Duration("node-startup-time", 2*time.Minute, "duration to wait after a cluster-autoscaler scaleUp event is detected"),
 		runImmediately:    rootCmd.PersistentFlags().Bool("now", false, "makes the check loop run straight away on program start rather than wait for the check interval to elapse"),
 		runOnce:           rootCmd.PersistentFlags().Bool("once", false, "run the check loop once then exit. also works with --now"),
-		prometheusAddress: rootCmd.PersistentFlags().String("prometheus-address", "prometheus", "Prometheus service address"),
+		prometheusAddress: rootCmd.PersistentFlags().String("prometheus-address", "prometheus", "Prometheus service address used to query cluster-autoscaler metrics"),
 	}
 }
 
