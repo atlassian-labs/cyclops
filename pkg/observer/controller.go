@@ -351,7 +351,7 @@ func (c *controller) checkIfSafeToStartCycle() bool {
 	}, b)
 
 	if err != nil {
-		klog.Errorln("there are stll cluster-autoscaler scaleUp events")
+		klog.Errorln("there are still cluster-autoscaler scaleUp events")
 		return false
 	}
 
