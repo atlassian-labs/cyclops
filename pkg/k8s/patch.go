@@ -1,7 +1,9 @@
 package k8s
 
 import (
+	"context"
 	"encoding/json"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
@@ -20,7 +22,7 @@ func PatchPod(name, namespace string, patches []Patch, client kubernetes.Interfa
 	if err != nil {
 		return err
 	}
-	_, err = client.CoreV1().Pods(namespace).Patch(name, types.JSONPatchType, data)
+	_, err = client.CoreV1().Pods(namespace).Patch(context.TODO(), name, types.JSONPatchType, data, v1.PatchOptions{})
 	return err
 }
 
@@ -30,6 +32,6 @@ func PatchNode(name string, patches []Patch, client kubernetes.Interface) error 
 	if err != nil {
 		return err
 	}
-	_, err = client.CoreV1().Nodes().Patch(name, types.JSONPatchType, data)
+	_, err = client.CoreV1().Nodes().Patch(context.TODO(), name, types.JSONPatchType, data, v1.PatchOptions{})
 	return err
 }

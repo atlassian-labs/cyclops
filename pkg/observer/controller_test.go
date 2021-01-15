@@ -3,6 +3,7 @@ package observer
 import (
 	"context"
 	"fmt"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"testing"
 
 	atlassianv1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
@@ -82,7 +83,7 @@ func TestController_validNodeGroups(t *testing.T) {
 				tt.scenario.Nodegroups[i].Spec.CycleSettings.Concurrency = 1
 				objects = append(objects, tt.scenario.Nodegroups[i])
 			}
-			client := fake.NewFakeClientWithScheme(scheme, objects...)
+			client := NewFakeClientWithScheme(scheme, objects...)
 
 			var ngList atlassianv1.NodeGroupList
 			_ = client.List(context.TODO(), &ngList)
@@ -174,7 +175,7 @@ func Test_inProgressCNRs(t *testing.T) {
 			for i := range tt.cnrs {
 				objects = append(objects, &tt.cnrs[i])
 			}
-			client := fake.NewFakeClientWithScheme(scheme, objects...)
+			client := NewFakeClientWithScheme(scheme, objects...)
 
 			c := controller{
 				client: client,
@@ -262,7 +263,7 @@ func Test_dropInProgressNodeGroups(t *testing.T) {
 			for i := range tt.cnrs.Items {
 				objects = append(objects, &tt.cnrs.Items[i])
 			}
-			client := fake.NewFakeClientWithScheme(scheme, objects...)
+			client := NewFakeClientWithScheme(scheme, objects...)
 
 			c := controller{
 				client: client,
@@ -317,4 +318,8 @@ func Test_sameNodeGroups(t *testing.T) {
 			assert.Equal(t, tt.expect, got)
 		})
 	}
+}
+
+func NewFakeClientWithScheme(clientScheme *runtime.Scheme, initObjs ...runtime.Object) client.Client {
+	return fake.NewClientBuilder().WithScheme(clientScheme).WithRuntimeObjects(initObjs...).Build()
 }

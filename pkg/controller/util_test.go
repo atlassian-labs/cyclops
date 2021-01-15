@@ -1,6 +1,7 @@
 package controller
 
 import (
+	coreV1 "k8s.io/api/core/v1"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -19,8 +20,10 @@ func TestNamespacePredicate(t *testing.T) {
 			"test create allowed",
 			"kube-system",
 			event.CreateEvent{
-				Meta: &v1.ObjectMeta{
-					Namespace: "kube-system",
+				Object: &coreV1.Event{
+					ObjectMeta: v1.ObjectMeta{
+						Namespace: "kube-system",
+					},
 				},
 			},
 			true,
@@ -29,8 +32,10 @@ func TestNamespacePredicate(t *testing.T) {
 			"test create denied",
 			"kube-system",
 			event.CreateEvent{
-				Meta: &v1.ObjectMeta{
-					Namespace: "default",
+				Object: &coreV1.Event{
+					ObjectMeta: v1.ObjectMeta{
+						Namespace: "default",
+					},
 				},
 			},
 			false,
@@ -39,8 +44,10 @@ func TestNamespacePredicate(t *testing.T) {
 			"test delete allowed",
 			"kube-system",
 			event.DeleteEvent{
-				Meta: &v1.ObjectMeta{
-					Namespace: "kube-system",
+				Object: &coreV1.Event{
+					ObjectMeta: v1.ObjectMeta{
+						Namespace: "kube-system",
+					},
 				},
 			},
 			true,
@@ -49,8 +56,10 @@ func TestNamespacePredicate(t *testing.T) {
 			"test delete denied",
 			"kube-system",
 			event.DeleteEvent{
-				Meta: &v1.ObjectMeta{
-					Namespace: "default",
+				Object: &coreV1.Event{
+					ObjectMeta: v1.ObjectMeta{
+						Namespace: "default",
+					},
 				},
 			},
 			false,
@@ -59,8 +68,10 @@ func TestNamespacePredicate(t *testing.T) {
 			"test update allowed",
 			"kube-system",
 			event.UpdateEvent{
-				MetaNew: &v1.ObjectMeta{
-					Namespace: "kube-system",
+				ObjectNew: &coreV1.Event{
+					ObjectMeta: v1.ObjectMeta{
+						Namespace: "kube-system",
+					},
 				},
 			},
 			true,
@@ -69,8 +80,10 @@ func TestNamespacePredicate(t *testing.T) {
 			"test update denied",
 			"kube-system",
 			event.UpdateEvent{
-				MetaNew: &v1.ObjectMeta{
-					Namespace: "default",
+				ObjectNew: &coreV1.Event{
+					ObjectMeta: v1.ObjectMeta{
+						Namespace: "default",
+					},
 				},
 			},
 			false,
@@ -79,8 +92,10 @@ func TestNamespacePredicate(t *testing.T) {
 			"test generic allowed",
 			"kube-system",
 			event.GenericEvent{
-				Meta: &v1.ObjectMeta{
-					Namespace: "kube-system",
+				Object: &coreV1.Event{
+					ObjectMeta: v1.ObjectMeta{
+						Namespace: "kube-system",
+					},
 				},
 			},
 			true,
@@ -89,8 +104,10 @@ func TestNamespacePredicate(t *testing.T) {
 			"test generic denied",
 			"kube-system",
 			event.GenericEvent{
-				Meta: &v1.ObjectMeta{
-					Namespace: "default",
+				Object: &coreV1.Event{
+					ObjectMeta: v1.ObjectMeta{
+						Namespace: "default",
+					},
 				},
 			},
 			false,

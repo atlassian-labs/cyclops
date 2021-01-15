@@ -85,12 +85,12 @@ func NewReconciler(
 }
 
 // Reconcile reconciles the incoming request, usually a cycleNodeRequest
-func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	logger := log.WithValues("name", request.Name, "namespace", request.Namespace, "controller", controllerName)
 
 	// Fetch the cycle node request from the API server
 	cycleNodeRequest := &v1.CycleNodeRequest{}
-	err := r.mgr.GetClient().Get(context.TODO(), request.NamespacedName, cycleNodeRequest)
+	err := r.mgr.GetClient().Get(ctx, request.NamespacedName, cycleNodeRequest)
 	if err != nil {
 		// Object not found, must have been deleted
 		if errors.IsNotFound(err) {
