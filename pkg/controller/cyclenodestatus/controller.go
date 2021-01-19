@@ -2,6 +2,7 @@ package cyclenodestatus
 
 import (
 	"context"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	v1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
 	"github.com/atlassian-labs/cyclops/pkg/cloudprovider"
@@ -10,7 +11,6 @@ import (
 	"github.com/atlassian-labs/cyclops/pkg/notifications"
 	coreV1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -78,26 +78,25 @@ func NewReconciler(
 	}
 
 	// Setup an indexer for pod spec.nodeName
-	err = mgr.GetFieldIndexer().IndexField(&coreV1.Pod{}, "spec.nodeName", func(object runtime.Object) []string {
+	if err := mgr.GetFieldIndexer().IndexField(context.TODO(), &coreV1.Pod{}, "spec.nodeName", func(object client.Object) []string {
 		p, ok := object.(*coreV1.Pod)
 		if !ok {
 			return []string{}
 		}
 		return []string{p.Spec.NodeName}
-	})
-	if err != nil {
+	}); err != nil {
 		return nil, err
 	}
 	return reconciler, nil
 }
 
 // Reconcile reconciles the incoming request, usually a cycleNodeStatus
-func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	logger := log.WithValues("name", request.Name, "namespace", request.Namespace, "controller", controllerName)
 
 	// Fetch the CycleNodeStatus from the API server
 	cycleNodeStatus := &v1.CycleNodeStatus{}
-	err := r.mgr.GetClient().Get(context.TODO(), request.NamespacedName, cycleNodeStatus)
+	err := r.mgr.GetClient().Get(ctx, request.NamespacedName, cycleNodeStatus)
 	if err != nil {
 		// Object not found, must have been deleted
 		if errors.IsNotFound(err) {

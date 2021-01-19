@@ -46,7 +46,7 @@ func NewResourceManager(
 }
 
 // UpdateObject updates the given object in the API
-func (t *ResourceManager) UpdateObject(obj runtime.Object) error {
+func (t *ResourceManager) UpdateObject(obj client.Object) error {
 	err := t.Client.Update(context.TODO(), obj)
 	if err != nil {
 		t.Logger.Error(err, "unable to update API object",

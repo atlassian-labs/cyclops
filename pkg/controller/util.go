@@ -16,17 +16,17 @@ func NewNamespacePredicate(namespace string) predicate.Predicate {
 }
 
 func (n *namespacePredicate) Create(e event.CreateEvent) bool {
-	return e.Meta.GetNamespace() == n.namespace
+	return e.Object.GetNamespace() == n.namespace
 }
 
 func (n *namespacePredicate) Delete(e event.DeleteEvent) bool {
-	return e.Meta.GetNamespace() == n.namespace
+	return e.Object.GetNamespace() == n.namespace
 }
 
 func (n *namespacePredicate) Update(e event.UpdateEvent) bool {
-	return e.MetaNew.GetNamespace() == n.namespace
+	return e.ObjectNew.GetNamespace() == n.namespace
 }
 
 func (n *namespacePredicate) Generic(e event.GenericEvent) bool {
-	return e.Meta.GetNamespace() == n.namespace
+	return e.Object.GetNamespace() == n.namespace
 }

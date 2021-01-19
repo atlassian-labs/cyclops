@@ -14,8 +14,7 @@ import (
 	"github.com/atlassian-labs/cyclops/pkg/metrics"
 	"github.com/atlassian-labs/cyclops/pkg/notifications"
 	"github.com/atlassian-labs/cyclops/pkg/notifications/notifierbuilder"
-	"github.com/operator-framework/operator-sdk/pkg/leader"
-	sdkVersion "github.com/operator-framework/operator-sdk/version"
+	"github.com/operator-framework/operator-lib/leader"
 	"gopkg.in/alecthomas/kingpin.v2"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -48,7 +47,8 @@ var log = logf.Log.WithName("cmd")
 
 func main() {
 	kingpin.MustParse(app.Parse(os.Args[1:]))
-	logf.SetLogger(zap.Logger(*debug))
+	logger := zap.New(zap.UseDevMode(*debug))
+	logf.SetLogger(logger)
 	printVersion()
 
 	// Get a config to talk to the apiserver
@@ -138,6 +138,5 @@ func main() {
 func printVersion() {
 	log.Info(fmt.Sprintf("Go Version: %s", runtime.Version()))
 	log.Info(fmt.Sprintf("Go OS/Arch: %s/%s", runtime.GOOS, runtime.GOARCH))
-	log.Info(fmt.Sprintf("operator-sdk Version: %v", sdkVersion.Version))
-	log.Info(fmt.Sprintf("cyclops Version: %v", version))
+	log.Info(fmt.Sprintf("Cyclops Version: %v", version))
 }

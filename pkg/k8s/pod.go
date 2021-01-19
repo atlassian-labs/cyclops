@@ -1,6 +1,7 @@
 package k8s
 
 import (
+	"context"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -16,7 +17,7 @@ var log = logf.Log.WithName("k8s.pod.go")
 // EvictPod evicts a single pod from Kubernetes
 func EvictPod(pod *v1.Pod, apiVersion string, client kubernetes.Interface) error {
 	log.Info("Evicting pod", "podName", pod.Name, "nodeName", pod.Spec.NodeName, "apiVersion", apiVersion)
-	return client.CoreV1().Pods(pod.Namespace).Evict(&v1beta1.Eviction{
+	return client.CoreV1().Pods(pod.Namespace).Evict(context.TODO(), &v1beta1.Eviction{
 		TypeMeta: metaV1.TypeMeta{
 			APIVersion: apiVersion,
 			Kind:       evictionKind,
