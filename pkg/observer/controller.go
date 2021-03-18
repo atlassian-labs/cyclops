@@ -300,11 +300,11 @@ func (c *controller) safeToStartCycle() bool {
 	// cluster_autoscaler_last_activity values will update every ~30 seconds in non-scaling scenario
 	// set threshold detection time to 40 seconds to take account for any anomaly that may put a slightly longer time
 	lastScaleEvent := time.Since(t)
-	if lastScaleEvent > (time.Second * 40) {
+	if lastScaleEvent > time.Second*40 {
 		klog.Infoln("Scale up event recently happened")
 		return false
 	}
-	klog.Infoln("No scale up event")
+	klog.V(3).Infoln("No scale up event")
 
 	return true
 }
