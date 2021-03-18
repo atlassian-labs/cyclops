@@ -272,7 +272,8 @@ func (c *controller) safeToStartCycle() bool {
 	v1api := promv1.NewAPI(client)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	result, warnings, err := v1api.Query(ctx, "cluster_autoscaler_last_activity{activity='scaleUp'}", time.Now())
+	// scaleDown metric will stops updating and report the last time it's updated when the cluster is scaling up
+	result, warnings, err := v1api.Query(ctx, "cluster_autoscaler_last_activity{activity='scaleDown'}", time.Now())
 	if err != nil {
 		// cluster-autoscaler might not be installed in the cluster. return true if it can't find the metrics of run the query
 		klog.Errorln("Error querying Prometheus:", err)
@@ -283,9 +284,9 @@ func (c *controller) safeToStartCycle() bool {
 	}
 
 	v := result.(model.Vector)
-	// consider safe if there isn't any scaleUp event yet
+	// cluster-autoscaler should always gives a response if it's active
 	if v.Len() == 0 {
-		klog.Infoln("No scaleUp events")
+		klog.Errorln("Empty response from prometheus")
 		return true
 	}
 
@@ -296,11 +297,14 @@ func (c *controller) safeToStartCycle() bool {
 		return false
 	}
 
+	// cluster_autoscaler_last_activity values will update every ~30 seconds in non-scaling scenario
+	// set threshold detection time to 40 seconds to take account for any anomaly that may put a slightly longer time
 	lastScaleEvent := time.Since(t)
-	if lastScaleEvent <= c.NodeStartupTime {
+	if lastScaleEvent > (time.Second * 40) {
 		klog.Infoln("Scale up event recently happened")
 		return false
 	}
+	klog.Infoln("No scale up event")
 
 	return true
 }
