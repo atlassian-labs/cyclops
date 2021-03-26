@@ -272,7 +272,8 @@ func (c *controller) safeToStartCycle() bool {
 	v1api := promv1.NewAPI(client)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	// scaleDown metric will stops updating and report the last time it's updated when the cluster is scaling up
+	// scaleDown metric is updated every cycle cluster-autoscaler is checking if the cluster should scaleDown
+	// scaleDown does not get checked and therefore not updated when the cluster is scaling up since no check for scaleDown is needed
 	result, warnings, err := v1api.Query(ctx, "cluster_autoscaler_last_activity{activity='scaleDown'}", time.Now())
 	if err != nil {
 		// cluster-autoscaler might not be installed in the cluster. return true if it can't find the metrics of run the query
@@ -297,10 +298,9 @@ func (c *controller) safeToStartCycle() bool {
 		return false
 	}
 
-	// cluster_autoscaler_last_activity values will update every ~30 seconds in non-scaling scenario
-	// set threshold detection time to 40 seconds to take account for any anomaly that may put a slightly longer time
+	// cluster_autoscaler_last_activity values will update every PrometheusScrapeInterval in non-scaling scenario
 	lastScaleEvent := time.Since(t)
-	if lastScaleEvent > time.Second*40 {
+	if lastScaleEvent > c.PrometheusScrapeInterval {
 		klog.Infoln("Scale up event recently happened")
 		return false
 	}
