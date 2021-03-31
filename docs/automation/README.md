@@ -189,27 +189,31 @@ Usage:
   cyclops-observer [flags]
 
 Flags:
-      --add_dir_header                   If true, adds the file directory to the header
-      --addr string                      Address to listen on for /metrics (default ":8080")
-      --alsologtostderr                  log to standard error as well as files
-      --check-interval duration          duration interval to check for changes. e.g. run the loop every 5 minutes" (default 5m0s)
-      --cloud-provider string            Which cloud provider to use, options: [aws] (default "aws")
-      --dry                              api-server drymode for applying CNRs
-  -h, --help                             help for cyclops-observer
-      --log_backtrace_at traceLocation   when logging hits line file:N, emit a stack trace (default :0)
-      --log_dir string                   If non-empty, write log files in this directory
-      --log_file string                  If non-empty, use this log file
-      --log_file_max_size uint           Defines the maximum size a log file can grow to. Unit is megabytes. If the value is 0, the maximum file size is unlimited. (default 1800)
-      --logtostderr                      log to standard error instead of files (default true)
-      --namespace string                 Namespaces to watch and create cnrs (default "kube-system")
-      --namespaces strings               Namespaces to watch for outdated daemonsets (default [kube-system])
-      --run-immediately                  makes the check loop run straight away on program start rather than wait for the cron
-      --skip_headers                     If true, avoid header prefixes in the log messages
-      --skip_log_headers                 If true, avoid headers when opening log files
-      --stderrthreshold severity         logs at or above this threshold go to stderr
-  -v, --v Level                          number for the log level verbosity
-      --vmodule moduleSpec               comma-separated list of pattern=N settings for file-filtered logging
-      --wait-interval duration           duration to wait after detecting changes before creating CNR objects. The window for letting changes on nodegroups settle before starting rotation (default 2m0s)
+      --add_dir_header                        If true, adds the file directory to the header
+      --addr string                           Address to listen on for /metrics (default ":8080")
+      --alsologtostderr                       log to standard error as well as files
+      --check-interval duration               duration interval to check for changes. e.g. run the loop every 5 minutes" (default 5m0s)
+      --cloud-provider string                 Which cloud provider to use, options: [aws] (default "aws")
+      --dry                                   api-server drymode for applying CNRs
+  -h, --help                                  help for cyclops-observer
+      --log_backtrace_at traceLocation        when logging hits line file:N, emit a stack trace (default :0)
+      --log_dir string                        If non-empty, write log files in this directory
+      --log_file string                       If non-empty, use this log file
+      --log_file_max_size uint                Defines the maximum size a log file can grow to. Unit is megabytes. If the value is 0, the maximum file size is unlimited. (default 1800)
+      --logtostderr                           log to standard error instead of files (default true)
+      --namespace string                      Namespaces to watch and create cnrs (default "kube-system")
+      --namespaces strings                    Namespaces to watch for cycle request objects (default [kube-system])
+      --node-startup-time duration            duration to wait after a cluster-autoscaler scaleUp event is detected (default 2m0s)
+      --now                                   makes the check loop run straight away on program start rather than wait for the check interval to elapse
+      --once                                  run the check loop once then exit. also works with --now
+      --prometheus-address string             Prometheus service address used to query cluster-autoscaler metrics (default "prometheus")
+      --prometheus-scrape-interval duration   Prometheus scrape interval used to detect change of value from prometheus query, needed to detect scaleUp event (default 40s)
+      --skip_headers                          If true, avoid header prefixes in the log messages
+      --skip_log_headers                      If true, avoid headers when opening log files
+      --stderrthreshold severity              logs at or above this threshold go to stderr
+  -v, --v Level                               number for the log level verbosity (default 0)
+      --vmodule moduleSpec                    comma-separated list of pattern=N settings for file-filtered logging
+      --wait-interval duration                duration to wait after detecting changes before creating CNR objects. The window for letting changes on nodegroups settle before starting rotation (default 2m0s)
 ```
 
 ### Diagram
