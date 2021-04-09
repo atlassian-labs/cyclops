@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -16,12 +17,14 @@ import (
 )
 
 const (
-	generateExample                = "xxxxx"
-	concurrencyLessThanZeroMessage = "concurrency cannot be less than 0"
-	concurrencyEqualsZeroMessage   = "concurrency set to 0"
-	nodeGroupScaledToZeroMessage   = "node group is scaled to 0"
-	cnrNameLabelKey                = "name"
-	cnrReasonAnnotationKey         = "reason"
+	generateExample                    = "xxxxx"
+	concurrencyLessThanZeroMessage     = "concurrency cannot be less than 0"
+	concurrencyEqualsZeroMessage       = "concurrency set to 0"
+	nodeGroupScaledToZeroMessage       = "node group is scaled to 0"
+	cnrNameLabelKey                    = "name"
+	cnrReasonAnnotationKey             = "reason"
+	waitTimeoutLessThanZeroMessage     = "waitTimeout cannot be less than 0 seconds"
+	waitTimeoutNotInTimeDurationFormat = "waitTimeout is not in time duration format"
 )
 
 // onceShotNodeLister creates a node lister that lists nodes with the controller client.Client as a Get/List
@@ -55,6 +58,14 @@ func validateCycleSettings(settings atlassianv1.CycleSettings) (bool, string) {
 
 	if settings.Concurrency == 0 {
 		return false, concurrencyEqualsZeroMessage
+	}
+
+	if _, err := time.ParseDuration(settings.WaitTimeout); err != nil {
+		return false, waitTimeoutNotInTimeDurationFormat
+	}
+
+	if timeout, _ := time.ParseDuration(settings.WaitTimeout); timeout < 0*time.Second {
+		return false, waitTimeoutLessThanZeroMessage
 	}
 
 	return true, ""

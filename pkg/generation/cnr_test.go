@@ -122,6 +122,7 @@ func TestValidateCNR(t *testing.T) {
 	nodeGroup.Spec.CycleSettings = atlassianv1.CycleSettings{
 		Method:      "Drain",
 		Concurrency: 1,
+		WaitTimeout: "3h",
 	}
 
 	tests := []struct {
@@ -129,6 +130,7 @@ func TestValidateCNR(t *testing.T) {
 		nodes       []*v1.Node
 		nodeNames   []string
 		concurrency int64
+		waitTimeout string
 		ok          bool
 		reason      string
 	}{
@@ -137,6 +139,7 @@ func TestValidateCNR(t *testing.T) {
 			nodes,
 			names,
 			1,
+			"3h",
 			true,
 			"",
 		},
@@ -145,6 +148,7 @@ func TestValidateCNR(t *testing.T) {
 			nodes,
 			names,
 			1,
+			"3h",
 			false,
 			`label value is not valid: a DNS-1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')`,
 		},
@@ -153,6 +157,7 @@ func TestValidateCNR(t *testing.T) {
 			nodes,
 			names,
 			1,
+			"3h",
 			false,
 			"name is not valid: must be no more than 253 characters",
 		},
@@ -161,6 +166,7 @@ func TestValidateCNR(t *testing.T) {
 			nodes,
 			names,
 			0,
+			"3h",
 			false,
 			concurrencyEqualsZeroMessage,
 		},
@@ -169,6 +175,7 @@ func TestValidateCNR(t *testing.T) {
 			nodes,
 			names,
 			-1,
+			"3h",
 			false,
 			concurrencyLessThanZeroMessage,
 		},
@@ -177,6 +184,7 @@ func TestValidateCNR(t *testing.T) {
 			nodes,
 			append(names, "missing"),
 			1,
+			"3h",
 			false,
 			`the node "missing" does not exist in the nodegroup but it is specified to cycle`,
 		},
@@ -185,8 +193,27 @@ func TestValidateCNR(t *testing.T) {
 			nil,
 			nil,
 			1,
+			"3h",
 			false,
 			nodeGroupScaledToZeroMessage,
+		},
+		{
+			"test-wrongformat-waittimeout",
+			nodes,
+			names,
+			0,
+			"1dwj1",
+			false,
+			concurrencyEqualsZeroMessage,
+		},
+		{
+			"test-negative-waittimeout",
+			nodes,
+			names,
+			-1,
+			"-1s",
+			false,
+			concurrencyLessThanZeroMessage,
 		},
 	}
 
@@ -194,6 +221,7 @@ func TestValidateCNR(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			nodeLister := test.NewTestNodeWatcher(tt.nodes, test.NodeListerOptions{ReturnErrorOnList: false})
 			nodeGroup.Spec.CycleSettings.Concurrency = tt.concurrency
+			nodeGroup.Spec.CycleSettings.WaitTimeout = tt.waitTimeout
 			cnr := GenerateCNR(nodeGroup, tt.nodeNames, tt.name, "kube-system")
 			ok, reason := ValidateCNR(nodeLister, cnr)
 			assert.Equal(t, tt.ok, ok)

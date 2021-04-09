@@ -4,12 +4,12 @@ import (
 	"strings"
 	"testing"
 
+	atlassianv1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
+	"github.com/atlassian-labs/cyclops/pkg/test"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	atlassianv1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
-	"github.com/atlassian-labs/cyclops/pkg/test"
 )
 
 func TestGetName(t *testing.T) {
@@ -103,34 +103,94 @@ func TestValidateCycleSettings(t *testing.T) {
 		reason        string
 	}{
 		{
-			"test positive",
-			atlassianv1.CycleSettings{Concurrency: 1},
+			"test concurrency positive",
+			atlassianv1.CycleSettings{Concurrency: 1, WaitTimeout: "1s"},
 			true,
 			"",
 		},
 		{
-			"test positive large",
-			atlassianv1.CycleSettings{Concurrency: 20},
+			"test concurrency positive large",
+			atlassianv1.CycleSettings{Concurrency: 20, WaitTimeout: "1s"},
 			true,
 			"",
 		},
 		{
-			"test 0",
-			atlassianv1.CycleSettings{Concurrency: 0},
+			"test concurrency 0",
+			atlassianv1.CycleSettings{Concurrency: 0, WaitTimeout: "1s"},
 			false,
 			concurrencyEqualsZeroMessage,
 		},
 		{
-			"test negative",
-			atlassianv1.CycleSettings{Concurrency: -1},
+			"test concurrency negative",
+			atlassianv1.CycleSettings{Concurrency: -1, WaitTimeout: "1s"},
 			false,
 			concurrencyLessThanZeroMessage,
 		},
 		{
-			"test negative large",
-			atlassianv1.CycleSettings{Concurrency: -20},
+			"test concurrency negative large",
+			atlassianv1.CycleSettings{Concurrency: -20, WaitTimeout: "1s"},
 			false,
 			concurrencyLessThanZeroMessage,
+		},
+		{
+			"test waitTimeout empty",
+			atlassianv1.CycleSettings{WaitTimeout: "", Concurrency: 1},
+			false,
+			waitTimeoutNotInTimeDurationFormat,
+		},
+		{
+			"test waitTimeout not in time duration format",
+			atlassianv1.CycleSettings{WaitTimeout: "1dwj1", Concurrency: 1},
+			false,
+			waitTimeoutNotInTimeDurationFormat,
+		},
+		{
+			"test waitTimeout positive seconds",
+			atlassianv1.CycleSettings{WaitTimeout: "1s", Concurrency: 1},
+			true,
+			"",
+		},
+		{
+			"test waitTimeout positive minute",
+			atlassianv1.CycleSettings{WaitTimeout: "1m", Concurrency: 1},
+			true,
+			"",
+		},
+		{
+			"test waitTimeout positive hour",
+			atlassianv1.CycleSettings{WaitTimeout: "1h", Concurrency: 1},
+			true,
+			"",
+		},
+		{
+			"test waitTimeout positive composite",
+			atlassianv1.CycleSettings{WaitTimeout: "1h1m1s", Concurrency: 1},
+			true,
+			"",
+		},
+		{
+			"test waitTimeout negative seconds",
+			atlassianv1.CycleSettings{WaitTimeout: "-1s", Concurrency: 1},
+			false,
+			waitTimeoutLessThanZeroMessage,
+		},
+		{
+			"test waitTimeout negative minute",
+			atlassianv1.CycleSettings{WaitTimeout: "-1m", Concurrency: 1},
+			false,
+			waitTimeoutLessThanZeroMessage,
+		},
+		{
+			"test waitTimeout negative hour",
+			atlassianv1.CycleSettings{WaitTimeout: "-1h", Concurrency: 1},
+			false,
+			waitTimeoutLessThanZeroMessage,
+		},
+		{
+			"test waitTimeout negative composite",
+			atlassianv1.CycleSettings{WaitTimeout: "-1h1m1s", Concurrency: 1},
+			false,
+			waitTimeoutLessThanZeroMessage,
 		},
 	}
 

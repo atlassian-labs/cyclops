@@ -37,4 +37,7 @@ type CycleSettings struct {
 	// IgnoreNamespaces is a list of namespace names in which running pods should be ignored
 	// when deciding whether a node has no more pods running.
 	IgnoreNamespaces []string `json:"ignoreNamespaces,omitempty"`
+
+	// If no waitTimeout is provided, wait method will timeout with the default time.
+	WaitTimeout string `json:"waitTimeout,omitempty"`
 }
