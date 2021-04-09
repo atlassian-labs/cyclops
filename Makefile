@@ -52,12 +52,17 @@ lint:
 docker:
 	docker build -t $(IMAGE) .
 
+# New version of operator-sdk no longer support generate CRDs directly
+# Build archieved source code to support different arch
+# Some variables in the operator-sdk gets value off git so there will be git error but this does not affect the compiling
 install-operator-sdk:
-	mkdir -p $(GOPATH)/src/github.com/operator-framework
-	-cd $(GOPATH)/src/github.com/operator-framework && git clone https://github.com/operator-framework/operator-sdk
-	git -C $(GOPATH)/src/github.com/operator-framework/operator-sdk checkout master
-	$(MAKE) -C $(GOPATH)/src/github.com/operator-framework/operator-sdk tidy
-	$(MAKE) -C $(GOPATH)/src/github.com/operator-framework/operator-sdk install
+	mkdir -p ${GOPATH}/src/github.com/operator-framework
+	mkdir -p /tmp/operator-sdk/
+	curl -fL https://github.com/operator-framework/operator-sdk/archive/refs/tags/v0.19.0.tar.gz -o /tmp/operator-sdk/v0.19.0.tar.gz
+	-cd /tmp/operator-sdk/ && tar -xzf v0.19.0.tar.gz
+	mv /tmp/operator-sdk/operator-sdk-0.19.0 ${GOPATH}/src/github.com/operator-framework/
+	$(MAKE) -C ${GOPATH}/src/github.com/operator-framework/operator-sdk-0.19.0 tidy
+	$(MAKE) -C ${GOPATH}/src/github.com/operator-framework/operator-sdk-0.19.0 install
 
 # See https://sdk.operatorframework.io/docs/golang/quickstart/
 generate-crds:
