@@ -3,8 +3,8 @@ package transitioner
 import (
 	"time"
 
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	v1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 // transitionToFailed transitions the current cycleNodeStatus to failed
@@ -40,4 +40,16 @@ func (t *CycleNodeStatusTransitioner) transitionObject(desiredPhase v1.CycleNode
 // than the timeout threshold
 func (t *CycleNodeStatusTransitioner) timedOut() bool {
 	return time.Now().After(t.cycleNodeStatus.Status.StartedTimestamp.Time.Add(nodeTerminationGracePeriod))
+}
+
+// waitMethodTimedOut returns true if the processing of this Wait CycleNodeStatus has been going longer
+// than the wait method timeout threshold
+func (t *CycleNodeStatusTransitioner) waitMethodTimedOut() bool {
+	parsedWaitTimeout, err := time.ParseDuration(t.cycleNodeStatus.Spec.CycleSettings.WaitTimeout)
+
+	// if no WaitTimeOut was specified in CNS spec, use the controller default WaitTimeout
+	if err != nil {
+		return time.Now().After(t.cycleNodeStatus.Status.StartedTimestamp.Time.Add(t.options.WaitTimeOut))
+	}
+	return time.Now().After(t.cycleNodeStatus.Status.StartedTimestamp.Time.Add(parsedWaitTimeout))
 }

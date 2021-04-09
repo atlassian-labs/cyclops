@@ -92,7 +92,7 @@ func (t *CycleNodeStatusTransitioner) transitionWaitingPods() (reconcile.Result,
 		return t.transitionToFailed(err)
 	}
 	if !finished {
-		if t.timedOut() {
+		if t.waitMethodTimedOut() {
 			return t.transitionToFailed(fmt.Errorf("timed out waiting for pods to finish"))
 		}
 		return reconcile.Result{Requeue: true, RequeueAfter: 60 * time.Second}, nil

@@ -2,6 +2,7 @@ package cyclenodestatus
 
 import (
 	"context"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	v1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
@@ -34,6 +35,7 @@ type Reconciler struct {
 	cloudProvider cloudprovider.CloudProvider
 	notifier      notifications.Notifier
 	rawClient     kubernetes.Interface
+	options       transitioner.Options
 }
 
 // NewReconciler returns a new Reconciler for CycleNodeStatuses, which implements reconcile.Reconciler
@@ -43,6 +45,7 @@ func NewReconciler(
 	cloudProvider cloudprovider.CloudProvider,
 	notifier notifications.Notifier,
 	namespace string,
+	options transitioner.Options,
 ) (reconcile.Reconciler, error) {
 	rawClient := kubernetes.NewForConfigOrDie(mgr.GetConfig())
 
@@ -52,6 +55,7 @@ func NewReconciler(
 		cloudProvider: cloudProvider,
 		notifier:      notifier,
 		rawClient:     rawClient,
+		options:       options,
 	}
 
 	// Create the new controller using the reconciler. This registers it with the main event loop.
@@ -114,6 +118,6 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 		logger,
 		r.notifier,
 		r.cloudProvider)
-	result, err := transitioner.NewCycleNodeStatusTransitioner(cycleNodeStatus, rm).Run()
+	result, err := transitioner.NewCycleNodeStatusTransitioner(cycleNodeStatus, rm, r.options).Run()
 	return result, err
 }
