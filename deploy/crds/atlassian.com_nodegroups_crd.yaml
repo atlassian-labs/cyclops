@@ -87,6 +87,10 @@ spec:
                     - Drain
                     - Wait
                     type: string
+                  waitTimeout:
+                    description: If no waitTimeout is provided, wait method will timeout
+                      with the default time.
+                    type: string
                 required:
                 - method
                 type: object
