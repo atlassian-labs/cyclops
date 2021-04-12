@@ -3,6 +3,7 @@ package generation
 import (
 	"strings"
 	"testing"
+	"time"
 
 	atlassianv1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
 	"github.com/atlassian-labs/cyclops/pkg/test"
@@ -104,91 +105,55 @@ func TestValidateCycleSettings(t *testing.T) {
 	}{
 		{
 			"test concurrency positive",
-			atlassianv1.CycleSettings{Concurrency: 1, CyclingTimeout: "1s"},
+			atlassianv1.CycleSettings{Concurrency: 1},
 			true,
 			"",
 		},
 		{
 			"test concurrency positive large",
-			atlassianv1.CycleSettings{Concurrency: 20, CyclingTimeout: "1s"},
+			atlassianv1.CycleSettings{Concurrency: 20},
 			true,
 			"",
 		},
 		{
 			"test concurrency 0",
-			atlassianv1.CycleSettings{Concurrency: 0, CyclingTimeout: "1s"},
+			atlassianv1.CycleSettings{Concurrency: 0},
 			false,
 			concurrencyEqualsZeroMessage,
 		},
 		{
 			"test concurrency negative",
-			atlassianv1.CycleSettings{Concurrency: -1, CyclingTimeout: "1s"},
+			atlassianv1.CycleSettings{Concurrency: -1},
 			false,
 			concurrencyLessThanZeroMessage,
 		},
 		{
 			"test concurrency negative large",
-			atlassianv1.CycleSettings{Concurrency: -20, CyclingTimeout: "1s"},
+			atlassianv1.CycleSettings{Concurrency: -20},
 			false,
 			concurrencyLessThanZeroMessage,
 		},
 		{
-			"test cyclingTimeout empty",
-			atlassianv1.CycleSettings{CyclingTimeout: "", Concurrency: 1},
+			"test cyclingTimeout positive small",
+			atlassianv1.CycleSettings{CyclingTimeout: &metav1.Duration{Duration: 1 * time.Hour}, Concurrency: 1},
 			true,
 			"",
 		},
 		{
-			"test cyclingTimeout not in time duration format",
-			atlassianv1.CycleSettings{CyclingTimeout: "1dwj1", Concurrency: 1},
-			false,
-			cyclingTimeoutNotInTimeDurationFormat,
-		},
-		{
-			"test cyclingTimeout positive seconds",
-			atlassianv1.CycleSettings{CyclingTimeout: "1s", Concurrency: 1},
+			"test cyclingTimeout positive large",
+			atlassianv1.CycleSettings{CyclingTimeout: &metav1.Duration{Duration: 99 * time.Hour}, Concurrency: 1},
 			true,
 			"",
 		},
 		{
-			"test cyclingTimeout positive minute",
-			atlassianv1.CycleSettings{CyclingTimeout: "1m", Concurrency: 1},
-			true,
-			"",
-		},
-		{
-			"test cyclingTimeout positive hour",
-			atlassianv1.CycleSettings{CyclingTimeout: "1h", Concurrency: 1},
-			true,
-			"",
-		},
-		{
-			"test cyclingTimeout positive composite",
-			atlassianv1.CycleSettings{CyclingTimeout: "1h1m1s", Concurrency: 1},
-			true,
-			"",
-		},
-		{
-			"test cyclingTimeout negative seconds",
-			atlassianv1.CycleSettings{CyclingTimeout: "-1s", Concurrency: 1},
+			"test cyclingTimeout negative small",
+			atlassianv1.CycleSettings{CyclingTimeout: &metav1.Duration{Duration: -1 * time.Second}, Concurrency: 1},
 			false,
 			cyclingTimeoutLessThanZeroMessage,
 		},
 		{
-			"test cyclingTimeout negative minute",
-			atlassianv1.CycleSettings{CyclingTimeout: "-1m", Concurrency: 1},
-			false,
-			cyclingTimeoutLessThanZeroMessage,
-		},
-		{
-			"test cyclingTimeout negative hour",
-			atlassianv1.CycleSettings{CyclingTimeout: "-1h", Concurrency: 1},
-			false,
-			cyclingTimeoutLessThanZeroMessage,
-		},
-		{
-			"test cyclingTimeout negative composite",
-			atlassianv1.CycleSettings{CyclingTimeout: "-1h1m1s", Concurrency: 1},
+			"test cyclingTimeout negative large",
+			atlassianv1.CycleSettings{CyclingTimeout: &metav1.Duration{Duration: -99 * time.Hour}, Concurrency: 1},
 			false,
 			cyclingTimeoutLessThanZeroMessage,
 		},

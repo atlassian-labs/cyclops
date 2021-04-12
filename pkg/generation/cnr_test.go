@@ -3,6 +3,7 @@ package generation
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/atlassian-labs/cyclops/pkg/test"
 
@@ -122,7 +123,7 @@ func TestValidateCNR(t *testing.T) {
 	nodeGroup.Spec.CycleSettings = atlassianv1.CycleSettings{
 		Method:         "Drain",
 		Concurrency:    1,
-		CyclingTimeout: "3h",
+		CyclingTimeout: nil,
 	}
 
 	tests := []struct {
@@ -130,7 +131,7 @@ func TestValidateCNR(t *testing.T) {
 		nodes          []*v1.Node
 		nodeNames      []string
 		concurrency    int64
-		cyclingTimeout string
+		cyclingTimeout *metav1.Duration
 		ok             bool
 		reason         string
 	}{
@@ -139,7 +140,7 @@ func TestValidateCNR(t *testing.T) {
 			nodes,
 			names,
 			1,
-			"3h",
+			nil,
 			true,
 			"",
 		},
@@ -148,7 +149,7 @@ func TestValidateCNR(t *testing.T) {
 			nodes,
 			names,
 			1,
-			"3h",
+			nil,
 			false,
 			`label value is not valid: a DNS-1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')`,
 		},
@@ -157,7 +158,7 @@ func TestValidateCNR(t *testing.T) {
 			nodes,
 			names,
 			1,
-			"3h",
+			nil,
 			false,
 			"name is not valid: must be no more than 253 characters",
 		},
@@ -166,7 +167,7 @@ func TestValidateCNR(t *testing.T) {
 			nodes,
 			names,
 			0,
-			"3h",
+			nil,
 			false,
 			concurrencyEqualsZeroMessage,
 		},
@@ -175,7 +176,7 @@ func TestValidateCNR(t *testing.T) {
 			nodes,
 			names,
 			-1,
-			"3h",
+			nil,
 			false,
 			concurrencyLessThanZeroMessage,
 		},
@@ -184,7 +185,7 @@ func TestValidateCNR(t *testing.T) {
 			nodes,
 			append(names, "missing"),
 			1,
-			"3h",
+			nil,
 			false,
 			`the node "missing" does not exist in the nodegroup but it is specified to cycle`,
 		},
@@ -193,27 +194,27 @@ func TestValidateCNR(t *testing.T) {
 			nil,
 			nil,
 			1,
-			"3h",
+			nil,
 			false,
 			nodeGroupScaledToZeroMessage,
 		},
 		{
-			"test-wrongformat-cyclingtimeout",
+			"test-positive-cyclingtimeout",
 			nodes,
 			names,
-			0,
-			"1dwj1",
-			false,
-			concurrencyEqualsZeroMessage,
+			1,
+			&metav1.Duration{Duration: 1 * time.Hour},
+			true,
+			"",
 		},
 		{
 			"test-negative-cyclingtimeout",
 			nodes,
 			names,
-			-1,
-			"-1s",
+			1,
+			&metav1.Duration{Duration: -1 * time.Hour},
 			false,
-			concurrencyLessThanZeroMessage,
+			cyclingTimeoutLessThanZeroMessage,
 		},
 	}
 

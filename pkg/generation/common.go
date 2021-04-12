@@ -61,15 +61,8 @@ func validateCycleSettings(settings atlassianv1.CycleSettings) (bool, string) {
 	}
 
 	// CyclingTimeout flag is optional, only validate if not empty
-	if settings.CyclingTimeout != "" {
-		timeout, err := time.ParseDuration(settings.CyclingTimeout)
-		if err != nil {
-			return false, cyclingTimeoutNotInTimeDurationFormat
-		}
-
-		if timeout < 0*time.Second {
-			return false, cyclingTimeoutLessThanZeroMessage
-		}
+	if settings.CyclingTimeout != nil && settings.CyclingTimeout.Duration < 0*time.Second {
+		return false, cyclingTimeoutLessThanZeroMessage
 	}
 
 	return true, ""

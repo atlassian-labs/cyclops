@@ -1,5 +1,9 @@
 package v1
 
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
 // CycleNodeRequestMethod is the method to use when cycling nodes.
 type CycleNodeRequestMethod string
 
@@ -41,5 +45,5 @@ type CycleSettings struct {
 	// CyclingTimeout is a string in time duration format that defines how long a until an
 	// in-progress CNS request timeout from the time it's worked on by the controller.
 	// If no cyclingTimeout is provided, CNS will use the default controller CNS cyclingTimeout.
-	CyclingTimeout string `json:"cyclingTimeout,omitempty"`
+	CyclingTimeout *metav1.Duration `json:"cyclingTimeout,omitempty"`
 }

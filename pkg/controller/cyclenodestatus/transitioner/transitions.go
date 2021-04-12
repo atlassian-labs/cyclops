@@ -33,12 +33,11 @@ func (t *CycleNodeStatusTransitioner) transitionUndefined() (reconcile.Result, e
 	currentTime := metav1.Now()
 	t.cycleNodeStatus.Status.StartedTimestamp = &currentTime
 
-	// Calculate cns timeout with the default duration if no CyclingTimeout is provided
-	parseTimeoutDuration, err := time.ParseDuration(t.cycleNodeStatus.Spec.CycleSettings.CyclingTimeout)
-	if err != nil {
-		parseTimeoutDuration = t.options.DefaultCNScyclingExpiry
+	// Calculate cns timeout timestamp with the default duration if no CyclingTimeout is provided or if CyclingTimeout is negative
+	timeoutTime := metav1.NewTime(currentTime.Add(t.options.DefaultCNScyclingExpiry))
+	if t.cycleNodeStatus.Spec.CycleSettings.CyclingTimeout != nil && t.cycleNodeStatus.Spec.CycleSettings.CyclingTimeout.Duration > 0*time.Second {
+		timeoutTime = metav1.NewTime(currentTime.Add(t.cycleNodeStatus.Spec.CycleSettings.CyclingTimeout.Duration))
 	}
-	timeoutTime := metav1.NewTime(time.Now().Add(parseTimeoutDuration))
 	t.cycleNodeStatus.Status.TimeoutTimestamp = &timeoutTime
 
 	// Transition the object to pending

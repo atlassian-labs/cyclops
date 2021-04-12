@@ -3,6 +3,7 @@ package generation
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/atlassian-labs/cyclops/pkg/test"
 	v1 "k8s.io/api/core/v1"
@@ -28,7 +29,7 @@ func TestValidateNodeGroup(t *testing.T) {
 		nodes          []*v1.Node
 		nodeNames      []string
 		concurrency    int64
-		cyclingTimeout string
+		cyclingTimeout *metav1.Duration
 		ok             bool
 		reason         string
 	}{
@@ -37,7 +38,7 @@ func TestValidateNodeGroup(t *testing.T) {
 			nodes,
 			names,
 			1,
-			"3h",
+			nil,
 			true,
 			"",
 		},
@@ -46,7 +47,7 @@ func TestValidateNodeGroup(t *testing.T) {
 			nodes,
 			names,
 			1,
-			"3h",
+			nil,
 			false,
 			`name is not valid: a DNS-1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')`,
 		},
@@ -55,7 +56,7 @@ func TestValidateNodeGroup(t *testing.T) {
 			nodes,
 			names,
 			1,
-			"3h",
+			nil,
 			false,
 			"name is not valid: must be no more than 253 characters",
 		},
@@ -64,7 +65,7 @@ func TestValidateNodeGroup(t *testing.T) {
 			nodes,
 			names,
 			0,
-			"3h",
+			nil,
 			false,
 			concurrencyEqualsZeroMessage,
 		},
@@ -73,7 +74,7 @@ func TestValidateNodeGroup(t *testing.T) {
 			nodes,
 			names,
 			-1,
-			"3h",
+			nil,
 			false,
 			concurrencyLessThanZeroMessage,
 		},
@@ -82,7 +83,7 @@ func TestValidateNodeGroup(t *testing.T) {
 			nodes,
 			append(names, "missing"),
 			1,
-			"3h",
+			nil,
 			true,
 			"",
 		},
@@ -91,27 +92,27 @@ func TestValidateNodeGroup(t *testing.T) {
 			nil,
 			nil,
 			1,
-			"3h",
+			nil,
 			false,
 			nodeGroupScaledToZeroMessage,
 		},
 		{
-			"test-wrongformat-cyclingtimeout",
+			"test-positive-cyclingtimeout",
 			nodes,
 			names,
-			0,
-			"1dwj1",
-			false,
-			concurrencyEqualsZeroMessage,
+			1,
+			&metav1.Duration{Duration: 1 * time.Hour},
+			true,
+			"",
 		},
 		{
 			"test-negative-cyclingtimeout",
 			nodes,
 			names,
-			-1,
-			"-1s",
+			1,
+			&metav1.Duration{Duration: -1 * time.Hour},
 			false,
-			concurrencyLessThanZeroMessage,
+			cyclingTimeoutLessThanZeroMessage,
 		},
 	}
 
