@@ -58,7 +58,7 @@ install-operator-sdk:
 	mkdir -p $(GOPATH)/src/github.com/operator-framework
 	-cd $(GOPATH)/src/github.com/operator-framework && git clone https://github.com/operator-framework/operator-sdk
 	git -C $(GOPATH)/src/github.com/operator-framework/operator-sdk checkout master
-	git -C $(GOPATH)/src/github.com/operator-framework/operator-sdk checkout 8e28aca60994c5cb1aec0251b85f0116cc4c9427
+	git -C $(GOPATH)/src/github.com/operator-framework/operator-sdk checkout tags/v0.19.0
 	$(MAKE) -C $(GOPATH)/src/github.com/operator-framework/operator-sdk tidy
 	$(MAKE) -C $(GOPATH)/src/github.com/operator-framework/operator-sdk install
 

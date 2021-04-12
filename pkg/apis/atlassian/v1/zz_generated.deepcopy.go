@@ -245,6 +245,10 @@ func (in *CycleNodeStatusStatus) DeepCopyInto(out *CycleNodeStatusStatus) {
 		in, out := &in.StartedTimestamp, &out.StartedTimestamp
 		*out = (*in).DeepCopy()
 	}
+	if in.TimeoutTimestamp != nil {
+		in, out := &in.TimeoutTimestamp, &out.TimeoutTimestamp
+		*out = (*in).DeepCopy()
+	}
 	return
 }
 

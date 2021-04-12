@@ -39,7 +39,7 @@ type CycleSettings struct {
 	IgnoreNamespaces []string `json:"ignoreNamespaces,omitempty"`
 
 	// CyclingTimeout is a string in time duration format that defines how long a until an
-	// in-progress CNS request timeout from the time it's worked on by the controller
+	// in-progress CNS request timeout from the time it's worked on by the controller.
 	// If no cyclingTimeout is provided, CNS will use the default controller CNS cyclingTimeout.
 	CyclingTimeout string `json:"cyclingTimeout,omitempty"`
 }

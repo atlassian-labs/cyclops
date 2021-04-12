@@ -37,13 +37,7 @@ func (t *CycleNodeStatusTransitioner) transitionObject(desiredPhase v1.CycleNode
 }
 
 // timedOut returns true if the processing of this CycleNodeStatus has been going longer
-// than the timeout threshold
+// than the calculated timeout timestamp
 func (t *CycleNodeStatusTransitioner) timedOut() bool {
-	parsedCyclingTimeout, err := time.ParseDuration(t.cycleNodeStatus.Spec.CycleSettings.CyclingTimeout)
-
-	// if no cyclingTimeout was specified in CNS spec, use the controller defaultCyclingCNSTimeout
-	if err != nil || parsedCyclingTimeout < 0*time.Second {
-		return time.Now().After(t.cycleNodeStatus.Status.StartedTimestamp.Time.Add(t.options.DefaultCNScyclingExpiry))
-	}
-	return time.Now().After(t.cycleNodeStatus.Status.StartedTimestamp.Time.Add(parsedCyclingTimeout))
+	return time.Now().After(t.cycleNodeStatus.Status.TimeoutTimestamp.Time)
 }
