@@ -55,6 +55,12 @@ spec:
                       will work on in parallel. Defaults to the size of the node group.
                     format: int64
                     type: integer
+                  cyclingTimeout:
+                    description: CyclingTimeout is a string in time duration format
+                      that defines how long a until an in-progress CNS request timeout
+                      from the time it's worked on by the controller If no cyclingTimeout
+                      is provided, CNS will use the default controller CNS cyclingTimeout.
+                    type: string
                   ignoreNamespaces:
                     description: IgnoreNamespaces is a list of namespace names in
                       which running pods should be ignored when deciding whether a
@@ -86,10 +92,6 @@ spec:
                     enum:
                     - Drain
                     - Wait
-                    type: string
-                  waitTimeout:
-                    description: If no waitTimeout is provided, wait method will timeout
-                      with the default time.
                     type: string
                 required:
                 - method

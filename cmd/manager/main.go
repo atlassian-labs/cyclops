@@ -39,10 +39,10 @@ var (
 	addr      = app.Flag("address", "Address to listen on for /metrics").Default(":8080").String()
 	namespace = app.Flag("namespace", "Namespace to watch for cycle request objects").Default("kube-system").String()
 
-	deleteCNR        = app.Flag("delete-cnr", "Whether or not to automatically delete CNRs").Default("false").Bool()
-	deleteCNRExpiry  = app.Flag("delete-cnr-expiry", "Delete the CNR this long after it was created and is successful").Default("168h").Duration()
-	deleteCNRRequeue = app.Flag("delete-cnr-requeue", "How often to check if a CNR can be deleted").Default("24h").Duration()
-	waitTimeOut      = app.Flag("wait-time-out", "How long until a CNS with Wait method time out").Default("3h").Duration()
+	deleteCNR               = app.Flag("delete-cnr", "Whether or not to automatically delete CNRs").Default("false").Bool()
+	deleteCNRExpiry         = app.Flag("delete-cnr-expiry", "Delete the CNR this long after it was created and is successful").Default("168h").Duration()
+	deleteCNRRequeue        = app.Flag("delete-cnr-requeue", "How often to check if a CNR can be deleted").Default("24h").Duration()
+	defaultCNScyclingExpiry = app.Flag("default-cycling-expiry", "Fail the CNS if it has been processing for this long").Default("3h").Duration()
 )
 
 var log = logf.Log.WithName("cmd")
@@ -118,7 +118,7 @@ func main() {
 
 	// Configure the CNS transitioner options
 	cnsOptions := cnsTransitioner.Options{
-		WaitTimeOut: *waitTimeOut,
+		DefaultCNScyclingExpiry: *defaultCNScyclingExpiry,
 	}
 
 	// Set up and register the controllers that will share resources between them

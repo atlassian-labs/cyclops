@@ -24,13 +24,13 @@ func TestValidateNodeGroup(t *testing.T) {
 	}
 
 	tests := []struct {
-		name        string
-		nodes       []*v1.Node
-		nodeNames   []string
-		concurrency int64
-		waitTimeout string
-		ok          bool
-		reason      string
+		name           string
+		nodes          []*v1.Node
+		nodeNames      []string
+		concurrency    int64
+		cyclingTimeout string
+		ok             bool
+		reason         string
 	}{
 		{
 			"ok-test",
@@ -96,7 +96,7 @@ func TestValidateNodeGroup(t *testing.T) {
 			nodeGroupScaledToZeroMessage,
 		},
 		{
-			"test-wrongformat-waittimeout",
+			"test-wrongformat-cyclingtimeout",
 			nodes,
 			names,
 			0,
@@ -105,7 +105,7 @@ func TestValidateNodeGroup(t *testing.T) {
 			concurrencyEqualsZeroMessage,
 		},
 		{
-			"test-negative-waittimeout",
+			"test-negative-cyclingtimeout",
 			nodes,
 			names,
 			-1,
@@ -124,9 +124,9 @@ func TestValidateNodeGroup(t *testing.T) {
 			nodeGroup.Spec.NodeGroupName = "system.nodegroup"
 			nodeGroup.Spec.NodeSelector = *selectorMeta
 			nodeGroup.Spec.CycleSettings = atlassianv1.CycleSettings{
-				Method:      "Drain",
-				Concurrency: tt.concurrency,
-				WaitTimeout: tt.waitTimeout,
+				Method:         "Drain",
+				Concurrency:    tt.concurrency,
+				CyclingTimeout: tt.cyclingTimeout,
 			}
 			ok, reason := ValidateNodeGroup(nodeLister, nodeGroup)
 			assert.Equal(t, tt.ok, ok)

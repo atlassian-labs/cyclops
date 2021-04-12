@@ -32,7 +32,7 @@ type cycle struct {
 	cnrNameFlag             *string
 	concurrencyOverrideFlag *int64
 	nodesFlag               *[]string
-	waitTimeOut             *string
+	cyclingTimeout          *string
 }
 
 // NewCycle returns a new cycle CLI application that implements all the interfaces needed for kubeplug
@@ -86,7 +86,7 @@ func (c *cycle) AddFlags(cmd *cobra.Command) {
 	c.cnrNameFlag = cmd.PersistentFlags().String("name", "", "option to specify name prefix of generated CNRs")
 	c.nodesFlag = cmd.PersistentFlags().StringSlice("nodes", nil, "option to specify which nodes of the nodegroup to cycle. Leave empty for all")
 	c.concurrencyOverrideFlag = cmd.PersistentFlags().Int64("concurrency", -1, "option to override concurrency of all CNRs. Set for 0 to skip. -1 or not specified will use values from NodeGroup definition")
-	c.waitTimeOut = cmd.PersistentFlags().String("waitTimeOut", "", "option to set timeout for CNR with Wait method. Default to controller defined timeout of \"3h\"")
+	c.cyclingTimeout = cmd.PersistentFlags().String("cyclingTimeout", "3h", "option to set timeout for cycling. Default to controller defined timeout of \"3h\"")
 }
 
 // Run function called by cobra with args and client ready
@@ -185,8 +185,8 @@ func (c *cycle) generateCNRs(nodeGroups *atlassianv1.NodeGroupList, name, namesp
 			cnr.Spec.CycleSettings.Concurrency = newConcurrencyValue
 		}
 
-		if newWaitTimeoutValue, set := c.waitTimeoutOverride(); set {
-			cnr.Spec.CycleSettings.WaitTimeout = newWaitTimeoutValue
+		if newCyclingTimeoutValue, set := c.cyclingTimeoutOverride(); set {
+			cnr.Spec.CycleSettings.CyclingTimeout = newCyclingTimeoutValue
 		}
 
 		if ok, reason := generation.ValidateCNR(generation.NewOneShotNodeLister(c.plug.Client), cnr); !ok {
@@ -300,10 +300,10 @@ func (c *cycle) nodesOverride() []string {
 	return *c.nodesFlag
 }
 
-// waitTimeoutOverride safely returns if the user wants to override the Wait method timeout
-func (c *cycle) waitTimeoutOverride() (string, bool) {
-	if c.waitTimeOut == nil || *c.waitTimeOut == "" {
+// cyclingTimeoutOverride safely returns if the user wants to override the cycling timeout
+func (c *cycle) cyclingTimeoutOverride() (string, bool) {
+	if c.cyclingTimeout == nil || *c.cyclingTimeout == "" {
 		return "", false
 	}
-	return *c.waitTimeOut, true
+	return *c.cyclingTimeout, true
 }

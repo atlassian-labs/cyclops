@@ -12,11 +12,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-var (
-	// How long we will try to cycle this one node for before giving up
-	nodeTerminationGracePeriod = 180 * time.Minute
-)
-
 // transitionUndefined transitions any CycleNodeStatuses in the Undefined phase to the Pending phase
 // It checks to ensure that a node name has been provided
 // When the CRD validation features are available in the Kubernetes API, we could probably remove these checks
@@ -92,7 +87,7 @@ func (t *CycleNodeStatusTransitioner) transitionWaitingPods() (reconcile.Result,
 		return t.transitionToFailed(err)
 	}
 	if !finished {
-		if t.waitMethodTimedOut() {
+		if t.timedOut() {
 			return t.transitionToFailed(fmt.Errorf("timed out waiting for pods to finish"))
 		}
 		return reconcile.Result{Requeue: true, RequeueAfter: 60 * time.Second}, nil

@@ -37,8 +37,8 @@ func NewCycleNodeStatusTransitioner(
 
 // Options stores configurable options for the NewCycleNodeStatusTransitioner
 type Options struct {
-	// waitTimeOut controls how long until the CycleNodeStatus with Wait method time out
-	WaitTimeOut time.Duration
+	// DefaultCNScyclingExpiry controls how long until the CycleNodeStatus will timeout
+	DefaultCNScyclingExpiry time.Duration
 }
 
 // Run runs the CycleNodeStatusTransitioner and returns a reconcile result and an error

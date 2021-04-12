@@ -120,19 +120,19 @@ func TestValidateCNR(t *testing.T) {
 	nodeGroup.Spec.NodeGroupName = "system.nodegroup"
 	nodeGroup.Spec.NodeSelector = *selectorMeta
 	nodeGroup.Spec.CycleSettings = atlassianv1.CycleSettings{
-		Method:      "Drain",
-		Concurrency: 1,
-		WaitTimeout: "3h",
+		Method:         "Drain",
+		Concurrency:    1,
+		CyclingTimeout: "3h",
 	}
 
 	tests := []struct {
-		name        string
-		nodes       []*v1.Node
-		nodeNames   []string
-		concurrency int64
-		waitTimeout string
-		ok          bool
-		reason      string
+		name           string
+		nodes          []*v1.Node
+		nodeNames      []string
+		concurrency    int64
+		cyclingTimeout string
+		ok             bool
+		reason         string
 	}{
 		{
 			"ok-test",
@@ -198,7 +198,7 @@ func TestValidateCNR(t *testing.T) {
 			nodeGroupScaledToZeroMessage,
 		},
 		{
-			"test-wrongformat-waittimeout",
+			"test-wrongformat-cyclingtimeout",
 			nodes,
 			names,
 			0,
@@ -207,7 +207,7 @@ func TestValidateCNR(t *testing.T) {
 			concurrencyEqualsZeroMessage,
 		},
 		{
-			"test-negative-waittimeout",
+			"test-negative-cyclingtimeout",
 			nodes,
 			names,
 			-1,
@@ -221,7 +221,7 @@ func TestValidateCNR(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			nodeLister := test.NewTestNodeWatcher(tt.nodes, test.NodeListerOptions{ReturnErrorOnList: false})
 			nodeGroup.Spec.CycleSettings.Concurrency = tt.concurrency
-			nodeGroup.Spec.CycleSettings.WaitTimeout = tt.waitTimeout
+			nodeGroup.Spec.CycleSettings.CyclingTimeout = tt.cyclingTimeout
 			cnr := GenerateCNR(nodeGroup, tt.nodeNames, tt.name, "kube-system")
 			ok, reason := ValidateCNR(nodeLister, cnr)
 			assert.Equal(t, tt.ok, ok)

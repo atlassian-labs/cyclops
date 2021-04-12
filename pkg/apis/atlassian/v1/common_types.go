@@ -38,6 +38,8 @@ type CycleSettings struct {
 	// when deciding whether a node has no more pods running.
 	IgnoreNamespaces []string `json:"ignoreNamespaces,omitempty"`
 
-	// If no waitTimeout is provided, wait method will timeout with the default time.
-	WaitTimeout string `json:"waitTimeout,omitempty"`
+	// CyclingTimeout is a string in time duration format that defines how long a until an
+	// in-progress CNS request timeout from the time it's worked on by the controller
+	// If no cyclingTimeout is provided, CNS will use the default controller CNS cyclingTimeout.
+	CyclingTimeout string `json:"cyclingTimeout,omitempty"`
 }
