@@ -135,8 +135,8 @@ func TestValidateCycleSettings(t *testing.T) {
 		{
 			"test cyclingTimeout empty",
 			atlassianv1.CycleSettings{CyclingTimeout: "", Concurrency: 1},
-			false,
-			cyclingTimeoutNotInTimeDurationFormat,
+			true,
+			"",
 		},
 		{
 			"test cyclingTimeout not in time duration format",

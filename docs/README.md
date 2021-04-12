@@ -51,17 +51,17 @@ usage: Cyclops [<flags>]
 Kubernetes operator to rotate a group of nodes
 
 Flags:
-      --help                       Show context-sensitive help (also try --help-long and --help-man).
-      --version                    Show application version.
-  -d, --debug                      Run with debug logging
-      --cloud-provider="aws"       Which cloud provider to use, options: [aws]
-      --messaging-provider=""      Which message provider to use, options: [slack] (Optional)
-      --address=":8080"            Address to listen on for /metrics
-      --namespace="kube-system"    Namespace to watch for cycle request objects
-      --delete-cnr                 Whether or not to automatically delete CNRs
-      --delete-cnr-expiry=168h     Delete the CNR this long after it was created and is successful
-      --delete-cnr-requeue=24h     How often to check if a CNR can be deleted
-      --default-cycling-expiry=3h  Fail the CNS if it has been processing for this long
+      --help                           Show context-sensitive help (also try --help-long and --help-man).
+      --version                        Show application version.
+  -d, --debug                          Run with debug logging
+      --cloud-provider="aws"           Which cloud provider to use, options: [aws]
+      --messaging-provider=""          Which message provider to use, options: [slack] (Optional)
+      --address=":8080"                Address to listen on for /metrics
+      --namespace="kube-system"        Namespace to watch for cycle request objects
+      --delete-cnr                     Whether or not to automatically delete CNRs
+      --delete-cnr-expiry=168h         Delete the CNR this long after it was created and is successful
+      --delete-cnr-requeue=24h         How often to check if a CNR can be deleted
+      --default-cns-cycling-expiry=3h  Fail the CNS if it has been processing for this long
 ```
 
 ### Package Layout and Usage

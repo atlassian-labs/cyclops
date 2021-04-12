@@ -42,7 +42,7 @@ var (
 	deleteCNR               = app.Flag("delete-cnr", "Whether or not to automatically delete CNRs").Default("false").Bool()
 	deleteCNRExpiry         = app.Flag("delete-cnr-expiry", "Delete the CNR this long after it was created and is successful").Default("168h").Duration()
 	deleteCNRRequeue        = app.Flag("delete-cnr-requeue", "How often to check if a CNR can be deleted").Default("24h").Duration()
-	defaultCNScyclingExpiry = app.Flag("default-cycling-expiry", "Fail the CNS if it has been processing for this long").Default("3h").Duration()
+	defaultCNScyclingExpiry = app.Flag("default-cns-cycling-expiry", "Fail the CNS if it has been cycling for this long").Default("3h").Duration()
 )
 
 var log = logf.Log.WithName("cmd")

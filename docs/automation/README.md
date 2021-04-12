@@ -85,7 +85,7 @@ Flags:
       --cluster string                 The name of the kubeconfig cluster to use
       --concurrency int                option to override concurrency of all CNRs. Set for 0 to skip. -1 or not specified will use values from NodeGroup definition (default -1)
       --context string                 The name of the kubeconfig context to use
-      --cycling-timeout string         option to set timeout for cycling. Default to controller defined timeout of "3h" (default "3h")
+      --cycling-timeout string         option to set timeout for cycling. Default to controller defined timeout
       --dry                            option to enable dry mode for applying CNRs
   -f, --filename strings               identifying the resource.
   -h, --help                           help for kubectl-cycle

@@ -86,7 +86,7 @@ func (c *cycle) AddFlags(cmd *cobra.Command) {
 	c.cnrNameFlag = cmd.PersistentFlags().String("name", "", "option to specify name prefix of generated CNRs")
 	c.nodesFlag = cmd.PersistentFlags().StringSlice("nodes", nil, "option to specify which nodes of the nodegroup to cycle. Leave empty for all")
 	c.concurrencyOverrideFlag = cmd.PersistentFlags().Int64("concurrency", -1, "option to override concurrency of all CNRs. Set for 0 to skip. -1 or not specified will use values from NodeGroup definition")
-	c.cyclingTimeout = cmd.PersistentFlags().String("cycling-timeout", "3h", "option to set timeout for cycling. Default to controller defined timeout of \"3h\"")
+	c.cyclingTimeout = cmd.PersistentFlags().String("cycling-timeout", "", "option to set timeout for cycling. Default to controller defined timeout")
 }
 
 // Run function called by cobra with args and client ready

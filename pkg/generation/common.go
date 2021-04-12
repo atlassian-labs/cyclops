@@ -60,12 +60,16 @@ func validateCycleSettings(settings atlassianv1.CycleSettings) (bool, string) {
 		return false, concurrencyEqualsZeroMessage
 	}
 
-	if _, err := time.ParseDuration(settings.CyclingTimeout); err != nil {
-		return false, cyclingTimeoutNotInTimeDurationFormat
-	}
+	// CyclingTimeout flag is optional, only validate if not empty
+	if settings.CyclingTimeout != "" {
+		timeout, err := time.ParseDuration(settings.CyclingTimeout)
+		if err != nil {
+			return false, cyclingTimeoutNotInTimeDurationFormat
+		}
 
-	if timeout, _ := time.ParseDuration(settings.CyclingTimeout); timeout < 0*time.Second {
-		return false, cyclingTimeoutLessThanZeroMessage
+		if timeout < 0*time.Second {
+			return false, cyclingTimeoutLessThanZeroMessage
+		}
 	}
 
 	return true, ""
