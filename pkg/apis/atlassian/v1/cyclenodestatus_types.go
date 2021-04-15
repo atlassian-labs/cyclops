@@ -26,8 +26,11 @@ type CycleNodeStatusStatus struct {
 	// CurrentNode stores this node that is being "worked on"
 	CurrentNode CycleNodeRequestNode `json:"currentNode"`
 
-	// startedTimestamp stores the timestamp that work on this node began
+	// StartedTimestamp stores the timestamp that work on this node began
 	StartedTimestamp *metav1.Time `json:"startedTimestamp,omitempty"`
+
+	// TimeoutTimestamp stores the timestamp of when this CNS will timeout
+	TimeoutTimestamp *metav1.Time `json:"timeoutTimestamp,omitempty"`
 }
 
 // CycleNodeStatusPhase is the phase that the cycleNodeStatus is in

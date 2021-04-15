@@ -1,5 +1,9 @@
 package v1
 
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
 // CycleNodeRequestMethod is the method to use when cycling nodes.
 type CycleNodeRequestMethod string
 
@@ -37,4 +41,9 @@ type CycleSettings struct {
 	// IgnoreNamespaces is a list of namespace names in which running pods should be ignored
 	// when deciding whether a node has no more pods running.
 	IgnoreNamespaces []string `json:"ignoreNamespaces,omitempty"`
+
+	// CyclingTimeout is a string in time duration format that defines how long a until an
+	// in-progress CNS request timeout from the time it's worked on by the controller.
+	// If no cyclingTimeout is provided, CNS will use the default controller CNS cyclingTimeout.
+	CyclingTimeout *metav1.Duration `json:"cyclingTimeout,omitempty"`
 }

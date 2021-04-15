@@ -3,10 +3,12 @@ package cli
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -32,6 +34,7 @@ type cycle struct {
 	cnrNameFlag             *string
 	concurrencyOverrideFlag *int64
 	nodesFlag               *[]string
+	cyclingTimeout          *time.Duration
 }
 
 // NewCycle returns a new cycle CLI application that implements all the interfaces needed for kubeplug
@@ -85,6 +88,7 @@ func (c *cycle) AddFlags(cmd *cobra.Command) {
 	c.cnrNameFlag = cmd.PersistentFlags().String("name", "", "option to specify name prefix of generated CNRs")
 	c.nodesFlag = cmd.PersistentFlags().StringSlice("nodes", nil, "option to specify which nodes of the nodegroup to cycle. Leave empty for all")
 	c.concurrencyOverrideFlag = cmd.PersistentFlags().Int64("concurrency", -1, "option to override concurrency of all CNRs. Set for 0 to skip. -1 or not specified will use values from NodeGroup definition")
+	c.cyclingTimeout = cmd.PersistentFlags().Duration("cycling-timeout", 0*time.Second, "option to set timeout for cycling. Default to controller defined timeout")
 }
 
 // Run function called by cobra with args and client ready
@@ -179,8 +183,12 @@ func (c *cycle) generateCNRs(nodeGroups *atlassianv1.NodeGroupList, name, namesp
 			generation.UseGenerateNameCNR(&cnr)
 		}
 
-		if newValue, set := c.concurrencyOverride(); set {
-			cnr.Spec.CycleSettings.Concurrency = newValue
+		if newConcurrencyValue, set := c.concurrencyOverride(); set {
+			cnr.Spec.CycleSettings.Concurrency = newConcurrencyValue
+		}
+
+		if newCyclingTimeoutValue, set := c.cyclingTimeoutOverride(); set {
+			cnr.Spec.CycleSettings.CyclingTimeout = newCyclingTimeoutValue
 		}
 
 		if ok, reason := generation.ValidateCNR(generation.NewOneShotNodeLister(c.plug.Client), cnr); !ok {
@@ -292,4 +300,12 @@ func (c *cycle) nodesOverride() []string {
 		return nil
 	}
 	return *c.nodesFlag
+}
+
+// cyclingTimeoutOverride safely returns if the user wants to override the cycling timeout
+func (c *cycle) cyclingTimeoutOverride() (*metav1.Duration, bool) {
+	if *c.cyclingTimeout == 0*time.Second {
+		return nil, false
+	}
+	return &metav1.Duration{Duration: *c.cyclingTimeout}, true
 }

@@ -115,6 +115,10 @@ spec:
       # of nodes in the node group
       concurrency: 5
 
+      # Optional field - use this to set how long the controller will tries to process a CNS for before
+      # timing out. The default is defined by the controller
+      cyclingTimeout: 10h2m1s
+
       # Optional field - use this to remove a list of labels from pods before draining. Useful
       # if you want to remove them from existing services before draining the nodes
       labelsToRemove:

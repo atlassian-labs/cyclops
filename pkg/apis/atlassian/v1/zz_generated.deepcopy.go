@@ -5,6 +5,7 @@
 package v1
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -245,6 +246,10 @@ func (in *CycleNodeStatusStatus) DeepCopyInto(out *CycleNodeStatusStatus) {
 		in, out := &in.StartedTimestamp, &out.StartedTimestamp
 		*out = (*in).DeepCopy()
 	}
+	if in.TimeoutTimestamp != nil {
+		in, out := &in.TimeoutTimestamp, &out.TimeoutTimestamp
+		*out = (*in).DeepCopy()
+	}
 	return
 }
 
@@ -285,6 +290,11 @@ func (in *CycleSettings) DeepCopyInto(out *CycleSettings) {
 		in, out := &in.IgnoreNamespaces, &out.IgnoreNamespaces
 		*out = make([]string, len(*in))
 		copy(*out, *in)
+	}
+	if in.CyclingTimeout != nil {
+		in, out := &in.CyclingTimeout, &out.CyclingTimeout
+		*out = new(metav1.Duration)
+		**out = **in
 	}
 	return
 }

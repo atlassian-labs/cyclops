@@ -3,13 +3,14 @@ package generation
 import (
 	"strings"
 	"testing"
+	"time"
 
+	atlassianv1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
+	"github.com/atlassian-labs/cyclops/pkg/test"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	atlassianv1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
-	"github.com/atlassian-labs/cyclops/pkg/test"
 )
 
 func TestGetName(t *testing.T) {
@@ -103,34 +104,58 @@ func TestValidateCycleSettings(t *testing.T) {
 		reason        string
 	}{
 		{
-			"test positive",
+			"test concurrency positive",
 			atlassianv1.CycleSettings{Concurrency: 1},
 			true,
 			"",
 		},
 		{
-			"test positive large",
+			"test concurrency positive large",
 			atlassianv1.CycleSettings{Concurrency: 20},
 			true,
 			"",
 		},
 		{
-			"test 0",
+			"test concurrency 0",
 			atlassianv1.CycleSettings{Concurrency: 0},
 			false,
 			concurrencyEqualsZeroMessage,
 		},
 		{
-			"test negative",
+			"test concurrency negative",
 			atlassianv1.CycleSettings{Concurrency: -1},
 			false,
 			concurrencyLessThanZeroMessage,
 		},
 		{
-			"test negative large",
+			"test concurrency negative large",
 			atlassianv1.CycleSettings{Concurrency: -20},
 			false,
 			concurrencyLessThanZeroMessage,
+		},
+		{
+			"test cyclingTimeout positive small",
+			atlassianv1.CycleSettings{CyclingTimeout: &metav1.Duration{Duration: 1 * time.Hour}, Concurrency: 1},
+			true,
+			"",
+		},
+		{
+			"test cyclingTimeout positive large",
+			atlassianv1.CycleSettings{CyclingTimeout: &metav1.Duration{Duration: 99 * time.Hour}, Concurrency: 1},
+			true,
+			"",
+		},
+		{
+			"test cyclingTimeout negative small",
+			atlassianv1.CycleSettings{CyclingTimeout: &metav1.Duration{Duration: -1 * time.Second}, Concurrency: 1},
+			false,
+			cyclingTimeoutLessThanZeroMessage,
+		},
+		{
+			"test cyclingTimeout negative large",
+			atlassianv1.CycleSettings{CyclingTimeout: &metav1.Duration{Duration: -99 * time.Hour}, Concurrency: 1},
+			false,
+			cyclingTimeoutLessThanZeroMessage,
 		},
 	}
 

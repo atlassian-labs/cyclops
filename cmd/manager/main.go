@@ -11,6 +11,7 @@ import (
 	"github.com/atlassian-labs/cyclops/pkg/controller/cyclenoderequest"
 	cnrTransitioner "github.com/atlassian-labs/cyclops/pkg/controller/cyclenoderequest/transitioner"
 	"github.com/atlassian-labs/cyclops/pkg/controller/cyclenodestatus"
+	cnsTransitioner "github.com/atlassian-labs/cyclops/pkg/controller/cyclenodestatus/transitioner"
 	"github.com/atlassian-labs/cyclops/pkg/metrics"
 	"github.com/atlassian-labs/cyclops/pkg/notifications"
 	"github.com/atlassian-labs/cyclops/pkg/notifications/notifierbuilder"
@@ -38,9 +39,10 @@ var (
 	addr      = app.Flag("address", "Address to listen on for /metrics").Default(":8080").String()
 	namespace = app.Flag("namespace", "Namespace to watch for cycle request objects").Default("kube-system").String()
 
-	deleteCNR        = app.Flag("delete-cnr", "Whether or not to automatically delete CNRs").Default("false").Bool()
-	deleteCNRExpiry  = app.Flag("delete-cnr-expiry", "Delete the CNR this long after it was created and is successful").Default("168h").Duration()
-	deleteCNRRequeue = app.Flag("delete-cnr-requeue", "How often to check if a CNR can be deleted").Default("24h").Duration()
+	deleteCNR               = app.Flag("delete-cnr", "Whether or not to automatically delete CNRs").Default("false").Bool()
+	deleteCNRExpiry         = app.Flag("delete-cnr-expiry", "Delete the CNR this long after it was created and is successful").Default("168h").Duration()
+	deleteCNRRequeue        = app.Flag("delete-cnr-requeue", "How often to check if a CNR can be deleted").Default("24h").Duration()
+	defaultCNScyclingExpiry = app.Flag("default-cns-cycling-expiry", "Fail the CNS if it has been cycling for this long").Default("3h").Duration()
 )
 
 var log = logf.Log.WithName("cmd")
@@ -114,13 +116,18 @@ func main() {
 		DeleteCNRRequeue: *deleteCNRRequeue,
 	}
 
+	// Configure the CNS transitioner options
+	cnsOptions := cnsTransitioner.Options{
+		DefaultCNScyclingExpiry: *defaultCNScyclingExpiry,
+	}
+
 	// Set up and register the controllers that will share resources between them
 	_, err = cyclenoderequest.NewReconciler(mgr, cloudProvider, notifier, *namespace, cnrOptions)
 	if err != nil {
 		log.Error(err, "Unable to add cycleNodeRequest controller")
 		os.Exit(1)
 	}
-	_, err = cyclenodestatus.NewReconciler(mgr, cloudProvider, notifier, *namespace)
+	_, err = cyclenodestatus.NewReconciler(mgr, cloudProvider, notifier, *namespace, cnsOptions)
 	if err != nil {
 		log.Error(err, "Unable to add cycleNodeStatus controller")
 		os.Exit(1)

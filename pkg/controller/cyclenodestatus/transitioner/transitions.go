@@ -12,11 +12,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-var (
-	// How long we will try to cycle this one node for before giving up
-	nodeTerminationGracePeriod = 180 * time.Minute
-)
-
 // transitionUndefined transitions any CycleNodeStatuses in the Undefined phase to the Pending phase
 // It checks to ensure that a node name has been provided
 // When the CRD validation features are available in the Kubernetes API, we could probably remove these checks
@@ -37,6 +32,13 @@ func (t *CycleNodeStatusTransitioner) transitionUndefined() (reconcile.Result, e
 	// Set the timestamp so we know when we've timed out
 	currentTime := metav1.Now()
 	t.cycleNodeStatus.Status.StartedTimestamp = &currentTime
+
+	// Calculate cns timeout timestamp with the default duration if no CyclingTimeout is provided or if CyclingTimeout is negative
+	timeoutTime := metav1.NewTime(currentTime.Add(t.options.DefaultCNScyclingExpiry))
+	if t.cycleNodeStatus.Spec.CycleSettings.CyclingTimeout != nil && t.cycleNodeStatus.Spec.CycleSettings.CyclingTimeout.Duration > 0*time.Second {
+		timeoutTime = metav1.NewTime(currentTime.Add(t.cycleNodeStatus.Spec.CycleSettings.CyclingTimeout.Duration))
+	}
+	t.cycleNodeStatus.Status.TimeoutTimestamp = &timeoutTime
 
 	// Transition the object to pending
 	return t.transitionObject(v1.CycleNodeStatusPending)

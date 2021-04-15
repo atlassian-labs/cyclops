@@ -19,17 +19,26 @@ var (
 type CycleNodeStatusTransitioner struct {
 	cycleNodeStatus *v1.CycleNodeStatus
 	rm              *controller.ResourceManager
+	options         Options
 }
 
 // NewCycleNodeStatusTransitioner returns a new cycleNodeStatus transitioner
 func NewCycleNodeStatusTransitioner(
 	cycleNodeStatus *v1.CycleNodeStatus,
 	rm *controller.ResourceManager,
+	options Options,
 ) *CycleNodeStatusTransitioner {
 	return &CycleNodeStatusTransitioner{
 		cycleNodeStatus: cycleNodeStatus,
 		rm:              rm,
+		options:         options,
 	}
+}
+
+// Options stores configurable options for the NewCycleNodeStatusTransitioner
+type Options struct {
+	// DefaultCNScyclingExpiry controls how long until the CycleNodeStatus will timeout
+	DefaultCNScyclingExpiry time.Duration
 }
 
 // Run runs the CycleNodeStatusTransitioner and returns a reconcile result and an error

@@ -52,10 +52,13 @@ lint:
 docker:
 	docker build -t $(IMAGE) .
 
+# New version of operator-sdk no longer support generate CRDs directly
+# Build from release v0.19.0 with commit hash 
 install-operator-sdk:
 	mkdir -p $(GOPATH)/src/github.com/operator-framework
 	-cd $(GOPATH)/src/github.com/operator-framework && git clone https://github.com/operator-framework/operator-sdk
 	git -C $(GOPATH)/src/github.com/operator-framework/operator-sdk checkout master
+	git -C $(GOPATH)/src/github.com/operator-framework/operator-sdk checkout tags/v0.19.0
 	$(MAKE) -C $(GOPATH)/src/github.com/operator-framework/operator-sdk tidy
 	$(MAKE) -C $(GOPATH)/src/github.com/operator-framework/operator-sdk install
 
