@@ -18,7 +18,7 @@ spec:
       serviceAccountName: cyclops
       containers:
         - name: cyclops
-          image: atlassian/cyclops:latest
+          image: ghcr.io/atlassian-labs/cyclops:v1.5.0
           command:
           - cyclops
           imagePullPolicy: Always
