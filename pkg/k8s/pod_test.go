@@ -55,7 +55,7 @@ func TestEvictPod(t *testing.T) {
 	assert.Equal(t, nil, EvictPod(pod, "core/v1", client))
 }
 
-func TestEvictOrKillPod(t *testing.T) {
+func TestEvictOrForciblyDeletePod(t *testing.T) {
 	pod := test.BuildTestPod(test.PodOpts{
 		Name:      "test",
 		Namespace: "kube-system",
@@ -82,7 +82,7 @@ func TestEvictOrKillPod(t *testing.T) {
 		return false, nil, nil
 	})
 
-	assert.Equal(t, nil, EvictOrKillPod(pod, "core/v1", client, testUnhealthyAfter, timeNow()),
+	assert.Equal(t, nil, EvictOrForciblyDeletePod(pod, "core/v1", client, testUnhealthyAfter, timeNow()),
 		"evict call expected to succeed")
 	assert.Equal(t, true, podEvictionAttempted,
 		"pod eviction should have been attempted")
@@ -91,7 +91,7 @@ func TestEvictOrKillPod(t *testing.T) {
 
 	// Now the pod has been unhealthy for a while, the deletion attempt should happen
 	pod.Status.Conditions = []corev1.PodCondition{podUnhealthyCondition(false, timeNow().Add(-10*time.Minute))}
-	assert.Equal(t, nil, EvictOrKillPod(pod, "core/v1", client, testUnhealthyAfter, timeNow()),
+	assert.Equal(t, nil, EvictOrForciblyDeletePod(pod, "core/v1", client, testUnhealthyAfter, timeNow()),
 		"evict call expected to succeed")
 	assert.Equal(t, true, podEvictionAttempted,
 		"pod eviction should have been attempted")

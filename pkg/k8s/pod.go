@@ -20,10 +20,10 @@ const (
 
 var log = logf.Log.WithName("k8s.pod.go")
 
-// KillAndRemovePod immediately terminates a given pod off the node, without waiting to check if it has been removed.
+// ForciblyDeletePod immediately terminates a given pod off the node, without waiting to check if it has been removed.
 // This should only be called on workloads that can tolerate being removed like this, and as a last resort.
-func KillAndRemovePod(podName, podNamespace, nodeName string, client kubernetes.Interface) error {
-	log.Info("Forcefully killing and removing pod", "podName", podName,
+func ForciblyDeletePod(podName, podNamespace, nodeName string, client kubernetes.Interface) error {
+	log.Info("Forcibly deleting pod", "podName", podName,
 		"podNamespace", podNamespace, "nodeName", nodeName)
 	var gracePeriodDeleteNow int64 = 0
 	return client.CoreV1().Pods(podNamespace).Delete(context.TODO(), podName, metaV1.DeleteOptions{
@@ -45,8 +45,8 @@ func EvictPod(pod *v1.Pod, apiVersion string, client kubernetes.Interface) error
 	})
 }
 
-// EvictOrKillPod tries to evict a pod, and if that fails will then check if it can forcibly remove the pod instead.
-func EvictOrKillPod(pod *v1.Pod, apiVersion string, client kubernetes.Interface, unhealthyAfter time.Duration, now time.Time) error {
+// EvictOrForciblyDeletePod tries to evict a pod, and if that fails will then check if it can forcibly remove the pod instead.
+func EvictOrForciblyDeletePod(pod *v1.Pod, apiVersion string, client kubernetes.Interface, unhealthyAfter time.Duration, now time.Time) error {
 	err := EvictPod(pod, apiVersion, client)
 	if err != nil {
 		// If we couldn't drain the pod, double check if it's been unhealthy for too long and if it has then
@@ -56,7 +56,7 @@ func EvictOrKillPod(pod *v1.Pod, apiVersion string, client kubernetes.Interface,
 				log.Info("Pod is un-evictable and is unhealthy for longer than the unhealthy threshold",
 					"podName", pod.Name, "podNamespace", pod.Namespace, "nodeName", pod.Spec.NodeName,
 					"unhealthyThreshold", unhealthyAfter)
-				return KillAndRemovePod(pod.Name, pod.Namespace, pod.Spec.NodeName, client)
+				return ForciblyDeletePod(pod.Name, pod.Namespace, pod.Spec.NodeName, client)
 			}
 		} else {
 			return err
@@ -69,7 +69,7 @@ func EvictOrKillPod(pod *v1.Pod, apiVersion string, client kubernetes.Interface,
 // stopping the eviction as a result.
 func EvictPods(pods []*v1.Pod, apiVersion string, client kubernetes.Interface, unhealthyAfter time.Duration, now time.Time) (evictionErrors []error) {
 	for _, pod := range pods {
-		err := EvictOrKillPod(pod, apiVersion, client, unhealthyAfter, now)
+		err := EvictOrForciblyDeletePod(pod, apiVersion, client, unhealthyAfter, now)
 		if err != nil && !errors.IsNotFound(err) {
 			evictionErrors = append(evictionErrors, err)
 		}
