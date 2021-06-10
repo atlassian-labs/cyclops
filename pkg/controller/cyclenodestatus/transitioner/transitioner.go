@@ -39,6 +39,9 @@ func NewCycleNodeStatusTransitioner(
 type Options struct {
 	// DefaultCNScyclingExpiry controls how long until the CycleNodeStatus will timeout
 	DefaultCNScyclingExpiry time.Duration
+	// UnhealthyPodTerminationThreshold controls how long we tolerate a pod being unhealthy and holding up the
+	// CycleNodeStatus before forcibly removing it
+	UnhealthyPodTerminationThreshold time.Duration
 }
 
 // Run runs the CycleNodeStatusTransitioner and returns a reconcile result and an error

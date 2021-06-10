@@ -2,6 +2,7 @@ package k8s
 
 import (
 	"fmt"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
@@ -14,7 +15,8 @@ const (
 
 // DrainPods attempts to delete or evict pods so that the node can be terminated.
 // Will prioritise using Evict if the API server supports it.
-func DrainPods(pods []*v1.Pod, client kubernetes.Interface) []error {
+// Pods that have been unhealthy for longer than the given duration will be forcibly removed to prevent stalling.
+func DrainPods(pods []*v1.Pod, client kubernetes.Interface, unhealthyAfter time.Duration) []error {
 	// Determine whether we are able to delete or evict pods
 	apiVersion, err := SupportEviction(client)
 	if err != nil {
@@ -25,7 +27,7 @@ func DrainPods(pods []*v1.Pod, client kubernetes.Interface) []error {
 	if len(apiVersion) == 0 {
 		return []error{fmt.Errorf("apiVersion does not support pod eviction API")}
 	}
-	return EvictPods(pods, apiVersion, client)
+	return EvictPods(pods, apiVersion, client, unhealthyAfter, time.Now())
 }
 
 // SupportEviction uses Discovery API to find out if the API server supports the eviction subresource

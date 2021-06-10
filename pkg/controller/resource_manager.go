@@ -46,21 +46,21 @@ func NewResourceManager(
 }
 
 // UpdateObject updates the given object in the API
-func (t *ResourceManager) UpdateObject(obj client.Object) error {
-	err := t.Client.Update(context.TODO(), obj)
+func (rm *ResourceManager) UpdateObject(obj client.Object) error {
+	err := rm.Client.Update(context.TODO(), obj)
 	if err != nil {
-		t.Logger.Error(err, "unable to update API object",
+		rm.Logger.Error(err, "unable to update API object",
 			"objectType", obj.GetObjectKind().GroupVersionKind().String())
 	}
 	return err
 }
 
 // LogEvent creates an event on the current object
-func (t *ResourceManager) LogEvent(obj runtime.Object, reason, messageFmt string, args ...interface{}) {
-	t.Recorder.Eventf(obj, coreV1.EventTypeNormal, reason, messageFmt, args...)
+func (rm *ResourceManager) LogEvent(obj runtime.Object, reason, messageFmt string, args ...interface{}) {
+	rm.Recorder.Eventf(obj, coreV1.EventTypeNormal, reason, messageFmt, args...)
 }
 
 // LogWarningEvent creates a warning event on the current object
-func (t *ResourceManager) LogWarningEvent(obj runtime.Object, reason, messageFmt string, args ...interface{}) {
-	t.Recorder.Eventf(obj, coreV1.EventTypeWarning, reason, messageFmt, args...)
+func (rm *ResourceManager) LogWarningEvent(obj runtime.Object, reason, messageFmt string, args ...interface{}) {
+	rm.Recorder.Eventf(obj, coreV1.EventTypeWarning, reason, messageFmt, args...)
 }
