@@ -127,7 +127,7 @@ func (t *CycleNodeStatusTransitioner) transitionRemovingLabelsFromPods() (reconc
 func (t *CycleNodeStatusTransitioner) transitionDraining() (reconcile.Result, error) {
 	// Drain pods off the node
 	t.rm.LogEvent(t.cycleNodeStatus, "DrainingPods", "Draining pods from node: %v", t.cycleNodeStatus.Status.CurrentNode.Name)
-	finished, errs := t.rm.DrainPods(t.cycleNodeStatus.Status.CurrentNode.Name)
+	finished, errs := t.rm.DrainPods(t.cycleNodeStatus.Status.CurrentNode.Name, t.options.UnhealthyPodTerminationThreshold)
 
 	// We need to do some fairly complicated error handling here. It is most efficient to drain all pods at once, as
 	// this stops us being blocked behind one pod that takes a long time to get evicted. This means we need to handle

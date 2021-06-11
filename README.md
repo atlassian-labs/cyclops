@@ -42,9 +42,7 @@ See [Docs](docs/README.md)
 ## Building
 
 ```bash
-# install the dep dependencies
-make setup
-# build Cyclops
+# build Cyclops - go mod will automatically download dependencies
 make build
 ```
 

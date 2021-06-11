@@ -10,7 +10,7 @@ import (
 )
 
 // GetPodsOnNode gets a list of the pods running on the given node, optionally filtered by the given label selector.
-func (t *ResourceManager) GetPodsOnNode(nodeName string) (pods []v1.Pod, err error) {
+func (rm *ResourceManager) GetPodsOnNode(nodeName string) (pods []v1.Pod, err error) {
 	podList := &v1.PodList{}
 	listOptions := &client.ListOptions{
 		Namespace: "",
@@ -18,15 +18,15 @@ func (t *ResourceManager) GetPodsOnNode(nodeName string) (pods []v1.Pod, err err
 			"spec.nodeName": nodeName,
 		}),
 	}
-	if err := t.Client.List(context.TODO(), podList, listOptions); err != nil {
+	if err := rm.Client.List(context.TODO(), podList, listOptions); err != nil {
 		return pods, err
 	}
 	return podList.Items, nil
 }
 
 // GetDrainablePodsOnNode gets a list of pods on a named node that we can evict or delete from the node.
-func (t *ResourceManager) GetDrainablePodsOnNode(nodeName string) (pods []v1.Pod, err error) {
-	allPods, err := t.GetPodsOnNode(nodeName)
+func (rm *ResourceManager) GetDrainablePodsOnNode(nodeName string) (pods []v1.Pod, err error) {
+	allPods, err := rm.GetPodsOnNode(nodeName)
 	if err != nil {
 		return pods, err
 	}

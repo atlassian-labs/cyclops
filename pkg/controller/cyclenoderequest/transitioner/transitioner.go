@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	v1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
 	"github.com/atlassian-labs/cyclops/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 type transitionFunc func() (reconcile.Result, error)
@@ -88,6 +88,6 @@ func (t *CycleNodeRequestTransitioner) transitionFuncs() map[v1.CycleNodeRequest
 		v1.CycleNodeRequestWaitingTermination: t.transitionWaitingTermination,
 		v1.CycleNodeRequestFailed:             t.transitionFailed,
 		v1.CycleNodeRequestSuccessful:         t.transitionSuccessful,
-		v1.CycleNodeRequestHealing:			   t.transitionHealing,
+		v1.CycleNodeRequestHealing:            t.transitionHealing,
 	}
 }
