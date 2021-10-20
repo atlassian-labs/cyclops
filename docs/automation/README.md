@@ -34,6 +34,12 @@ spec:
   cycleSettings:
     method: Drain
     concurrency: 1
+  healthChecks:
+  - endpoint: http://{{ .NodeIP }}:8080/ready
+    regexMatch: Ready
+    validStatusCodes:
+    - 200
+    waitPeriod: 5m
 ```
 
 The cycleSettings dictionary is exactly the same as CycleNodeRequest

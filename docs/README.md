@@ -58,6 +58,7 @@ Flags:
       --messaging-provider=""          Which message provider to use, options: [slack] (Optional)
       --address=":8080"                Address to listen on for /metrics
       --namespace="kube-system"        Namespace to watch for cycle request objects
+      --health-check-timeout=5s        Timeout on health checks performed
       --delete-cnr                     Whether or not to automatically delete CNRs
       --delete-cnr-expiry=168h         Delete the CNR this long after it was created and is successful
       --delete-cnr-requeue=24h         How often to check if a CNR can be deleted

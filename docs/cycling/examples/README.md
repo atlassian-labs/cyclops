@@ -202,3 +202,34 @@ spec:
 ```
 
 This example shows the usage of the `nodeGroupsList` optional field with concurrency. Cyclops maintains same concurrency for all the nodes inside those `nodeGroupName` and `nodeGroupsList` cloud provider node groups. This is useful for situations where you need to split a group of node into different cloud provider node groups, e.g. split by availability zones due to autoscaling issue, and also want to maintain same concurrency for nodes in those groups especially a lower concurrency which cannot be achieved by creating multiple `NodeGroup` objects.
+
+## Example 6 - Cycling with health checks enabled
+
+```yaml
+apiVersion: "atlassian.com/v1"
+kind: "CycleNodeRequest"
+metadata:
+  name: "example"
+  namespace: "kube-system"
+spec:
+  nodeGroupName: "az1-nodes.my-nodegroup.my-site"
+  selector:
+    matchLabels:
+      role: node
+      customer: shared
+  cycleSettings:
+    concurrency: 1
+    method: Drain
+  healthChecks:
+  - endpoint: http://{{ .NodeIP }}:8080/ready
+    regexMatch: Ready
+    validStatusCodes:
+    - 200
+    waitPeriod: 5m
+  - endpoint: http://service-name.namespace.svc.cluster.local:9090/ready
+    validStatusCodes:
+    - 200
+    waitPeriod: 5m
+```
+
+Cyclops can optionally perform a set of health checks before each node selected in terminated. This can be useful to perform deep health checks on system daemons or pods running on host network to ensure they are healthy before continuing with cycling. The set of health checks will be performed until each returns a healthy status once. `{{ .NodeIP }}` can be use to render the endpoint with the private ip of a new instance brought up during the cycling.
