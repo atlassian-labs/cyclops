@@ -98,6 +98,7 @@ func GenerateCNR(nodeGroup atlassianv1.NodeGroup, nodes []string, name, namespac
 			Selector:       nodeGroup.Spec.NodeSelector,
 			NodeNames:      nodes,
 			CycleSettings:  nodeGroup.Spec.CycleSettings,
+			HealthChecks:   nodeGroup.Spec.HealthChecks,
 		},
 	}
 }

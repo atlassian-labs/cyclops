@@ -2,6 +2,7 @@ package cyclenodestatus
 
 import (
 	"context"
+	"net/http"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -114,6 +115,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 	rm := cyclecontroller.NewResourceManager(
 		r.mgr.GetClient(),
 		r.rawClient,
+		*http.DefaultClient,
 		r.mgr.GetEventRecorderFor(eventName),
 		logger,
 		r.notifier,

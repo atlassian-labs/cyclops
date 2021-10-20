@@ -25,6 +25,9 @@ type CycleNodeRequestSpec struct {
 
 	// CycleSettings stores the settings to use for cycling the nodes.
 	CycleSettings CycleSettings `json:"cycleSettings"`
+
+	// HealthChecks stores the settings to configure instance custom health checks
+	HealthChecks []HealthCheck `json:"healthChecks,omitempty"`
 }
 
 // CycleNodeRequestStatus defines the observed state of CycleNodeRequest
@@ -70,6 +73,9 @@ type CycleNodeRequestStatus struct {
 
 	// NodesAvailable stores the nodes still available to pick up for cycling from the list of nodes to terminate
 	NodesAvailable []CycleNodeRequestNode `json:"nodesAvailable,omitempty"`
+
+	// Healthchecks keeps track of instance health check information
+	HealthChecks map[string]HealthCheckStatus `json:"healthChecks,omitempty"`
 }
 
 // CycleNodeRequestNode stores a current node that is being worked on
@@ -83,6 +89,19 @@ type CycleNodeRequestNode struct {
 	// NodeGroupName stores current cloud provider node group name
 	// which this node belongs to
 	NodeGroupName string `json:"nodeGroupName"`
+}
+
+// HealthcheckStatusList groups all health checks status information for a node
+type HealthCheckStatus struct {
+	// Ready keeps track of the first timestamp at which the node status was reported as "ready"
+	NodeReady *metav1.Time `json:"ready,omitempty"`
+
+	// Checks keeps track of the list of health checks performed on the node and which have already passed
+	Checks []bool `json:"checks,omitempty"`
+
+	// Skip denotes whether a node is part of a nodegroup before cycling has begun. If this is the case,
+	// health checks on the instance are skipped, like this only new instances are checked.
+	Skip bool `json:"skip,omitempty"`
 }
 
 // CycleNodeRequestPhase is the phase that the cycleNodeRequest is in

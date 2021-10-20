@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/atlassian-labs/cyclops/pkg/cloudprovider"
 	"github.com/atlassian-labs/cyclops/pkg/notifications"
@@ -19,6 +20,7 @@ import (
 type ResourceManager struct {
 	Client        client.Client
 	RawClient     kubernetes.Interface
+	HttpClient    http.Client
 	Recorder      record.EventRecorder
 	Logger        logr.Logger
 	Notifier      notifications.Notifier
@@ -30,6 +32,7 @@ type ResourceManager struct {
 func NewResourceManager(
 	client client.Client,
 	rawClient kubernetes.Interface,
+	httpClient http.Client,
 	recorder record.EventRecorder,
 	logger logr.Logger,
 	notifier notifications.Notifier,
@@ -38,6 +41,7 @@ func NewResourceManager(
 	return &ResourceManager{
 		Client:        client,
 		RawClient:     rawClient,
+		HttpClient:    httpClient,
 		Recorder:      recorder,
 		Logger:        logger,
 		Notifier:      notifier,

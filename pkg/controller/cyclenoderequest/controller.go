@@ -3,6 +3,7 @@ package cyclenoderequest
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 
 	v1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
@@ -118,10 +119,23 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 		}
 	}
 
+	httpClient := http.Client{
+		Timeout: r.options.HealthCheckTimeout,
+	}
+
+	if cycleNodeRequest.Spec.HealthChecks != nil {
+		for i, healthCheck := range cycleNodeRequest.Spec.HealthChecks {
+			if healthCheck.ValidStatusCodes == nil || len(healthCheck.ValidStatusCodes) == 0 {
+				cycleNodeRequest.Spec.HealthChecks[i].ValidStatusCodes = []uint{200}
+			}
+		}
+	}
+
 	logger = log.WithValues("name", request.Name, "namespace", request.Namespace, "phase", cycleNodeRequest.Status.Phase)
 	rm := cyclecontroller.NewResourceManager(
 		r.mgr.GetClient(),
 		r.rawClient,
+		httpClient,
 		r.mgr.GetEventRecorderFor(eventName),
 		logger,
 		r.notifier,

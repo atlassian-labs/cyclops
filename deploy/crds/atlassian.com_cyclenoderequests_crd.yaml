@@ -104,6 +104,39 @@ spec:
                 required:
                 - method
                 type: object
+              healthChecks:
+                description: HealthChecks stores the settings to configure instance
+                  custom health checks
+                items:
+                  description: HealthCheck defines the health check configuration
+                    for the NodeGroup
+                  properties:
+                    endpoint:
+                      description: 'Endpoint url of the health check. Optional: {{
+                        .NodeIP }} gets replaced by the private IP of the node being
+                        scaled up.'
+                      type: string
+                    regexMatch:
+                      description: RegexMatch specifies a regex string the body of
+                        the http result to should. By default no matching is done.
+                      type: string
+                    validStatusCodes:
+                      description: ValidStatusCodes keeps track of the list of possible
+                        status codes returned by the endpoint denoting the service
+                        as healthy. Defaults to [200].
+                      items:
+                        type: integer
+                      type: array
+                    waitPeriod:
+                      description: WaitPeriod is the time allowed for the health check
+                        to pass before considering the service unhealthy and failing
+                        the CycleNodeRequest.
+                      type: string
+                  required:
+                  - endpoint
+                  - waitPeriod
+                  type: object
+                type: array
               nodeGroupName:
                 description: NodeGroupName is the name of the node group in the cloud
                   provider that will be increased to bring up replacement nodes.
@@ -214,6 +247,31 @@ spec:
                   fail the request.
                 format: date-time
                 type: string
+              healthChecks:
+                additionalProperties:
+                  description: HealthcheckStatusList groups all health checks status
+                    information for a node
+                  properties:
+                    checks:
+                      description: Checks keeps track of the list of health checks
+                        performed on the node and which have already passed
+                      items:
+                        type: boolean
+                      type: array
+                    ready:
+                      description: Ready keeps track of the first timestamp at which
+                        the node status was reported as "ready"
+                      format: date-time
+                      type: string
+                    skip:
+                      description: Skip denotes whether a node is part of a nodegroup
+                        before cycling has begun. If this is the case, health checks
+                        on the instance are skipped, like this only new instances
+                        are checked.
+                      type: boolean
+                  type: object
+                description: Healthchecks keeps track of instance health check information
+                type: object
               message:
                 description: A human readable message indicating details about why
                   the CycleNodeRequest is in this condition.

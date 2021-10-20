@@ -3,6 +3,10 @@ package transitioner
 import (
 	"context"
 	"fmt"
+	"html/template"
+	"io/ioutil"
+	"regexp"
+	"strings"
 	"time"
 
 	v1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
@@ -272,6 +276,76 @@ func findOffendingNodes(kubeNodes []corev1.Node, cloudProviderNodes map[string]c
 	}
 
 	return nodesNotInCPNodeGroup, nodesNotInKube
+}
+
+// buildHealthCheckEndpoint generates the endpoint which will be used to perform a health check
+// It will render a string and replace {{ .NodeIP }} with the node private IP. If this is not present,
+// then the endpoint returned will be identical to the input
+func buildHealthCheckEndpoint(node corev1.Node, endpoint string) (string, error) {
+	tmpl, err := template.New("endpoint").Parse(endpoint)
+	if err != nil {
+		return "", err
+	}
+
+	var privateIP string
+
+	// If there is no private IP, the error will be caught when trying
+	// to perform the health check on the node
+	for _, address := range node.Status.Addresses {
+		if address.Type == corev1.NodeInternalIP {
+			privateIP = address.Address
+		}
+	}
+
+	// Ensure other fields cannot be rendered to the filter
+	tmplStruct := struct {
+		NodeIP string
+	}{
+		NodeIP: privateIP,
+	}
+
+	var renderedEndpoint strings.Builder
+	if err = tmpl.Execute(&renderedEndpoint, tmplStruct); err != nil {
+		return "", err
+	}
+
+	return renderedEndpoint.String(), nil
+}
+
+// healthCheckPassed checks if the statusCode returned matches the set of valid status code for the health check
+// as well as if the body matches regex provided
+func healthCheckPassed(healthCheck v1.HealthCheck, statusCode uint, body []byte) (bool, string) {
+	// If there is not regex match string specified, don't check the body of the response
+	r := regexp.MustCompile(healthCheck.RegexMatch)
+	if healthCheck.RegexMatch != "" && !r.Match(body) {
+		return false, fmt.Sprintf("regex %s did not match body %b", healthCheck.RegexMatch, body)
+	}
+
+	for _, validStatusCode := range healthCheck.ValidStatusCodes {
+		if statusCode == validStatusCode {
+			return true, ""
+		}
+	}
+
+	return false, fmt.Sprintf("status code %d returned, did not match expected %v", statusCode, healthCheck.ValidStatusCodes)
+}
+
+// performHealthCheck makes the health check request to the endpoint specified, reads the body and returns
+// the status code/body to determinate weather it passed
+func (t *CycleNodeRequestTransitioner) performHealthCheck(endpoint string) (uint, []byte, error) {
+	resp, err := t.rm.HttpClient.Get(endpoint)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	defer resp.Body.Close()
+
+	bytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	return uint(resp.StatusCode), bytes, nil
 }
 
 // transitionToUnsuccessful transitions the current cycleNodeRequest to healing/failed
