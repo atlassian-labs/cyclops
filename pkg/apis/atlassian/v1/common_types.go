@@ -7,9 +7,6 @@ import (
 // CycleNodeRequestMethod is the method to use when cycling nodes.
 type CycleNodeRequestMethod string
 
-// HealthCheckScheme specifies the scheme used to connect to the node.
-type HealthCheckScheme string
-
 const (
 	// CycleNodeRequestMethodDrain actively drains pods off the node before terminating it.
 	// This is the default method.
@@ -18,12 +15,6 @@ const (
 	// CycleNodeRequestMethodWait waits for pods to leave the node before terminating it.
 	// It will ignore DaemonSets and select pods. These can be configured in the CRD spec.
 	CycleNodeRequestMethodWait = "Wait"
-
-	// HealthCheckSchemeHttp specifies to use http to connect to the node. This is the default.
-	HealthCheckSchemeHttp HealthCheckScheme = "http"
-
-	// HealthCheckSchemeHttps specifies to use https to connect to the node.
-	HealthCheckSchemeHttps HealthCheckScheme = "https"
 )
 
 // CycleSettings are configuration options to control how nodes are cycled

@@ -232,4 +232,4 @@ spec:
     waitPeriod: 5m
 ```
 
-Cyclops can optionally perform a set of health checks before each node selected in terminated. This can be useful to perform deep health checks on system daemons or pods running on host network to ensure they are healthy before continuing with cycling. The set of health checks will be performed until each returns a healthy status once. `{{ .NodeIP }}` can be use to render the endpoint with the private ip of a new instance brought up during the cycling.
+Cyclops can optionally perform a set of health checks before each node selected is terminated. This can be useful to perform deep health checks on system daemons or pods running on host network to ensure they are healthy before continuing with cycling. The set of health checks will be performed until each returns a healthy status once. `{{ .NodeIP }}` can be used to render the endpoint with the private IP of a new instance brought up during the cycling.
