@@ -119,7 +119,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 		}
 	}
 
-	httpClient := http.Client{
+	httpClient := &http.Client{
 		Timeout: r.options.HealthCheckTimeout,
 	}
 

@@ -12,6 +12,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// getNodeName generates a unique name for the node by combining the node name and provider ID
+// Do not use the provider assigned name of the node
+// If the name of the node is the private dns address, there is a risk of new instances being
+// assigned the same address as a previously terminated node in the initial set in the nodegroup.
+// This would cause the new node health checks to be skipped
+func getNodeName(kubeNode corev1.Node) string {
+	return fmt.Sprintf("%s/%s", kubeNode.Spec.ProviderID, kubeNode.Name)
+}
+
 // buildHealthCheckEndpoint generates the endpoint which will be used to perform a health check
 // It will render a string and replace {{ .NodeIP }} with the node private IP. If this is not present,
 // then the endpoint returned will be identical to the input
@@ -48,20 +57,24 @@ func buildHealthCheckEndpoint(node corev1.Node, endpoint string) (string, error)
 
 // healthCheckPassed checks if the statusCode returned matches the set of valid status code for the health check
 // as well as if the body matches regex provided
-func healthCheckPassed(healthCheck v1.HealthCheck, statusCode uint, body []byte) (bool, string) {
+func healthCheckPassed(healthCheck v1.HealthCheck, statusCode uint, body []byte) error {
 	// If there is not regex match string specified, don't check the body of the response
-	r := regexp.MustCompile(healthCheck.RegexMatch)
+	r, err := regexp.Compile(healthCheck.RegexMatch)
+	if err != nil {
+		return err
+	}
+
 	if healthCheck.RegexMatch != "" && !r.Match(body) {
-		return false, fmt.Sprintf("regex %s did not match body %b", healthCheck.RegexMatch, body)
+		return fmt.Errorf("regex %s did not match body %b", healthCheck.RegexMatch, body)
 	}
 
 	for _, validStatusCode := range healthCheck.ValidStatusCodes {
 		if statusCode == validStatusCode {
-			return true, ""
+			return nil
 		}
 	}
 
-	return false, fmt.Sprintf("status code %d returned, did not match expected %v", statusCode, healthCheck.ValidStatusCodes)
+	return fmt.Errorf("status code %d returned, did not match expected %v", statusCode, healthCheck.ValidStatusCodes)
 }
 
 // performHealthCheck makes the health check request to the endpoint specified, reads the body and returns
@@ -88,16 +101,12 @@ func (t *CycleNodeRequestTransitioner) performInitialHealthChecks(kubeNodes []co
 	t.cycleNodeRequest.Status.HealthChecks = make(map[string]v1.HealthCheckStatus)
 
 	// Build a set of ready nodes from which to check below
-	var readyNodesSet = make(map[string]corev1.Node)
+	readyNodesSet := make(map[string]corev1.Node)
 
 	// Collect all nodes in the nodegroup and assign Skip=true
 	// Health checks will not be performed on them during cycling in the ScalingUp phase
 	for _, kubeNode := range kubeNodes {
-		// Do not use the provider assigned name of the node
-		// If the name of the node is the private dns address, there is a risk of new instances being
-		// assigned the same address as a previously terminated node in the initial set in the nodegroup.
-		// This would cause the new node health checks to be skipped
-		nodeName := fmt.Sprintf("%s/%s", kubeNode.Spec.ProviderID, kubeNode.Name)
+		nodeName := getNodeName(kubeNode)
 		readyNodesSet[nodeName] = kubeNode
 
 		// Set up the health check statuses for each node
@@ -129,8 +138,8 @@ func (t *CycleNodeRequestTransitioner) performInitialHealthChecks(kubeNodes []co
 				return fmt.Errorf("initial health check %s failed: %v", endpoint, err)
 			}
 
-			if passed, reason := healthCheckPassed(healthCheck, statusCode, body); !passed {
-				return fmt.Errorf("initial health check %s failed: %s", endpoint, reason)
+			if err := healthCheckPassed(healthCheck, statusCode, body); err != nil {
+				return fmt.Errorf("initial health check %s failed: %v", endpoint, err)
 			}
 
 			t.rm.Logger.Info("Initial health check passed", "endpoint", endpoint)
@@ -150,7 +159,7 @@ func (t *CycleNodeRequestTransitioner) performCyclingHealthChecks(kubeNodes []co
 	// Cycling is paused until all health checks pass
 	// If no health checks are configured, nothing happens
 	for _, kubeNode := range kubeNodes {
-		nodeName := fmt.Sprintf("%s/%s", kubeNode.Spec.ProviderID, kubeNode.Name)
+		nodeName := getNodeName(kubeNode)
 		healthChecksStatus, ok := t.cycleNodeRequest.Status.HealthChecks[nodeName]
 
 		// Pick up the new instances attached to the nodegroup
@@ -205,8 +214,8 @@ func (t *CycleNodeRequestTransitioner) performCyclingHealthChecks(kubeNodes []co
 			}
 
 			// Still within the waiting period here, must trigger requeueing this phase
-			// Don't bother logging the reason, this would fill up the logs
-			if passed, _ := healthCheckPassed(healthCheck, statusCode, body); !passed {
+			// Don't bother logging the error, this would fill up the logs
+			if err := healthCheckPassed(healthCheck, statusCode, body); err != nil {
 				allHealthChecksPassed = false
 				continue
 			}

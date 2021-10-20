@@ -170,7 +170,7 @@ func (t *CycleNodeRequestTransitioner) transitionPending() (reconcile.Result, er
 		}
 	}
 
-	if t.cycleNodeRequest.Spec.HealthChecks != nil {
+	if len(t.cycleNodeRequest.Spec.HealthChecks) > 0 {
 		if err = t.performInitialHealthChecks(kubeNodes); err != nil {
 			return t.transitionToHealing(err)
 		}
@@ -384,23 +384,20 @@ func (t *CycleNodeRequestTransitioner) transitionScalingUp() (reconcile.Result, 
 	}
 
 	// Skip looping through nodes if no health checks need to be performed
-	if t.cycleNodeRequest.Spec.HealthChecks == nil {
-		t.rm.LogEvent(t.cycleNodeRequest, "ScalingUpCompleted", "New nodes are now ready")
-		return t.transitionObject(v1.CycleNodeRequestCordoningNode)
-	}
-
-	allHealthChecksPassed, err := t.performCyclingHealthChecks(kubeNodes)
-	if err != nil {
-		return t.transitionToHealing(err)
-	}
-
-	if !allHealthChecksPassed {
-		// Reconcile any health checks passed to the cnr object
-		if err := t.rm.UpdateObject(t.cycleNodeRequest); err != nil {
+	if len(t.cycleNodeRequest.Spec.HealthChecks) > 0 {
+		allHealthChecksPassed, err := t.performCyclingHealthChecks(kubeNodes)
+		if err != nil {
 			return t.transitionToHealing(err)
 		}
 
-		return reconcile.Result{Requeue: true, RequeueAfter: requeueDuration}, nil
+		if !allHealthChecksPassed {
+			// Reconcile any health checks passed to the cnr object
+			if err := t.rm.UpdateObject(t.cycleNodeRequest); err != nil {
+				return t.transitionToHealing(err)
+			}
+
+			return reconcile.Result{Requeue: true, RequeueAfter: requeueDuration}, nil
+		}
 	}
 
 	t.rm.LogEvent(t.cycleNodeRequest, "ScalingUpCompleted", "New nodes are now ready")
