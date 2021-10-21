@@ -18,6 +18,9 @@ type NodeGroupSpec struct {
 
 	// CycleSettings stores the settings to use for cycling the nodes.
 	CycleSettings CycleSettings `json:"cycleSettings"`
+
+	// Healthchecks stores the settings to configure instance custom health checks
+	HealthChecks []HealthCheck `json:"healthChecks,omitempty"`
 }
 
 // NodeGroupStatus defines the observed state of NodeGroup

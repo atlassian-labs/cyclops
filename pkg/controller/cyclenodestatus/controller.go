@@ -114,6 +114,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 	rm := cyclecontroller.NewResourceManager(
 		r.mgr.GetClient(),
 		r.rawClient,
+		nil,
 		r.mgr.GetEventRecorderFor(eventName),
 		logger,
 		r.notifier,

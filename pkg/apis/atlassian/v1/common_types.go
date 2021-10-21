@@ -47,3 +47,21 @@ type CycleSettings struct {
 	// If no cyclingTimeout is provided, CNS will use the default controller CNS cyclingTimeout.
 	CyclingTimeout *metav1.Duration `json:"cyclingTimeout,omitempty"`
 }
+
+// HealthCheck defines the health check configuration for the NodeGroup
+// +k8s:openapi-gen=true
+type HealthCheck struct {
+	// Endpoint url of the health check. Optional: {{ .NodeIP }} gets replaced by the private IP of the node being scaled up.
+	Endpoint string `json:"endpoint"`
+
+	// WaitPeriod is the time allowed for the health check to pass before considering the
+	// service unhealthy and failing the CycleNodeRequest.
+	WaitPeriod *metav1.Duration `json:"waitPeriod"`
+
+	// ValidStatusCodes keeps track of the list of possible status codes returned by
+	// the endpoint denoting the service as healthy. Defaults to [200].
+	ValidStatusCodes []uint `json:"validStatusCodes,omitempty"`
+
+	// RegexMatch specifies a regex string the body of the http result to should. By default no matching is done.
+	RegexMatch string `json:"regexMatch,omitempty"`
+}

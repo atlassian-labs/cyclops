@@ -111,7 +111,7 @@ func (n *notifier) CyclingStarted(cnr *v1.CycleNodeRequest) error {
 // PhaseTransitioned pushes a threaded notification when the cycling transitions to a new phase
 func (n *notifier) PhaseTransitioned(cnr *v1.CycleNodeRequest) error {
 	if cnr.Status.ThreadTimestamp == "" {
-		return fmt.Errorf("ThreadTimestamp not set in CycleNodeRequest")
+		return fmt.Errorf("threadTimestamp not set in CycleNodeRequest")
 	}
 
 	// If the cycling succeeded, update the cycle status notification
@@ -148,10 +148,14 @@ func (n *notifier) PhaseTransitioned(cnr *v1.CycleNodeRequest) error {
 
 // NodesSelected pushes a threaded notification showing which new nodes are being cycled
 func (n *notifier) NodesSelected(cnr *v1.CycleNodeRequest) error {
+	if cnr.Status.ThreadTimestamp == "" {
+		return fmt.Errorf("threadTimestamp not set in CycleNodeRequest")
+	}
+
 	// Sanity check to make sure not to post an empty update
 	selectedNodes := newSelectedNodeNames(cnr)
 	if len(selectedNodes) == 0 {
-		return fmt.Errorf("No new nodes selected")
+		return fmt.Errorf("no new nodes selected")
 	}
 
 	messageParameters := slackapi.NewPostMessageParameters()

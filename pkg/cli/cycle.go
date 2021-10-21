@@ -29,12 +29,13 @@ type cycle struct {
 	plug    *kubeplug.Plug
 	version string
 
-	selectAllFlag           *bool
-	dryModeFlag             *bool
-	cnrNameFlag             *string
-	concurrencyOverrideFlag *int64
-	nodesFlag               *[]string
-	cyclingTimeout          *time.Duration
+	selectAllFlag               *bool
+	dryModeFlag                 *bool
+	cnrNameFlag                 *string
+	concurrencyOverrideFlag     *int64
+	nodesFlag                   *[]string
+	cyclingTimeout              *time.Duration
+	skipInitialHealthChecksFlag *bool
 }
 
 // NewCycle returns a new cycle CLI application that implements all the interfaces needed for kubeplug
@@ -78,6 +79,9 @@ kubectl cycle --name example-123 --all --dry
 
 # output CNRs instead of cycling for all nodegroups
 kubectl cycle --name example-123 --all -o yaml
+
+# cycle system node group without the initial health checks
+kubectl cycle --name example-123 system --skip-initial-health-checks
 `
 }
 
@@ -89,6 +93,7 @@ func (c *cycle) AddFlags(cmd *cobra.Command) {
 	c.nodesFlag = cmd.PersistentFlags().StringSlice("nodes", nil, "option to specify which nodes of the nodegroup to cycle. Leave empty for all")
 	c.concurrencyOverrideFlag = cmd.PersistentFlags().Int64("concurrency", -1, "option to override concurrency of all CNRs. Set for 0 to skip. -1 or not specified will use values from NodeGroup definition")
 	c.cyclingTimeout = cmd.PersistentFlags().Duration("cycling-timeout", 0*time.Second, "option to set timeout for cycling. Default to controller defined timeout")
+	c.skipInitialHealthChecksFlag = cmd.PersistentFlags().Bool("skip-initial-health-checks", false, "option to skip the initial set of health checks before cycling.")
 }
 
 // Run function called by cobra with args and client ready
@@ -190,6 +195,9 @@ func (c *cycle) generateCNRs(nodeGroups *atlassianv1.NodeGroupList, name, namesp
 		if newCyclingTimeoutValue, set := c.cyclingTimeoutOverride(); set {
 			cnr.Spec.CycleSettings.CyclingTimeout = newCyclingTimeoutValue
 		}
+
+		// If the cli argument is not used, this will not be added to the cnr spec
+		cnr.Spec.SkipInitialHealthChecks = c.skipInitialHealthChecks()
 
 		if ok, reason := generation.ValidateCNR(generation.NewOneShotNodeLister(c.plug.Client), cnr); !ok {
 			name, suffix := generation.GetNameExample(cnr.ObjectMeta)
@@ -308,4 +316,9 @@ func (c *cycle) cyclingTimeoutOverride() (*metav1.Duration, bool) {
 		return nil, false
 	}
 	return &metav1.Duration{Duration: *c.cyclingTimeout}, true
+}
+
+// skipInitialHealthChecks safely returns the --skip-initial-health-checks flag
+func (c *cycle) skipInitialHealthChecks() bool {
+	return c.skipInitialHealthChecksFlag != nil && *c.skipInitialHealthChecksFlag
 }

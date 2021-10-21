@@ -39,6 +39,9 @@ type Options struct {
 
 	// DeleteCNRRequeue controls how often we should check if a CycleNodeRequest is ready to be deleted
 	DeleteCNRRequeue time.Duration
+
+	// HealthCheckTimeout controls the duration of the timeout period for health checks performed on nodes
+	HealthCheckTimeout time.Duration
 }
 
 // NewCycleNodeRequestTransitioner returns a new cycleNodeRequest transitioner

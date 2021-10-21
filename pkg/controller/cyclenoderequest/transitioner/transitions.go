@@ -170,6 +170,12 @@ func (t *CycleNodeRequestTransitioner) transitionPending() (reconcile.Result, er
 		}
 	}
 
+	if len(t.cycleNodeRequest.Spec.HealthChecks) > 0 {
+		if err = t.performInitialHealthChecks(kubeNodes); err != nil {
+			return t.transitionToHealing(err)
+		}
+	}
+
 	// If the concurrency isn't provided, then default it to the number of nodesToTerminate
 	if t.cycleNodeRequest.Spec.CycleSettings.Concurrency <= 0 {
 		t.cycleNodeRequest.Spec.CycleSettings.Concurrency = int64(len(t.cycleNodeRequest.Status.NodesToTerminate))
@@ -181,6 +187,7 @@ func (t *CycleNodeRequestTransitioner) transitionPending() (reconcile.Result, er
 	if err := t.removeOldChildrenFromCluster(); err != nil {
 		return t.transitionToHealing(err)
 	}
+
 	return t.transitionObject(v1.CycleNodeRequestInitialised)
 }
 
@@ -373,6 +380,23 @@ func (t *CycleNodeRequestTransitioner) transitionScalingUp() (reconcile.Result, 
 				t.cycleNodeRequest.Status.CurrentNodes = append(t.cycleNodeRequest.Status.CurrentNodes[:i], t.cycleNodeRequest.Status.CurrentNodes[i+1:]...)
 				break
 			}
+		}
+	}
+
+	// Skip looping through nodes if no health checks need to be performed
+	if len(t.cycleNodeRequest.Spec.HealthChecks) > 0 {
+		allHealthChecksPassed, err := t.performCyclingHealthChecks(kubeNodes)
+		if err != nil {
+			return t.transitionToHealing(err)
+		}
+
+		if !allHealthChecksPassed {
+			// Reconcile any health checks passed to the cnr object
+			if err := t.rm.UpdateObject(t.cycleNodeRequest); err != nil {
+				return t.transitionToHealing(err)
+			}
+
+			return reconcile.Result{Requeue: true, RequeueAfter: requeueDuration}, nil
 		}
 	}
 

@@ -39,6 +39,8 @@ var (
 	addr      = app.Flag("address", "Address to listen on for /metrics").Default(":8080").String()
 	namespace = app.Flag("namespace", "Namespace to watch for cycle request objects").Default("kube-system").String()
 
+	healthCheckTimeout = app.Flag("health-check-timeout", "Timeout on health checks performed").Default("5s").Duration()
+
 	deleteCNR                        = app.Flag("delete-cnr", "Whether or not to automatically delete CNRs").Default("false").Bool()
 	deleteCNRExpiry                  = app.Flag("delete-cnr-expiry", "Delete the CNR this long after it was created and is successful").Default("168h").Duration()
 	deleteCNRRequeue                 = app.Flag("delete-cnr-requeue", "How often to check if a CNR can be deleted").Default("24h").Duration()
@@ -112,9 +114,10 @@ func main() {
 
 	// Configure the CNR transitioner options
 	cnrOptions := cnrTransitioner.Options{
-		DeleteCNR:        *deleteCNR,
-		DeleteCNRExpiry:  *deleteCNRExpiry,
-		DeleteCNRRequeue: *deleteCNRRequeue,
+		DeleteCNR:          *deleteCNR,
+		DeleteCNRExpiry:    *deleteCNRExpiry,
+		DeleteCNRRequeue:   *deleteCNRRequeue,
+		HealthCheckTimeout: *healthCheckTimeout,
 	}
 
 	// Configure the CNS transitioner options

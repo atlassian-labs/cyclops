@@ -1,0 +1,24 @@
+apiVersion: "atlassian.com/v1"
+kind: "CycleNodeRequest"
+metadata:
+  name: "example"
+  namespace: "kube-system"
+spec:
+  nodeGroupName: "az1-nodes.my-nodegroup.my-site"
+  selector:
+    matchLabels:
+      role: node
+      customer: shared
+  cycleSettings:
+    concurrency: 1
+    method: Drain
+  healthChecks:
+  - endpoint: http://{{ .NodeIP }}:8080/ready
+    regexMatch: Ready
+    validStatusCodes:
+    - 200
+    waitPeriod: 5m
+  - endpoint: http://service-name.namespace.svc.cluster.local:9090/ready
+    validStatusCodes:
+    - 200
+    waitPeriod: 5m
