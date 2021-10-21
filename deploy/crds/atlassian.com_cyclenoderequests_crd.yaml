@@ -200,6 +200,10 @@ spec:
                       are ANDed.
                     type: object
                 type: object
+              skipInitialHealthChecks:
+                description: SkipInitialHealthChecks is an optional flag to skip the
+                  initial set of node health checks before cycling begins
+                type: boolean
             required:
             - cycleSettings
             - nodeGroupName

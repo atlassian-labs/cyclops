@@ -12,13 +12,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// getNodeName generates a unique name for the node by combining the node name and provider ID
+// getNodeHash generates a unique name for the node by combining the node name and provider ID
 // Do not use the provider assigned name of the node
 // If the name of the node is the private dns address, there is a risk of new instances being
 // assigned the same address as a previously terminated node in the initial set in the nodegroup.
 // This would cause the new node health checks to be skipped
-func getNodeName(kubeNode corev1.Node) string {
-	return fmt.Sprintf("%s/%s", kubeNode.Spec.ProviderID, kubeNode.Name)
+func getNodeHash(node v1.CycleNodeRequestNode) string {
+	return fmt.Sprintf("%s/%s", node.ProviderID, node.Name)
 }
 
 // buildHealthCheckEndpoint generates the endpoint which will be used to perform a health check
@@ -106,25 +106,36 @@ func (t *CycleNodeRequestTransitioner) performInitialHealthChecks(kubeNodes []co
 	// Collect all nodes in the nodegroup and assign Skip=true
 	// Health checks will not be performed on them during cycling in the ScalingUp phase
 	for _, kubeNode := range kubeNodes {
-		nodeName := getNodeName(kubeNode)
-		readyNodesSet[nodeName] = kubeNode
+		nodeHash := getNodeHash(v1.CycleNodeRequestNode{
+			Name:       kubeNode.Name,
+			ProviderID: kubeNode.Spec.ProviderID,
+		})
+
+		readyNodesSet[nodeHash] = kubeNode
 
 		// Set up the health check statuses for each node
 		// All nodes present in the nodegroup before cycling should be skipped after cycling has begun
-		t.cycleNodeRequest.Status.HealthChecks[nodeName] = v1.HealthCheckStatus{
+		t.cycleNodeRequest.Status.HealthChecks[nodeHash] = v1.HealthCheckStatus{
 			Skip: true,
 		}
+	}
+
+	// The CNR can be configured to skip the initial set of health checks
+	// This can be useful for cycling out known unhealthy nodes which would fail these checks
+	if t.cycleNodeRequest.Spec.SkipInitialHealthChecks {
+		t.rm.Logger.Info("Skipping initial health checks")
+		return nil
 	}
 
 	// Perform healthchecks on all nodes in the nodegroup before cycling begins
 	// If any healthchecks fail, cycling should not start
 	for _, node := range t.cycleNodeRequest.Status.NodesToTerminate {
-		nodeName := fmt.Sprintf("%s/%s", node.ProviderID, node.Name)
+		nodeHash := getNodeHash(node)
 
 		// Check if the node is ready, fail the cnr
-		kubeNode, ok := readyNodesSet[nodeName]
+		kubeNode, ok := readyNodesSet[nodeHash]
 		if !ok {
-			return fmt.Errorf("node %s/%s not ready", nodeName, node.Name)
+			return fmt.Errorf("node %s/%s not ready", nodeHash, node.Name)
 		}
 
 		for _, healthCheck := range t.cycleNodeRequest.Spec.HealthChecks {
@@ -159,8 +170,12 @@ func (t *CycleNodeRequestTransitioner) performCyclingHealthChecks(kubeNodes []co
 	// Cycling is paused until all health checks pass
 	// If no health checks are configured, nothing happens
 	for _, kubeNode := range kubeNodes {
-		nodeName := getNodeName(kubeNode)
-		healthChecksStatus, ok := t.cycleNodeRequest.Status.HealthChecks[nodeName]
+		nodeHash := getNodeHash(v1.CycleNodeRequestNode{
+			Name:       kubeNode.Name,
+			ProviderID: kubeNode.Spec.ProviderID,
+		})
+
+		healthChecksStatus, ok := t.cycleNodeRequest.Status.HealthChecks[nodeHash]
 
 		// Pick up the new instances attached to the nodegroup
 		// All original instances were already added in the Pending phase
@@ -170,7 +185,7 @@ func (t *CycleNodeRequestTransitioner) performCyclingHealthChecks(kubeNodes []co
 				Checks: make([]bool, len(t.cycleNodeRequest.Spec.HealthChecks)),
 			}
 
-			t.cycleNodeRequest.Status.HealthChecks[nodeName] = healthChecksStatus
+			t.cycleNodeRequest.Status.HealthChecks[nodeHash] = healthChecksStatus
 		}
 
 		// This is a node which was part of the nodegroup before cycling began
@@ -185,7 +200,7 @@ func (t *CycleNodeRequestTransitioner) performCyclingHealthChecks(kubeNodes []co
 		if healthChecksStatus.NodeReady == nil {
 			now := metav1.Now()
 			healthChecksStatus.NodeReady = &now
-			t.cycleNodeRequest.Status.HealthChecks[nodeName] = healthChecksStatus
+			t.cycleNodeRequest.Status.HealthChecks[nodeHash] = healthChecksStatus
 		}
 
 		for i, healthCheck := range t.cycleNodeRequest.Spec.HealthChecks {
@@ -223,7 +238,7 @@ func (t *CycleNodeRequestTransitioner) performCyclingHealthChecks(kubeNodes []co
 			t.rm.Logger.Info("Health check passed", "endpoint", endpoint)
 
 			healthChecksStatus.Checks[i] = true
-			t.cycleNodeRequest.Status.HealthChecks[nodeName] = healthChecksStatus
+			t.cycleNodeRequest.Status.HealthChecks[nodeHash] = healthChecksStatus
 		}
 	}
 

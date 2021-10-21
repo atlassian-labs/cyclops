@@ -28,6 +28,9 @@ type CycleNodeRequestSpec struct {
 
 	// HealthChecks stores the settings to configure instance custom health checks
 	HealthChecks []HealthCheck `json:"healthChecks,omitempty"`
+
+	// SkipInitialHealthChecks is an optional flag to skip the initial set of node health checks before cycling begins
+	SkipInitialHealthChecks bool `json:"skipInitialHealthChecks,omitempty"`
 }
 
 // CycleNodeRequestStatus defines the observed state of CycleNodeRequest

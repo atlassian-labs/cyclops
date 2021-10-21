@@ -105,6 +105,7 @@ Flags:
       --request-timeout string         The length of time to wait before giving up on a single server request. Non-zero values should contain a corresponding time unit (e.g. 1s, 2m, 3h). A value of zero means don't timeout requests. (default "0")
   -l, --selector string                Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)
   -s, --server string                  The address and port of the Kubernetes API server
+      --skip-initial-health-checks     option to skip the initial set of health checks before cycling.
       --template string                Template string or path to template file to use when -o=go-template, -o=go-template-file. The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview].
       --tls-server-name string         Server name to use for server certificate validation. If it is not provided, the hostname used to contact the server is used
       --token string                   Bearer token for authentication to the API server
@@ -136,6 +137,8 @@ Flags:
 #### output CNRs instead of cycling for all nodegroups
 `kubectl cycle --name example-123 --all -o yaml`
 
+#### cycle system node group without the initial health checks
+`kubectl cycle --name example-123 system --skip-initial-health-checks`
 
 ### Example output
 
