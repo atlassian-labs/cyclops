@@ -65,7 +65,7 @@ func healthCheckPassed(healthCheck v1.HealthCheck, statusCode uint, body []byte)
 	}
 
 	if healthCheck.RegexMatch != "" && !r.Match(body) {
-		return fmt.Errorf("regex %s did not match body %b", healthCheck.RegexMatch, body)
+		return fmt.Errorf("regex %s did not match body %s", healthCheck.RegexMatch, string(body))
 	}
 
 	for _, validStatusCode := range healthCheck.ValidStatusCodes {
