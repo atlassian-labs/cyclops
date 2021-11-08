@@ -152,12 +152,19 @@ func (t *CycleNodeRequestTransitioner) transitionPending() (reconcile.Result, er
 		// Otherwise just add all the nodes in the node group
 		t.rm.LogEvent(t.cycleNodeRequest, "SelectingNodes", "Adding all node group nodes to NodesToTerminate")
 		for _, kubeNode := range kubeNodes {
+			// Check to ensure the kubeNode object maps to an existing node in the ASG
+			// If this isn't the case, this is a phantom node. Fail the cnr to be safe.
+			nodeGroupName, ok := nodeGroupInstances[kubeNode.Spec.ProviderID]
+			if !ok {
+				return t.transitionToHealing(fmt.Errorf("kubeNode %s not found in the list of instances in the ASG", kubeNode.Name))
+			}
+
 			t.cycleNodeRequest.Status.NodesAvailable = append(
 				t.cycleNodeRequest.Status.NodesAvailable,
 				v1.CycleNodeRequestNode{
 					Name:          kubeNode.Name,
 					ProviderID:    kubeNode.Spec.ProviderID,
-					NodeGroupName: nodeGroupInstances[kubeNode.Spec.ProviderID].NodeGroupName(),
+					NodeGroupName: nodeGroupName.NodeGroupName(),
 				})
 
 			t.cycleNodeRequest.Status.NodesToTerminate = append(
@@ -165,7 +172,7 @@ func (t *CycleNodeRequestTransitioner) transitionPending() (reconcile.Result, er
 				v1.CycleNodeRequestNode{
 					Name:          kubeNode.Name,
 					ProviderID:    kubeNode.Spec.ProviderID,
-					NodeGroupName: nodeGroupInstances[kubeNode.Spec.ProviderID].NodeGroupName(),
+					NodeGroupName: nodeGroupName.NodeGroupName(),
 				})
 		}
 	}

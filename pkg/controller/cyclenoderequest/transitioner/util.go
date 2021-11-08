@@ -279,6 +279,10 @@ func (t *CycleNodeRequestTransitioner) transitionToUnsuccessful(phase v1.CycleNo
 	t.cycleNodeRequest.Status.Phase = phase
 	// don't try to append message if it's nil
 	if err != nil {
+		if t.cycleNodeRequest.Status.Message != "" {
+			t.cycleNodeRequest.Status.Message += ", "
+		}
+
 		t.cycleNodeRequest.Status.Message += err.Error()
 	}
 
