@@ -1,5 +1,6 @@
 VERSION = 1.7.0
 IMAGE = cyclops:$(VERSION)
+ARCH=$(if $(TARGETPLATFORM),$(lastword $(subst /, ,$(TARGETPLATFORM))),amd64)
 
 MANAGER_BIN = cyclops
 CLI_BIN = kubectl-cycle
@@ -23,13 +24,13 @@ build-cli:
 build: build-manager build-cli build-observer
 
 build-manager-linux:
-	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o bin/linux/${MANAGER_BIN} -ldflags="-X main.version=${VERSION}" cmd/manager/main.go
+	CGO_ENABLED=0 GOOS=linux GOARCH=$(ARCH) go build -a -installsuffix cgo -o bin/linux/${MANAGER_BIN} -ldflags="-X main.version=${VERSION}" cmd/manager/main.go
 
 build-cli-linux:
-	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o bin/linux/${CLI_BIN} -ldflags="-X main.version=${VERSION}" cmd/cli/main.go
+	CGO_ENABLED=0 GOOS=linux GOARCH=$(ARCH) go build -a -installsuffix cgo -o bin/linux/${CLI_BIN} -ldflags="-X main.version=${VERSION}" cmd/cli/main.go
 
 build-observer-linux:
-	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o bin/linux/${OBSERVER_BIN} -ldflags="-X main.version=${VERSION}" cmd/observer/main.go
+	CGO_ENABLED=0 GOOS=linux GOARCH=$(ARCH) go build -a -installsuffix cgo -o bin/linux/${OBSERVER_BIN} -ldflags="-X main.version=${VERSION}" cmd/observer/main.go
 
 build-linux: build-manager-linux build-cli-linux build-observer-linux
 
@@ -50,7 +51,7 @@ lint:
 	golangci-lint run
 
 docker:
-	docker build -t $(IMAGE) .
+	docker buildx build -t $(IMAGE) --platform linux/$(ARCH) .
 
 # New version of operator-sdk no longer support generate CRDs directly
 # Build from release v0.19.0 with commit hash 

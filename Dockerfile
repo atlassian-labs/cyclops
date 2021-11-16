@@ -1,4 +1,5 @@
-FROM golang:1.15 as builder
+FROM --platform=$BUILDPLATFORM golang:1.15 as builder
+ARG TARGETPLATFORM
 WORKDIR /go/src/github.com/atlassian-labs/cyclops
 COPY go.mod go.sum Makefile ./
 COPY cmd cmd
