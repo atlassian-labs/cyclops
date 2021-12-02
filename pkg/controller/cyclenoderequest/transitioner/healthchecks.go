@@ -225,6 +225,7 @@ func (t *CycleNodeRequestTransitioner) performCyclingHealthChecks(kubeNodes []co
 			statusCode, body, err := t.performHealthCheck(endpoint)
 			if err != nil {
 				t.rm.Logger.Error(err, "Health check failed", "endpoint", endpoint)
+				allHealthChecksPassed = false
 				continue
 			}
 
