@@ -1,4 +1,4 @@
-VERSION = 1.7.0
+VERSION = 1.7.1
 IMAGE = cyclops:$(VERSION)
 ARCH=$(if $(TARGETPLATFORM),$(lastword $(subst /, ,$(TARGETPLATFORM))),amd64)
 
