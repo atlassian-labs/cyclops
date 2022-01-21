@@ -203,7 +203,7 @@ func TestValidateMetadata(t *testing.T) {
 			"test not okay name and no labels",
 			metav1.ObjectMeta{Name: "test-a-3ABC3"},
 			false,
-			`name is not valid: a DNS-1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')`,
+			`name is not valid: a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')`,
 		},
 		{
 			"test too long name and no labels",
@@ -215,7 +215,7 @@ func TestValidateMetadata(t *testing.T) {
 			"test ok name and not okay label",
 			metav1.ObjectMeta{Name: "test", Labels: map[string]string{cnrNameLabelKey: "DEADBEEF-3735928559"}},
 			false,
-			`label value is not valid: a DNS-1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')`,
+			`label value is not valid: a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')`,
 		},
 		{
 			"test ok name and not too long label",
