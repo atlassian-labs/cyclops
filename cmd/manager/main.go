@@ -105,7 +105,8 @@ func main() {
 
 	// Setup the notifier if it is enabled
 	if *messagingProviderName != "" {
-		if notifier, err = notifierbuilder.BuildNotifier(*messagingProviderName); err != nil {
+		notifier, err = notifierbuilder.BuildNotifier(*messagingProviderName)
+		if err != nil {
 			log.Error(err, "Unable to build notifier")
 			os.Exit(1)
 		}

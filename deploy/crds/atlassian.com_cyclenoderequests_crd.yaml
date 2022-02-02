@@ -375,7 +375,7 @@ spec:
                 type: string
               healthChecks:
                 additionalProperties:
-                  description: HealthcheckStatus groups all health checks status information
+                  description: HealthCheckStatus groups all health checks status information
                     for a node
                   properties:
                     checks:

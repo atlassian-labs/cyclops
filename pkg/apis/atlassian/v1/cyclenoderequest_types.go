@@ -104,7 +104,7 @@ type CycleNodeRequestNode struct {
 	PrivateIP string `json:"privateIp,omitempty"`
 }
 
-// HealthcheckStatus groups all health checks status information for a node
+// HealthCheckStatus groups all health checks status information for a node
 type HealthCheckStatus struct {
 	// Ready keeps track of the first timestamp at which the node status was reported as "ready"
 	NodeReady *metav1.Time `json:"ready,omitempty"`

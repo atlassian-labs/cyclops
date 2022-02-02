@@ -96,7 +96,7 @@ func tlsCertsValid(tlsConfig v1.TLSConfig) error {
 	key := os.Getenv(tlsConfig.Key)
 
 	if (certificate == "" && key != "") || (certificate != "" && key == "") {
-		return fmt.Errorf("cert or key missing, ensure both neither are missing for mTLS")
+		return fmt.Errorf("cert or key missing, ensure neither are missing for mTLS")
 	}
 
 	// Check that if the certificate and key and both present, the root CA must also
