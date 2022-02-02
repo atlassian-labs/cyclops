@@ -87,6 +87,10 @@ func NewReconciler(
 
 // Validates the tls configuration for a pre-termination check or healthcheck and
 // returns an error if these are misconfigured
+// There are 3 valid modes:
+// No fields:   no TLS
+// CA only:     TLS
+// All fields:  mTLS
 func tlsCertsValid(tlsConfig v1.TLSConfig) error {
 	// Check that either both the the tls cert and private key are added or missing
 	// If they are both added, cyclops will forward them when making requests for mTLS
