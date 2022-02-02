@@ -64,4 +64,43 @@ type HealthCheck struct {
 
 	// RegexMatch specifies a regex string the body of the http result to should. By default no matching is done.
 	RegexMatch string `json:"regexMatch,omitempty"`
+
+	// TLS configuration for the http client to make requests. Can either make standard https requests
+	// or optionally forward certs signed by the root CA for mTLS.
+	TLSConfig `json:"tls,omitempty"`
+}
+
+// PreTerminationCheck defines the configuration for the check done before terminating an instance. The trigger can be
+// considered a http sigterm and the subsequent check to know when the process has completed it's triggered action.
+// +k8s:openapi-gen=true
+type PreTerminationCheck struct {
+	// Endpoint url of the health check. Optional: {{ .NodeIP }} gets replaced by the private IP of the node being scaled up.
+	Endpoint string `json:"triggerEndpoint"`
+
+	// ValidStatusCodes keeps track of the list of possible status codes returned by
+	// the endpoint denoting the service as healthy. Defaults to [200].
+	ValidStatusCodes []uint `json:"validStatusCodes,omitempty"`
+
+	// HealthCheck denotes the configuration for performing health checks after the trigger has been sent. This works the
+	// exact same way as health check on new nodes.
+	HealthCheck `json:"healthCheck"`
+
+	// TLS configuration for the http client to make requests. Can either make standard https requests
+	// or optionally forward certs signed by the root CA for mTLS.
+	TLSConfig `json:"tls,omitempty"`
+}
+
+// TLSConfig defined the tls configuration for the http client to make a request.
+// +k8s:openapi-gen=true
+type TLSConfig struct {
+	// RootCA is the root CA shared between Cyclops and the upstream server.
+	RootCA string `json:"rootCA,omitempty"`
+
+	// Certificate is the crt given to Cyclops for mTLS. It is sent as part
+	// of the request to the upstream server.
+	Certificate string `json:"crt,omitempty"`
+
+	// Key is the private key which forms a pair with the certificate. It is
+	// sent as part of the request to the upstream server for mTLS.
+	Key string `json:"key,omitempty"`
 }

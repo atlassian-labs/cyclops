@@ -233,3 +233,38 @@ spec:
 ```
 
 Cyclops can optionally perform a set of health checks before each node selected is terminated. This can be useful to perform deep health checks on system daemons or pods running on host network to ensure they are healthy before continuing with cycling. The set of health checks will be performed until each returns a healthy status once. `{{ .NodeIP }}` can be used to render the endpoint with the private IP of a new instance brought up during the cycling.
+
+## Example 7 - Cycling with pre-termination checks enabled
+
+```yaml
+apiVersion: "atlassian.com/v1"
+kind: "CycleNodeRequest"
+metadata:
+  name: "example"
+  namespace: "kube-system"
+spec:
+  nodeGroupName: "az1-nodes.my-nodegroup.my-site"
+  selector:
+    matchLabels:
+      role: node
+      customer: shared
+  cycleSettings:
+    concurrency: 1
+    method: Drain
+  preTerminationChecks:
+  - triggerEndpoint: https://{{ .NodeIP }}:8080/trigger
+    tls:
+      rootCA: ROOT_CA
+      crt: LEAF_CRT
+      key: LEAF_KEY
+    healthCheck:
+      endpoint: https://{{ .NodeIP }}:8080/ready
+      regexMatch: Ready
+      waitPeriod: 10m
+      tls:
+        rootCA: ROOT_CA
+        crt: LEAF_CRT
+        key: LEAF_KEY
+```
+
+Cyclops can optionally perform a set of pre-termination checks before each node is terminated. These checks can be useful to trigger processes on the nodes to go through a require procedure in preparation for the node to be terminated. Think of it as a http sigterm with follow-up checks to monitor it. The health checks will be performed after the trigger has been sent and work the same was as health checks for new nodes. `{{ .NodeIP }}` can be used to render the endpoint with the private IP of the instance about to be terminated. These checks also support TLS and mTLS.

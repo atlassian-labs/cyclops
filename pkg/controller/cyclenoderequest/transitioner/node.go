@@ -103,25 +103,42 @@ func (t *CycleNodeRequestTransitioner) addNamedNodesToTerminate(kubeNodes []core
 
 				t.cycleNodeRequest.Status.NodesAvailable = append(
 					t.cycleNodeRequest.Status.NodesAvailable,
-					v1.CycleNodeRequestNode{
-						Name:          kubeNode.Name,
-						ProviderID:    kubeNode.Spec.ProviderID,
-						NodeGroupName: nodeGroupInstances[kubeNode.Spec.ProviderID].NodeGroupName(),
-					})
+					newCycleNodeRequestNode(&kubeNode, nodeGroupInstances[kubeNode.Spec.ProviderID].NodeGroupName()),
+				)
 
 				t.cycleNodeRequest.Status.NodesToTerminate = append(
 					t.cycleNodeRequest.Status.NodesToTerminate,
-					v1.CycleNodeRequestNode{
-						Name:          kubeNode.Name,
-						ProviderID:    kubeNode.Spec.ProviderID,
-						NodeGroupName: nodeGroupInstances[kubeNode.Spec.ProviderID].NodeGroupName(),
-					})
+					newCycleNodeRequestNode(&kubeNode, nodeGroupInstances[kubeNode.Spec.ProviderID].NodeGroupName()),
+				)
+
 				break
 			}
 		}
+
 		if !foundNode {
 			return fmt.Errorf("could not find node by name: %v", namedNode)
 		}
 	}
 	return nil
+}
+
+// newCycleNodeRequestNode converts a corev1.Node to a v1.CycleNodeRequestNode. This is done multiple
+// times across the code, this function standardises the process
+func newCycleNodeRequestNode(kubeNode *corev1.Node, nodeGroupName string) v1.CycleNodeRequestNode {
+	var privateIP string
+
+	// If there is no private IP, the error will be caught when trying
+	// to perform a health check on the node
+	for _, address := range kubeNode.Status.Addresses {
+		if address.Type == corev1.NodeInternalIP {
+			privateIP = address.Address
+		}
+	}
+
+	return v1.CycleNodeRequestNode{
+		Name:          kubeNode.Name,
+		ProviderID:    kubeNode.Spec.ProviderID,
+		NodeGroupName: nodeGroupName,
+		PrivateIP:     privateIP,
+	}
 }

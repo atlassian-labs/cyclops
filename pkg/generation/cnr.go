@@ -94,11 +94,13 @@ func GenerateCNR(nodeGroup atlassianv1.NodeGroup, nodes []string, name, namespac
 			Labels:    labels,
 		},
 		Spec: atlassianv1.CycleNodeRequestSpec{
-			NodeGroupsList: nodeGroup.GetNodeGroupNames(),
-			Selector:       nodeGroup.Spec.NodeSelector,
-			NodeNames:      nodes,
-			CycleSettings:  nodeGroup.Spec.CycleSettings,
-			HealthChecks:   nodeGroup.Spec.HealthChecks,
+			NodeGroupsList:          nodeGroup.GetNodeGroupNames(),
+			Selector:                nodeGroup.Spec.NodeSelector,
+			NodeNames:               nodes,
+			CycleSettings:           nodeGroup.Spec.CycleSettings,
+			HealthChecks:            nodeGroup.Spec.HealthChecks,
+			PreTerminationChecks:    nodeGroup.Spec.PreTerminationChecks,
+			SkipInitialHealthChecks: nodeGroup.Spec.SkipInitialHealthChecks,
 		},
 	}
 }

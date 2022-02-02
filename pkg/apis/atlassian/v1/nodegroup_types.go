@@ -21,6 +21,13 @@ type NodeGroupSpec struct {
 
 	// Healthchecks stores the settings to configure instance custom health checks
 	HealthChecks []HealthCheck `json:"healthChecks,omitempty"`
+
+	// PreTerminationChecks stores the settings to configure instance pre-termination checks
+	PreTerminationChecks []PreTerminationCheck `json:"preTerminationChecks,omitempty"`
+
+	// SkipInitialHealthChecks is an optional flag to skip the initial set of node health checks before cycling begins
+	// This does not affect the health checks performed as part of the pre-termination checks.
+	SkipInitialHealthChecks bool `json:"skipInitialHealthChecks,omitempty"`
 }
 
 // NodeGroupStatus defines the observed state of NodeGroup

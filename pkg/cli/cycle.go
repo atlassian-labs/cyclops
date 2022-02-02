@@ -197,6 +197,7 @@ func (c *cycle) generateCNRs(nodeGroups *atlassianv1.NodeGroupList, name, namesp
 		}
 
 		// If the cli argument is not used, this will not be added to the cnr spec
+		// This argument overrides the value given in the nodegroup spec
 		cnr.Spec.SkipInitialHealthChecks = c.skipInitialHealthChecks()
 
 		if ok, reason := generation.ValidateCNR(generation.NewOneShotNodeLister(c.plug.Client), cnr); !ok {

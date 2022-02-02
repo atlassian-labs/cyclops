@@ -32,9 +32,9 @@ The CycleNodeRequest CRD handles a request to cycle nodes belonging to a specifi
 
 4. In the **Initialised** phase, detach a number of nodes (governed by the concurrency of the CycleNodeRequest) from the node group. This will trigger the cloud provider to add replacement nodes for each. Transition the object to **ScalingUp**. If there are no more nodes to cycle then transition to **Successful**.
 
-5. In the **ScalingUp** phase, wait for the cloud provider to bring up the new nodes and then wait for the new nodes to be **Ready** in the Kubernetes API. Transition the object to **CordoningNode**.
+5. In the **ScalingUp** phase, wait for the cloud provider to bring up the new nodes and then wait for the new nodes to be **Ready** in the Kubernetes API. Wait for the configured health checks on the node succeed. Transition the object to **CordoningNode**.
 
-6. In the **CordoningNode** phase, cordon the selected nodes in the Kubernetes API. Transition the object to **WaitingTermination**.
+6. In the **CordoningNode** phase, perform the pre-termination checks and then cordon the selected nodes in the Kubernetes API. Transition the object to **WaitingTermination**.
     
 7. In the **WaitingTermination** phase, create a CycleNodeStatus CRD for every node that was cordoned. Each of these CycleNodeStatuses handles the termination of an individual node. The controller will wait for a number of them to enter the **Successful** or **Failed** phase before moving on.
     

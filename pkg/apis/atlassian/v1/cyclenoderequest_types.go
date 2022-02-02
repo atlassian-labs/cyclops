@@ -29,7 +29,11 @@ type CycleNodeRequestSpec struct {
 	// HealthChecks stores the settings to configure instance custom health checks
 	HealthChecks []HealthCheck `json:"healthChecks,omitempty"`
 
+	// PreTerminationChecks stores the settings to configure instance pre-termination checks
+	PreTerminationChecks []PreTerminationCheck `json:"preTerminationChecks,omitempty"`
+
 	// SkipInitialHealthChecks is an optional flag to skip the initial set of node health checks before cycling begins
+	// This does not affect the health checks performed as part of the pre-termination checks.
 	SkipInitialHealthChecks bool `json:"skipInitialHealthChecks,omitempty"`
 }
 
@@ -77,8 +81,11 @@ type CycleNodeRequestStatus struct {
 	// NodesAvailable stores the nodes still available to pick up for cycling from the list of nodes to terminate
 	NodesAvailable []CycleNodeRequestNode `json:"nodesAvailable,omitempty"`
 
-	// Healthchecks keeps track of instance health check information
+	// HealthChecks keeps track of instance health check information
 	HealthChecks map[string]HealthCheckStatus `json:"healthChecks,omitempty"`
+
+	// PreTerminationChecks keeps track of the instance pre termination check information
+	PreTerminationChecks map[string]PreTerminationCheckStatusList `json:"preTerminationChecks,omitempty"`
 }
 
 // CycleNodeRequestNode stores a current node that is being worked on
@@ -92,9 +99,12 @@ type CycleNodeRequestNode struct {
 	// NodeGroupName stores current cloud provider node group name
 	// which this node belongs to
 	NodeGroupName string `json:"nodeGroupName"`
+
+	// Private ip of the instance
+	PrivateIP string `json:"privateIp,omitempty"`
 }
 
-// HealthcheckStatusList groups all health checks status information for a node
+// HealthcheckStatus groups all health checks status information for a node
 type HealthCheckStatus struct {
 	// Ready keeps track of the first timestamp at which the node status was reported as "ready"
 	NodeReady *metav1.Time `json:"ready,omitempty"`
@@ -105,6 +115,21 @@ type HealthCheckStatus struct {
 	// Skip denotes whether a node is part of a nodegroup before cycling has begun. If this is the case,
 	// health checks on the instance are skipped, like this only new instances are checked.
 	Skip bool `json:"skip,omitempty"`
+}
+
+// PreTerminationCheckStatusList groups all the PreTerminationCheckStatus for a node
+type PreTerminationCheckStatusList struct {
+	Checks []PreTerminationCheckStatus `json:"checks,omitempty"`
+}
+
+// PreTerminationCheckStatus groups all status information for the pre-termination trigger
+// and ensuing heath checks
+type PreTerminationCheckStatus struct {
+	// Trigger marks the timestamp at which the trigger is sent.
+	Trigger *metav1.Time `json:"trigger,omitempty"`
+
+	// Check keeps track of health check result performed on the node
+	Check bool `json:"check,omitempty"`
 }
 
 // CycleNodeRequestPhase is the phase that the cycleNodeRequest is in

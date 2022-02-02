@@ -161,19 +161,13 @@ func (t *CycleNodeRequestTransitioner) transitionPending() (reconcile.Result, er
 
 			t.cycleNodeRequest.Status.NodesAvailable = append(
 				t.cycleNodeRequest.Status.NodesAvailable,
-				v1.CycleNodeRequestNode{
-					Name:          kubeNode.Name,
-					ProviderID:    kubeNode.Spec.ProviderID,
-					NodeGroupName: nodeGroupName.NodeGroupName(),
-				})
+				newCycleNodeRequestNode(&kubeNode, nodeGroupName.NodeGroupName()),
+			)
 
 			t.cycleNodeRequest.Status.NodesToTerminate = append(
 				t.cycleNodeRequest.Status.NodesToTerminate,
-				v1.CycleNodeRequestNode{
-					Name:          kubeNode.Name,
-					ProviderID:    kubeNode.Spec.ProviderID,
-					NodeGroupName: nodeGroupName.NodeGroupName(),
-				})
+				newCycleNodeRequestNode(&kubeNode, nodeGroupName.NodeGroupName()),
+			)
 		}
 	}
 
@@ -255,11 +249,7 @@ func (t *CycleNodeRequestTransitioner) transitionInitialised() (reconcile.Result
 		if _, ok := validProviderIDs[node.Spec.ProviderID]; ok {
 			t.cycleNodeRequest.Status.CurrentNodes = append(
 				t.cycleNodeRequest.Status.CurrentNodes,
-				v1.CycleNodeRequestNode{
-					Name:          node.Name,
-					ProviderID:    node.Spec.ProviderID,
-					NodeGroupName: readyInstances[node.Spec.ProviderID].NodeGroupName(),
-				},
+				newCycleNodeRequestNode(node, readyInstances[node.Spec.ProviderID].NodeGroupName()),
 			)
 		}
 	}
@@ -418,18 +408,44 @@ func (t *CycleNodeRequestTransitioner) transitionCordoning() (reconcile.Result, 
 	t.rm.LogEvent(t.cycleNodeRequest, "CordoningNodes", "Cordoning nodes: %v", t.cycleNodeRequest.Status.CurrentNodes)
 
 	for _, node := range t.cycleNodeRequest.Status.CurrentNodes {
+		// Perform pre-termination checks before the node is cordoned
+		// Cruicially, do this before the CNS is created for node to begin that process
+		// The node should be ready for termination before any of this takes place
+		if len(t.cycleNodeRequest.Spec.PreTerminationChecks) > 0 {
+			// First try to send the trigger, if is has already been sent then this will
+			// be skipped in the function. The trigger must only be sent once
+			if err := t.sendPreTerminationTrigger(node); err != nil {
+				return t.transitionToHealing(err)
+			}
+
+			// After the trigger has been sent, perform health checks to monitor if the node
+			// can be cordoned/terminated. If all checks pass then it can be cordoned/terminated.
+			allHealthChecksPassed, err := t.performPreTerminationHealthCheck(node)
+			if err != nil {
+				return t.transitionToHealing(err)
+			}
+
+			if !allHealthChecksPassed {
+				// Reconcile any health checks passed to the cnr object
+				if err := t.rm.UpdateObject(t.cycleNodeRequest); err != nil {
+					return t.transitionToHealing(err)
+				}
+
+				return reconcile.Result{Requeue: true, RequeueAfter: requeueDuration}, nil
+			}
+		}
+
 		// Cordon the node and create a CycleNodeStatus CRD to do work on it
 		if err := k8s.CordonNode(node.Name, t.rm.RawClient); err != nil {
 			return t.transitionToHealing(err)
 		}
-		err := t.rm.Client.Create(context.TODO(), t.makeCycleNodeStatusForNode(node.Name))
-		if err != nil {
+
+		if err := t.rm.Client.Create(context.TODO(), t.makeCycleNodeStatusForNode(node.Name)); err != nil {
 			return t.transitionToHealing(err)
 		}
 
 		// Add a label to the node to show that we've started working on it
-		err = k8s.AddLabelToNode(node.Name, cycleNodeLabel, t.cycleNodeRequest.Name, t.rm.RawClient)
-		if err != nil {
+		if err := k8s.AddLabelToNode(node.Name, cycleNodeLabel, t.cycleNodeRequest.Name, t.rm.RawClient); err != nil {
 			t.rm.Logger.Error(err, "patch failed: could not add cyclops label to node", "nodeName", node.Name)
 			return t.transitionToHealing(err)
 		}

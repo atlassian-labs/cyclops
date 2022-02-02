@@ -126,6 +126,9 @@ spec:
                     description: NodeGroupName stores current cloud provider node
                       group name which this node belongs to
                     type: string
+                  privateIp:
+                    description: Private ip of the instance
+                    type: string
                   providerId:
                     description: Cloud Provider ID of the node
                     type: string
