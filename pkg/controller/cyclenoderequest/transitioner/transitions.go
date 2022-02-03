@@ -420,7 +420,7 @@ func (t *CycleNodeRequestTransitioner) transitionCordoning() (reconcile.Result, 
 
 			// After the trigger has been sent, perform health checks to monitor if the node
 			// can be cordoned/terminated. If all checks pass then it can be cordoned/terminated.
-			allHealthChecksPassed, err := t.performPreTerminationHealthCheck(node)
+			allHealthChecksPassed, err := t.performPreTerminationHealthChecks(node)
 			if err != nil {
 				return t.transitionToHealing(err)
 			}

@@ -93,14 +93,14 @@ type PreTerminationCheck struct {
 // TLSConfig defined the tls configuration for the http client to make a request.
 // +k8s:openapi-gen=true
 type TLSConfig struct {
-	// RootCA is the root CA shared between Cyclops and the upstream server.
+	// RootCA is the root CA shared between Cyclops and the upstream host.
 	RootCA string `json:"rootCA,omitempty"`
 
 	// Certificate is the crt given to Cyclops for mTLS. It is sent as part
-	// of the request to the upstream server.
+	// of the request to the upstream host.
 	Certificate string `json:"crt,omitempty"`
 
 	// Key is the private key which forms a pair with the certificate. It is
-	// sent as part of the request to the upstream server for mTLS.
+	// sent as part of the request to the upstream host for mTLS.
 	Key string `json:"key,omitempty"`
 }

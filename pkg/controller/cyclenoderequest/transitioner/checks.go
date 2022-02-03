@@ -307,8 +307,8 @@ func (t *CycleNodeRequestTransitioner) performCyclingHealthChecks(kubeNodes []co
 	return allHealthChecksPassed, nil
 }
 
-// sendPreTerminationTrigger sends a http request to as a trigger. When this is done, the upstream server
-// will know that the node associated node is going to be terminated and so it should begin it's own
+// sendPreTerminationTrigger sends a http request as a trigger. When this is done, the upstream host
+// will know that the associated node is going to be terminated and so it should begin it's own
 // shutdown process before that begins. This can be thought of as a http sigterm.
 func (t *CycleNodeRequestTransitioner) sendPreTerminationTrigger(node v1.CycleNodeRequestNode) error {
 	nodeHash := getNodeHash(node)
@@ -371,10 +371,10 @@ func (t *CycleNodeRequestTransitioner) sendPreTerminationTrigger(node v1.CycleNo
 	return nil
 }
 
-// performPreTerminationHealthCheck is a health check performed on the upstream server after the trigger has been sent.
+// performPreTerminationHealthChecks is a health check performed on the upstream server after the trigger has been sent.
 // It monitors the progress shutdown progress. Cyclops will wait until this endpoint returns the expected response before
 // proceeding to terminate the node.
-func (t *CycleNodeRequestTransitioner) performPreTerminationHealthCheck(node v1.CycleNodeRequestNode) (bool, error) {
+func (t *CycleNodeRequestTransitioner) performPreTerminationHealthChecks(node v1.CycleNodeRequestNode) (bool, error) {
 	var allHealthChecksPassed bool = true
 	nodeHash := getNodeHash(node)
 

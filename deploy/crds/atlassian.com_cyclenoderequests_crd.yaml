@@ -128,16 +128,16 @@ spec:
                         crt:
                           description: Certificate is the crt given to Cyclops for
                             mTLS. It is sent as part of the request to the upstream
-                            server.
+                            host.
                           type: string
                         key:
                           description: Key is the private key which forms a pair with
                             the certificate. It is sent as part of the request to
-                            the upstream server for mTLS.
+                            the upstream host for mTLS.
                           type: string
                         rootCA:
                           description: RootCA is the root CA shared between Cyclops
-                            and the upstream server.
+                            and the upstream host.
                           type: string
                       type: object
                     validStatusCodes:
@@ -207,16 +207,16 @@ spec:
                             crt:
                               description: Certificate is the crt given to Cyclops
                                 for mTLS. It is sent as part of the request to the
-                                upstream server.
+                                upstream host.
                               type: string
                             key:
                               description: Key is the private key which forms a pair
                                 with the certificate. It is sent as part of the request
-                                to the upstream server for mTLS.
+                                to the upstream host for mTLS.
                               type: string
                             rootCA:
                               description: RootCA is the root CA shared between Cyclops
-                                and the upstream server.
+                                and the upstream host.
                               type: string
                           type: object
                         validStatusCodes:
@@ -243,16 +243,16 @@ spec:
                         crt:
                           description: Certificate is the crt given to Cyclops for
                             mTLS. It is sent as part of the request to the upstream
-                            server.
+                            host.
                           type: string
                         key:
                           description: Key is the private key which forms a pair with
                             the certificate. It is sent as part of the request to
-                            the upstream server for mTLS.
+                            the upstream host for mTLS.
                           type: string
                         rootCA:
                           description: RootCA is the root CA shared between Cyclops
-                            and the upstream server.
+                            and the upstream host.
                           type: string
                       type: object
                     triggerEndpoint:
