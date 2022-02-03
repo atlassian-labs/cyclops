@@ -1,0 +1,28 @@
+apiVersion: "atlassian.com/v1"
+kind: "CycleNodeRequest"
+metadata:
+  name: "example"
+  namespace: "kube-system"
+spec:
+  nodeGroupName: "az1-nodes.my-nodegroup.my-site"
+  selector:
+    matchLabels:
+      role: node
+      customer: shared
+  cycleSettings:
+    concurrency: 1
+    method: Drain
+  preTerminationChecks:
+  - triggerEndpoint: https://{{ .NodeIP }}:8080/trigger
+    tls:
+      rootCA: ROOT_CA
+      crt: LEAF_CRT
+      key: LEAF_KEY
+    healthCheck:
+      endpoint: https://{{ .NodeIP }}:8080/ready
+      regexMatch: Ready
+      waitPeriod: 10m
+      tls:
+        rootCA: ROOT_CA
+        crt: LEAF_CRT
+        key: LEAF_KEY

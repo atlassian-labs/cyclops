@@ -112,6 +112,26 @@ spec:
                       description: RegexMatch specifies a regex string the body of
                         the http result to should. By default no matching is done.
                       type: string
+                    tls:
+                      description: TLS configuration for the http client to make requests.
+                        Can either make standard https requests or optionally forward
+                        certs signed by the root CA for mTLS.
+                      properties:
+                        crt:
+                          description: Certificate is the crt given to Cyclops for
+                            mTLS. It is sent as part of the request to the upstream
+                            host.
+                          type: string
+                        key:
+                          description: Key is the private key which forms a pair with
+                            the certificate. It is sent as part of the request to
+                            the upstream host for mTLS.
+                          type: string
+                        rootCA:
+                          description: RootCA is the root CA shared between Cyclops
+                            and the upstream host.
+                          type: string
+                      type: object
                     validStatusCodes:
                       description: ValidStatusCodes keeps track of the list of possible
                         status codes returned by the endpoint denoting the service
@@ -184,6 +204,109 @@ spec:
                       are ANDed.
                     type: object
                 type: object
+              preTerminationChecks:
+                description: PreTerminationChecks stores the settings to configure
+                  instance pre-termination checks
+                items:
+                  description: PreTerminationCheck defines the configuration for the
+                    check done before terminating an instance. The trigger can be
+                    considered a http sigterm and the subsequent check to know when
+                    the process has completed it's triggered action.
+                  properties:
+                    healthCheck:
+                      description: HealthCheck denotes the configuration for performing
+                        health checks after the trigger has been sent. This works
+                        the exact same way as health check on new nodes.
+                      properties:
+                        endpoint:
+                          description: 'Endpoint url of the health check. Optional:
+                            {{ .NodeIP }} gets replaced by the private IP of the node
+                            being scaled up.'
+                          type: string
+                        regexMatch:
+                          description: RegexMatch specifies a regex string the body
+                            of the http result to should. By default no matching is
+                            done.
+                          type: string
+                        tls:
+                          description: TLS configuration for the http client to make
+                            requests. Can either make standard https requests or optionally
+                            forward certs signed by the root CA for mTLS.
+                          properties:
+                            crt:
+                              description: Certificate is the crt given to Cyclops
+                                for mTLS. It is sent as part of the request to the
+                                upstream host.
+                              type: string
+                            key:
+                              description: Key is the private key which forms a pair
+                                with the certificate. It is sent as part of the request
+                                to the upstream host for mTLS.
+                              type: string
+                            rootCA:
+                              description: RootCA is the root CA shared between Cyclops
+                                and the upstream host.
+                              type: string
+                          type: object
+                        validStatusCodes:
+                          description: ValidStatusCodes keeps track of the list of
+                            possible status codes returned by the endpoint denoting
+                            the service as healthy. Defaults to [200].
+                          items:
+                            type: integer
+                          type: array
+                        waitPeriod:
+                          description: WaitPeriod is the time allowed for the health
+                            check to pass before considering the service unhealthy
+                            and failing the CycleNodeRequest.
+                          type: string
+                      required:
+                      - endpoint
+                      - waitPeriod
+                      type: object
+                    tls:
+                      description: TLS configuration for the http client to make requests.
+                        Can either make standard https requests or optionally forward
+                        certs signed by the root CA for mTLS.
+                      properties:
+                        crt:
+                          description: Certificate is the crt given to Cyclops for
+                            mTLS. It is sent as part of the request to the upstream
+                            host.
+                          type: string
+                        key:
+                          description: Key is the private key which forms a pair with
+                            the certificate. It is sent as part of the request to
+                            the upstream host for mTLS.
+                          type: string
+                        rootCA:
+                          description: RootCA is the root CA shared between Cyclops
+                            and the upstream host.
+                          type: string
+                      type: object
+                    triggerEndpoint:
+                      description: 'Endpoint url of the health check. Optional: {{
+                        .NodeIP }} gets replaced by the private IP of the node being
+                        scaled up.'
+                      type: string
+                    validStatusCodes:
+                      description: ValidStatusCodes keeps track of the list of possible
+                        status codes returned by the endpoint denoting the service
+                        as healthy. Defaults to [200].
+                      items:
+                        type: integer
+                      type: array
+                  required:
+                  - healthCheck
+                  - triggerEndpoint
+                  type: object
+                type: array
+              skipInitialHealthChecks:
+                description: SkipInitialHealthChecks is an optional flag to skip the
+                  initial set of node health checks before cycling begins This does
+                  not affect the health checks performed as part of the pre-termination
+                  checks.
+                type: boolean
             required:
             - cycleSettings
             - nodeGroupName

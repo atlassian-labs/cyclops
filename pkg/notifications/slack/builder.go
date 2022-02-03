@@ -10,16 +10,15 @@ import (
 
 // NewNotifier returns a new Slack notifier
 func NewNotifier() (notifications.Notifier, error) {
-	channelID := os.Getenv("SLACK_CHANNEL_ID")
-	token := os.Getenv("SLACK_BOT_USER_OAUTH_ACCESS_TOKEN")
-
 	// Return an error is no slack oauth token is provided
-	if token == "" {
+	token, ok := os.LookupEnv("SLACK_BOT_USER_OAUTH_ACCESS_TOKEN")
+	if !ok {
 		return nil, fmt.Errorf("missing slack oauth token")
 	}
 
 	// Return an error if no slack channel is specified
-	if channelID == "" {
+	channelID, ok := os.LookupEnv("SLACK_CHANNEL_ID")
+	if !ok {
 		return nil, fmt.Errorf("missing slack channel id")
 	}
 
@@ -29,8 +28,7 @@ func NewNotifier() (notifications.Notifier, error) {
 	}
 
 	// Check that the slack app has been added to the channel in the workspace
-	_, err := n.client.GetConversationInfo(channelID, false)
-	if err != nil {
+	if _, err := n.client.GetConversationInfo(channelID, false); err != nil {
 		return nil, err
 	}
 
