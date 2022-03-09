@@ -29,13 +29,14 @@ type cycle struct {
 	plug    *kubeplug.Plug
 	version string
 
-	selectAllFlag               *bool
-	dryModeFlag                 *bool
-	cnrNameFlag                 *string
-	concurrencyOverrideFlag     *int64
-	nodesFlag                   *[]string
-	cyclingTimeout              *time.Duration
-	skipInitialHealthChecksFlag *bool
+	selectAllFlag                *bool
+	dryModeFlag                  *bool
+	cnrNameFlag                  *string
+	concurrencyOverrideFlag      *int64
+	nodesFlag                    *[]string
+	cyclingTimeout               *time.Duration
+	skipInitialHealthChecksFlag  *bool
+	skipPreTerminationChecksFlag *bool
 }
 
 // NewCycle returns a new cycle CLI application that implements all the interfaces needed for kubeplug
@@ -94,6 +95,7 @@ func (c *cycle) AddFlags(cmd *cobra.Command) {
 	c.concurrencyOverrideFlag = cmd.PersistentFlags().Int64("concurrency", -1, "option to override concurrency of all CNRs. Set for 0 to skip. -1 or not specified will use values from NodeGroup definition")
 	c.cyclingTimeout = cmd.PersistentFlags().Duration("cycling-timeout", 0*time.Second, "option to set timeout for cycling. Default to controller defined timeout")
 	c.skipInitialHealthChecksFlag = cmd.PersistentFlags().Bool("skip-initial-health-checks", false, "option to skip the initial set of health checks before cycling.")
+	c.skipPreTerminationChecksFlag = cmd.PersistentFlags().Bool("skip-pre-termination-checks", false, "option to skip the initial set of health checks before cycling.")
 }
 
 // Run function called by cobra with args and client ready
@@ -199,6 +201,7 @@ func (c *cycle) generateCNRs(nodeGroups *atlassianv1.NodeGroupList, name, namesp
 		// If the cli argument is not used, this will not be added to the cnr spec
 		// This argument overrides the value given in the nodegroup spec
 		cnr.Spec.SkipInitialHealthChecks = c.skipInitialHealthChecks()
+		cnr.Spec.SkipPreTerminationChecks = c.skipPreTerminationChecks()
 
 		if ok, reason := generation.ValidateCNR(generation.NewOneShotNodeLister(c.plug.Client), cnr); !ok {
 			name, suffix := generation.GetNameExample(cnr.ObjectMeta)
@@ -322,4 +325,9 @@ func (c *cycle) cyclingTimeoutOverride() (*metav1.Duration, bool) {
 // skipInitialHealthChecks safely returns the --skip-initial-health-checks flag
 func (c *cycle) skipInitialHealthChecks() bool {
 	return c.skipInitialHealthChecksFlag != nil && *c.skipInitialHealthChecksFlag
+}
+
+// skipInitialHealthChecks safely returns the --skip-pre-termination-checks flag
+func (c *cycle) skipPreTerminationChecks() bool {
+	return c.skipPreTerminationChecksFlag != nil && *c.skipPreTerminationChecksFlag
 }
