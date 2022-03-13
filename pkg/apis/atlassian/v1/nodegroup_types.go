@@ -29,7 +29,7 @@ type NodeGroupSpec struct {
 	// This does not affect the health checks performed as part of the pre-termination checks.
 	SkipInitialHealthChecks bool `json:"skipInitialHealthChecks,omitempty"`
 
-	// SkipPreTerminationChecks is an optional flag to skip pre-termination checks before cycling begins
+	// SkipPreTerminationChecks is an optional flag to skip pre-termination checks during cycling
 	SkipPreTerminationChecks bool `json:"skipPreTerminationChecks,omitempty"`
 }
 

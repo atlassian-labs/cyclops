@@ -95,7 +95,7 @@ func (c *cycle) AddFlags(cmd *cobra.Command) {
 	c.concurrencyOverrideFlag = cmd.PersistentFlags().Int64("concurrency", -1, "option to override concurrency of all CNRs. Set for 0 to skip. -1 or not specified will use values from NodeGroup definition")
 	c.cyclingTimeout = cmd.PersistentFlags().Duration("cycling-timeout", 0*time.Second, "option to set timeout for cycling. Default to controller defined timeout")
 	c.skipInitialHealthChecksFlag = cmd.PersistentFlags().Bool("skip-initial-health-checks", false, "option to skip the initial set of health checks before cycling.")
-	c.skipPreTerminationChecksFlag = cmd.PersistentFlags().Bool("skip-pre-termination-checks", false, "option to skip the initial set of health checks before cycling.")
+	c.skipPreTerminationChecksFlag = cmd.PersistentFlags().Bool("skip-pre-termination-checks", false, "option to skip pre-termination checks during cycling.")
 }
 
 // Run function called by cobra with args and client ready
