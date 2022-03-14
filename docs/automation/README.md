@@ -106,6 +106,7 @@ Flags:
   -l, --selector string                Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)
   -s, --server string                  The address and port of the Kubernetes API server
       --skip-initial-health-checks     option to skip the initial set of health checks before cycling.
+      --skip-pre-termination-checks    option to skip pre-termination checks during cycling.
       --template string                Template string or path to template file to use when -o=go-template, -o=go-template-file. The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview].
       --tls-server-name string         Server name to use for server certificate validation. If it is not provided, the hostname used to contact the server is used
       --token string                   Bearer token for authentication to the API server

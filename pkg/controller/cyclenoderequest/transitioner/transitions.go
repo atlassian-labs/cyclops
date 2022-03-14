@@ -408,10 +408,13 @@ func (t *CycleNodeRequestTransitioner) transitionCordoning() (reconcile.Result, 
 	t.rm.LogEvent(t.cycleNodeRequest, "CordoningNodes", "Cordoning nodes: %v", t.cycleNodeRequest.Status.CurrentNodes)
 
 	for _, node := range t.cycleNodeRequest.Status.CurrentNodes {
+		if t.cycleNodeRequest.Spec.SkipPreTerminationChecks {
+			t.rm.Logger.Info("Skipping pre-termination checks")
+		}
 		// Perform pre-termination checks before the node is cordoned
 		// Cruicially, do this before the CNS is created for node to begin that process
 		// The node should be ready for termination before any of this takes place
-		if len(t.cycleNodeRequest.Spec.PreTerminationChecks) > 0 {
+		if !t.cycleNodeRequest.Spec.SkipPreTerminationChecks && len(t.cycleNodeRequest.Spec.PreTerminationChecks) > 0 {
 			// First try to send the trigger, if is has already been sent then this will
 			// be skipped in the function. The trigger must only be sent once
 			if err := t.sendPreTerminationTrigger(node); err != nil {

@@ -35,6 +35,9 @@ type CycleNodeRequestSpec struct {
 	// SkipInitialHealthChecks is an optional flag to skip the initial set of node health checks before cycling begins
 	// This does not affect the health checks performed as part of the pre-termination checks.
 	SkipInitialHealthChecks bool `json:"skipInitialHealthChecks,omitempty"`
+
+	// SkipPreTerminationChecks is an optional flag to skip pre-termination checks during cycling
+	SkipPreTerminationChecks bool `json:"skipPreTerminationChecks,omitempty"`
 }
 
 // CycleNodeRequestStatus defines the observed state of CycleNodeRequest

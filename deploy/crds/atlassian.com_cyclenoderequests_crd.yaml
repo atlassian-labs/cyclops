@@ -323,6 +323,10 @@ spec:
                   not affect the health checks performed as part of the pre-termination
                   checks.
                 type: boolean
+              skipPreTerminationChecks:
+                description: SkipPreTerminationChecks is an optional flag to skip
+                  pre-termination checks during cycling
+                type: boolean
             required:
             - cycleSettings
             - nodeGroupName
