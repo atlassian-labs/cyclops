@@ -185,6 +185,7 @@ func (c *cycle) generateCNRs(nodeGroups *atlassianv1.NodeGroupList, name, namesp
 	for _, nodeGroup := range nodeGroups.Items {
 		cnr := generation.GenerateCNR(nodeGroup, c.nodesOverride(), name, namespace)
 		generation.GiveReason(&cnr, "cli")
+		generation.GiveClientVersion(&cnr, c.version)
 
 		if name == "" {
 			generation.UseGenerateNameCNR(&cnr)
