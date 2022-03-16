@@ -1,5 +1,5 @@
 VERSION = 1.7.1
-# IMPORTANT! Update this version if changes to controller affect objects created by cli
+# IMPORTANT! Update this version if changes to controller affect CNR
 MINIMAL_COMPATIBLE_CLIENT_VERSION = 1.7.1
 IMAGE = cyclops:$(VERSION)
 ARCH=$(if $(TARGETPLATFORM),$(lastword $(subst /, ,$(TARGETPLATFORM))),amd64)
