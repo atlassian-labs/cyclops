@@ -11,6 +11,7 @@ import (
 	cyclecontroller "github.com/atlassian-labs/cyclops/pkg/controller"
 	"github.com/atlassian-labs/cyclops/pkg/controller/cyclenoderequest/transitioner"
 	"github.com/atlassian-labs/cyclops/pkg/notifications"
+	"github.com/hashicorp/go-version"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -25,10 +26,16 @@ const (
 	controllerName       = "cyclenoderequest.controller"
 	eventName            = "cyclops"
 	reconcileConcurrency = 1
-	clusterNameEnv       = "CLUSTER_NAME"
+	clusterNameEnv             = "CLUSTER_NAME"
+	ClientAPIVersionAnnotation = "client.api.version"
 )
 
-var log = logf.Log.WithName(controllerName)
+var (
+	log = logf.Log.WithName(controllerName)
+	// replaced by ldflags at buildtime
+	apiVersion = "undefined" //nolint:golint,varcheck,deadcode,unused
+
+)
 
 // Reconciler reconciles CycleNodeRequests. It implements reconcile.Reconciler
 type Reconciler struct {
@@ -127,6 +134,22 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 		}
 		logger.Error(err, "Failed to get cycleNodeRequest")
 		return reconcile.Result{}, err
+	}
+
+	cnrClientAPIVersionAnnotation := cycleNodeRequest.Annotations[ClientAPIVersionAnnotation]
+	if cnrClientAPIVersionAnnotation != "" {
+		controllerAPIVersion, err := version.NewVersion(apiVersion)
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+		clientAPIVersion, err := version.NewVersion(cnrClientAPIVersionAnnotation)
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+		if clientAPIVersion.LessThan(controllerAPIVersion) {
+			cycleNodeRequest.Status.Phase = v1.CycleNodeRequestFailed
+			cycleNodeRequest.Status.Message = "Client API version " + cnrClientAPIVersionAnnotation + " does not match controller API version " + apiVersion
+		}
 	}
 
 	if r.notifier != nil {

@@ -22,6 +22,8 @@ import (
 	promv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 )
 
+var apiVersion = "undefined" //nolint:golint,varcheck,deadcode,unused
+
 // controller implements the Controller interface for running observers to detect changes and creating CNRs
 type controller struct {
 	client     client.Client
@@ -321,6 +323,7 @@ func (c *controller) createCNRs(changedNodeGroups []*ListedNodeGroups) {
 		cnr := generation.GenerateCNR(*nodeGroup.NodeGroup, nodeNames, c.CNRPrefix, c.Namespace)
 		generation.UseGenerateNameCNR(&cnr)
 		generation.GiveReason(&cnr, nodeGroup.Reason)
+		generation.SetAPIVersion(&cnr, apiVersion)
 
 		name := generation.GetName(cnr.ObjectMeta)
 

@@ -3,6 +3,7 @@ package generation
 import (
 	"context"
 	"fmt"
+	"github.com/atlassian-labs/cyclops/pkg/controller/cyclenoderequest"
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -71,6 +72,13 @@ func GiveReason(cnr *atlassianv1.CycleNodeRequest, reason string) {
 		cnr.Annotations = map[string]string{}
 	}
 	cnr.Annotations[cnrReasonAnnotationKey] = reason
+}
+// SetAPIVersion adds apiVersion annotation to the cnr
+func SetAPIVersion(cnr *atlassianv1.CycleNodeRequest, clientVersion string){
+	if cnr.Annotations == nil {
+		cnr.Annotations = map[string]string{}
+	}
+	cnr.Annotations[cyclenoderequest.ClientAPIVersionAnnotation] = clientVersion
 }
 
 // GenerateCNR creates a setup CNR from a NodeGroup with the specified params
