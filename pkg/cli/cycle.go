@@ -24,6 +24,9 @@ const (
 	separator = "«─»"
 )
 
+// replaced by ldflags at buildtime
+var apiVersion = "undefined" //nolint:golint,varcheck,deadcode,unused
+
 // cycle contains the logic and state to run as a kubectl plugin to cycle nodes
 type cycle struct {
 	plug    *kubeplug.Plug
@@ -185,7 +188,7 @@ func (c *cycle) generateCNRs(nodeGroups *atlassianv1.NodeGroupList, name, namesp
 	for _, nodeGroup := range nodeGroups.Items {
 		cnr := generation.GenerateCNR(nodeGroup, c.nodesOverride(), name, namespace)
 		generation.GiveReason(&cnr, "cli")
-		generation.GiveClientVersion(&cnr, c.version)
+		generation.SetAPIVersion(&cnr, apiVersion)
 
 		if name == "" {
 			generation.UseGenerateNameCNR(&cnr)

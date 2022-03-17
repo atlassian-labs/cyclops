@@ -11,7 +11,7 @@ import (
 	cyclecontroller "github.com/atlassian-labs/cyclops/pkg/controller"
 	"github.com/atlassian-labs/cyclops/pkg/controller/cyclenoderequest/transitioner"
 	"github.com/atlassian-labs/cyclops/pkg/notifications"
-	version "github.com/hashicorp/go-version"
+	"github.com/hashicorp/go-version"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -26,14 +26,14 @@ const (
 	controllerName       = "cyclenoderequest.controller"
 	eventName            = "cyclops"
 	reconcileConcurrency = 1
-	clusterNameEnv                 = "CLUSTER_NAME"
-	ClientVersionAnnotation        = "client.version"
+	clusterNameEnv             = "CLUSTER_NAME"
+	ClientAPIVersionAnnotation = "client.api.version"
 )
 
 var (
 	log = logf.Log.WithName(controllerName)
 	// replaced by ldflags at buildtime
-	minimalCompatibleClientVersion = "undefined" //nolint:golint,varcheck,deadcode,unused
+	apiVersion = "undefined" //nolint:golint,varcheck,deadcode,unused
 
 )
 
@@ -136,19 +136,19 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 		return reconcile.Result{}, err
 	}
 
-	cnrClientVersionAnnotation := cycleNodeRequest.Annotations[ClientVersionAnnotation]
-	if cnrClientVersionAnnotation != "" {
-		minClientVersion, err := version.NewVersion(minimalCompatibleClientVersion)
+	cnrClientAPIVersionAnnotation := cycleNodeRequest.Annotations[ClientAPIVersionAnnotation]
+	if cnrClientAPIVersionAnnotation != "" {
+		controllerAPIVersion, err := version.NewVersion(apiVersion)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
-		clientVersion, err := version.NewVersion(cnrClientVersionAnnotation)
+		clientAPIVersion, err := version.NewVersion(cnrClientAPIVersionAnnotation)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
-		if clientVersion.LessThan(minClientVersion) {
+		if clientAPIVersion.LessThan(controllerAPIVersion) {
 			cycleNodeRequest.Status.Phase = v1.CycleNodeRequestFailed
-			cycleNodeRequest.Status.Message = "Client version " + cnrClientVersionAnnotation  + " is below the minimal compatible version " + minimalCompatibleClientVersion
+			cycleNodeRequest.Status.Message = "Client API version " + cnrClientAPIVersionAnnotation + " does not match controller API version " + apiVersion
 		}
 	}
 

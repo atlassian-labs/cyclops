@@ -73,12 +73,12 @@ func GiveReason(cnr *atlassianv1.CycleNodeRequest, reason string) {
 	}
 	cnr.Annotations[cnrReasonAnnotationKey] = reason
 }
-
-func GiveClientVersion(cnr *atlassianv1.CycleNodeRequest, clientVersion string){
+// SetAPIVersion adds apiVersion annotation to the cnr
+func SetAPIVersion(cnr *atlassianv1.CycleNodeRequest, clientVersion string){
 	if cnr.Annotations == nil {
 		cnr.Annotations = map[string]string{}
 	}
-	cnr.Annotations[cyclenoderequest.ClientVersionAnnotation] = clientVersion
+	cnr.Annotations[cyclenoderequest.ClientAPIVersionAnnotation] = clientVersion
 }
 
 // GenerateCNR creates a setup CNR from a NodeGroup with the specified params

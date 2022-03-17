@@ -1,11 +1,12 @@
 VERSION = 1.7.1
-# IMPORTANT! Update this version if changes to controller affect CNR
-MINIMAL_COMPATIBLE_CLIENT_VERSION = 1.7.1
+# IMPORTANT! Update api version if a new release affects cnr
+API_VERSION = 1.0.0
 IMAGE = cyclops:$(VERSION)
 ARCH=$(if $(TARGETPLATFORM),$(lastword $(subst /, ,$(TARGETPLATFORM))),amd64)
 BASE_PACKAGE = github.com/atlassian-labs/cyclops/pkg
-OBSERVER_BUILD_LD_FLAGS = -X 'main.version=${VERSION}' -X '${BASE_PACKAGE}/observer.version=${VERSION}'
-MANAGER_BUILD_LD_FLAGS = -X 'main.version=${VERSION}' -X '${BASE_PACKAGE}/controller/cyclenoderequest.minimalCompatibleClientVersion=${MINIMAL_COMPATIBLE_CLIENT_VERSION}'
+CLI_BUILD_LD_FLAGS= -X 'main.version=${VERSION}' -X '${BASE_PACKAGE}/cli.apiVersion=${API_VERSION}'
+OBSERVER_BUILD_LD_FLAGS = -X 'main.version=${VERSION}' -X '${BASE_PACKAGE}/observer.apiVersion=${API_VERSION}'
+MANAGER_BUILD_LD_FLAGS = -X 'main.version=${VERSION}' -X '${BASE_PACKAGE}/controller/cyclenoderequest.apiVersion=${API_VERSION}'
 
 MANAGER_BIN = cyclops
 CLI_BIN = kubectl-cycle
@@ -15,7 +16,7 @@ OBSERVER_BIN = observer
 .DEFAULT_GOAL := build
 
 install-cli:
-	go build -o ${GOPATH}/bin/${CLI_BIN} -ldflags="-X main.version=${VERSION}" cmd/cli/main.go
+	go build -o ${GOPATH}/bin/${CLI_BIN} -ldflags="${CLI_BUILD_LD_FLAGS}" cmd/cli/main.go
 
 build-observer:
 	go build -o bin/${OBSERVER_BIN} -ldflags="${OBSERVER_BUILD_LD_FLAGS}" cmd/observer/main.go
@@ -24,7 +25,7 @@ build-manager:
 	go build -o bin/${MANAGER_BIN} -ldflags="${MANAGER_BUILD_LD_FLAGS}" cmd/manager/main.go
 
 build-cli:
-	go build -o bin/${CLI_BIN} -ldflags="-X main.version=${VERSION}" cmd/cli/main.go
+	go build -o bin/${CLI_BIN} -ldflags="${CLI_BUILD_LD_FLAGS}" cmd/cli/main.go
 
 build: build-manager build-cli build-observer
 
@@ -32,7 +33,7 @@ build-manager-linux:
 	CGO_ENABLED=0 GOOS=linux GOARCH=$(ARCH) go build -a -installsuffix cgo -o bin/linux/${MANAGER_BIN} -ldflags="${MANAGER_BUILD_LD_FLAGS}" cmd/manager/main.go
 
 build-cli-linux:
-	CGO_ENABLED=0 GOOS=linux GOARCH=$(ARCH) go build -a -installsuffix cgo -o bin/linux/${CLI_BIN} -ldflags="-X main.version=${VERSION}" cmd/cli/main.go
+	CGO_ENABLED=0 GOOS=linux GOARCH=$(ARCH) go build -a -installsuffix cgo -o bin/linux/${CLI_BIN} -ldflags="${CLI_BUILD_LD_FLAGS}" cmd/cli/main.go
 
 build-observer-linux:
 	CGO_ENABLED=0 GOOS=linux GOARCH=$(ARCH) go build -a -installsuffix cgo -o bin/linux/${OBSERVER_BIN} -ldflags="${OBSERVER_BUILD_LD_FLAGS}" cmd/observer/main.go
