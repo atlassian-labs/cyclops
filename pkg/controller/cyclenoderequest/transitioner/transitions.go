@@ -407,10 +407,12 @@ func (t *CycleNodeRequestTransitioner) transitionScalingUp() (reconcile.Result, 
 func (t *CycleNodeRequestTransitioner) transitionCordoning() (reconcile.Result, error) {
 	t.rm.LogEvent(t.cycleNodeRequest, "CordoningNodes", "Cordoning nodes: %v", t.cycleNodeRequest.Status.CurrentNodes)
 
+	if t.cycleNodeRequest.Spec.SkipPreTerminationChecks {
+		t.rm.Logger.Info("Skipping pre-termination checks")
+	}
+
+	allNodesCordoned := true
 	for _, node := range t.cycleNodeRequest.Status.CurrentNodes {
-		if t.cycleNodeRequest.Spec.SkipPreTerminationChecks {
-			t.rm.Logger.Info("Skipping pre-termination checks")
-		}
 		// Perform pre-termination checks before the node is cordoned
 		// Cruicially, do this before the CNS is created for node to begin that process
 		// The node should be ready for termination before any of this takes place
@@ -428,14 +430,21 @@ func (t *CycleNodeRequestTransitioner) transitionCordoning() (reconcile.Result, 
 				return t.transitionToHealing(err)
 			}
 
+			// If not all health checks have passed, continue to the next node instead of cordoning
 			if !allHealthChecksPassed {
-				// Reconcile any health checks passed to the cnr object
-				if err := t.rm.UpdateObject(t.cycleNodeRequest); err != nil {
-					return t.transitionToHealing(err)
-				}
-
-				return reconcile.Result{Requeue: true, RequeueAfter: requeueDuration}, nil
+				allNodesCordoned = false
+				continue
 			}
+		}
+
+		// If node is already cordoned, continue to the next node
+		cordoned, err := k8s.IsCordoned(node.Name, t.rm.RawClient)
+		if err != nil {
+			t.rm.Logger.Error(err, "failed to check if node is cordoned", "nodeName", node.Name)
+			return t.transitionToHealing(err)
+		}
+		if cordoned {
+			continue
 		}
 
 		// Cordon the node and create a CycleNodeStatus CRD to do work on it
@@ -452,6 +461,15 @@ func (t *CycleNodeRequestTransitioner) transitionCordoning() (reconcile.Result, 
 			t.rm.Logger.Error(err, "patch failed: could not add cyclops label to node", "nodeName", node.Name)
 			return t.transitionToHealing(err)
 		}
+	}
+
+	if !allNodesCordoned {
+		// Reconcile any health checks passed to the cnr object
+		if err := t.rm.UpdateObject(t.cycleNodeRequest); err != nil {
+			return t.transitionToHealing(err)
+		}
+
+		return reconcile.Result{Requeue: true, RequeueAfter: requeueDuration}, nil
 	}
 
 	// The scale up + cordon is finished, we no longer need this list of nodes

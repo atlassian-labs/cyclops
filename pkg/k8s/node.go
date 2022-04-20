@@ -1,10 +1,12 @@
 package k8s
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
@@ -32,6 +34,15 @@ func UncordonNode(name string, client kubernetes.Interface) error {
 		},
 	}
 	return PatchNode(name, patches, client)
+}
+
+// IsCordoned checks if a node is cordoned
+func IsCordoned(name string, client kubernetes.Interface) (bool, error) {
+	node, err := client.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		return false, err
+	}
+	return node.Spec.Unschedulable, nil
 }
 
 // AddLabelToNode performs a patch operation on a node to add a label to the node
