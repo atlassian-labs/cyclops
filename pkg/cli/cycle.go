@@ -40,6 +40,7 @@ type cycle struct {
 	cyclingTimeout               *time.Duration
 	skipInitialHealthChecksFlag  *bool
 	skipPreTerminationChecksFlag *bool
+	forceAsgConfigCheckFlag      *bool
 }
 
 // NewCycle returns a new cycle CLI application that implements all the interfaces needed for kubeplug
@@ -99,6 +100,7 @@ func (c *cycle) AddFlags(cmd *cobra.Command) {
 	c.cyclingTimeout = cmd.PersistentFlags().Duration("cycling-timeout", 0*time.Second, "option to set timeout for cycling. Default to controller defined timeout")
 	c.skipInitialHealthChecksFlag = cmd.PersistentFlags().Bool("skip-initial-health-checks", false, "option to skip the initial set of health checks before cycling.")
 	c.skipPreTerminationChecksFlag = cmd.PersistentFlags().Bool("skip-pre-termination-checks", false, "option to skip pre-termination checks during cycling.")
+	c.forceAsgConfigCheckFlag = cmd.PersistentFlags().Bool("force-asg-config-check", false, "option to force compare nodegroup config with AGG and skip cycling if there are no changes")
 }
 
 // Run function called by cobra with args and client ready
@@ -189,6 +191,11 @@ func (c *cycle) generateCNRs(nodeGroups *atlassianv1.NodeGroupList, name, namesp
 		cnr := generation.GenerateCNR(nodeGroup, c.nodesOverride(), name, namespace)
 		generation.GiveReason(&cnr, "cli")
 		generation.SetAPIVersion(&cnr, apiVersion)
+
+		forceCheckAsgConfig := c.forceAsgConfigCheck()
+		if forceCheckAsgConfig {
+			generation.SetForceCheckAsgConfig(&cnr)
+		}
 
 		if name == "" {
 			generation.UseGenerateNameCNR(&cnr)
@@ -334,4 +341,8 @@ func (c *cycle) skipInitialHealthChecks() bool {
 // skipInitialHealthChecks safely returns the --skip-pre-termination-checks flag
 func (c *cycle) skipPreTerminationChecks() bool {
 	return c.skipPreTerminationChecksFlag != nil && *c.skipPreTerminationChecksFlag
+}
+
+func (c *cycle) forceAsgConfigCheck() bool {
+	return c.forceAsgConfigCheckFlag != nil && *c.forceAsgConfigCheckFlag
 }

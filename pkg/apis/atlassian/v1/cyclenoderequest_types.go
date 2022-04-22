@@ -165,6 +165,9 @@ const (
 
 	// CycleNodeRequestHealing is for the state before Failing where cyclops will try to put the cluster back in a consistent state
 	CycleNodeRequestHealing CycleNodeRequestPhase = "Healing"
+
+	// CycleNodeRequestSkipped is for the state when there are no changes between nodegroup config and its respective AGS in cloud provider
+	CycleNodeRequestSkipped CycleNodeRequestPhase = "Skipped"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

@@ -22,6 +22,9 @@ var (
 	nodeEquilibriumWaitLimit = 5 * time.Minute
 )
 
+const ForceAsgConfigCheckAnnotation = "force-check-asg-config"
+
+
 // transitionUndefined transitions any CycleNodeRequests in the undefined phase to the pending phase
 // It checks to ensure that a valid selector has been provided.
 func (t *CycleNodeRequestTransitioner) transitionUndefined() (reconcile.Result, error) {
@@ -106,6 +109,23 @@ func (t *CycleNodeRequestTransitioner) transitionPending() (reconcile.Result, er
 
 	// get instances inside cloud provider node groups
 	nodeGroupInstances := nodeGroups.Instances()
+
+	forceCheckAsgConfigAnnotations := t.cycleNodeRequest.Annotations[ForceAsgConfigCheckAnnotation]
+	if forceCheckAsgConfigAnnotations == "true" {
+		var skipped = true
+		for _, instance := range nodeGroupInstances {
+			outOfDate := instance.OutOfDate()
+			if outOfDate {
+				skipped = false
+				break
+			}
+		}
+		if skipped {
+			t.cycleNodeRequest.Status.Message = "Cycling skipped because all nodes in the nodegroups are up-to-date with a cloud provider ASG"
+			return t.transitionObject(v1.CycleNodeRequestSkipped)
+		}
+	}
+
 	// Do some sanity checking before we start filtering things
 	// Check the instance count of the node group matches the number of nodes found in Kubernetes
 	if len(kubeNodes) != len(nodeGroupInstances) {
@@ -529,6 +549,37 @@ func (t *CycleNodeRequestTransitioner) transitionFailed() (reconcile.Result, err
 
 // transitionSuccessful handles successful CycleNodeRequests
 func (t *CycleNodeRequestTransitioner) transitionSuccessful() (reconcile.Result, error) {
+	shouldRequeue, err := t.finalReapChildren()
+	if err != nil {
+		return t.transitionToHealing(err)
+	}
+	if shouldRequeue {
+		return reconcile.Result{Requeue: true, RequeueAfter: transitionDuration}, nil
+	}
+
+	// If deleting CycleNodeRequests is not enabled, stop here
+	if !t.options.DeleteCNR {
+		return reconcile.Result{}, nil
+	}
+
+	// Delete CycleNodeRequests that have reaped all of their children and are older
+	// than the time configured to keep them for.
+	if t.cycleNodeRequest.CreationTimestamp.Add(t.options.DeleteCNRExpiry).Before(time.Now()) {
+		t.rm.Logger.Info("Deleting CycleNodeRequest")
+		err := t.rm.Client.Delete(context.TODO(), t.cycleNodeRequest)
+		if err != nil {
+			t.rm.Logger.Error(err, "Unable to delete expired CycleNodeRequest")
+		}
+		return reconcile.Result{}, nil
+	}
+
+	// Requeue them for checking later if the expiry has been reached
+	t.rm.Logger.Info("Requeuing CycleNodeRequest for deleting later")
+	return reconcile.Result{Requeue: true, RequeueAfter: t.options.DeleteCNRRequeue}, nil
+}
+
+// transitionSkipped handles skipped CycleNodeRequests
+func (t *CycleNodeRequestTransitioner) transitionSkipped() (reconcile.Result, error) {
 	shouldRequeue, err := t.finalReapChildren()
 	if err != nil {
 		return t.transitionToHealing(err)

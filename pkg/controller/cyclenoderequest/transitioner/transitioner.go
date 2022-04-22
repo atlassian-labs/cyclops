@@ -91,6 +91,7 @@ func (t *CycleNodeRequestTransitioner) transitionFuncs() map[v1.CycleNodeRequest
 		v1.CycleNodeRequestWaitingTermination: t.transitionWaitingTermination,
 		v1.CycleNodeRequestFailed:             t.transitionFailed,
 		v1.CycleNodeRequestSuccessful:         t.transitionSuccessful,
+		v1.CycleNodeRequestSkipped:			   t.transitionSkipped,
 		v1.CycleNodeRequestHealing:            t.transitionHealing,
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/atlassian-labs/cyclops/pkg/controller/cyclenoderequest"
+	"github.com/atlassian-labs/cyclops/pkg/controller/cyclenoderequest/transitioner"
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -79,6 +80,14 @@ func SetAPIVersion(cnr *atlassianv1.CycleNodeRequest, clientVersion string){
 		cnr.Annotations = map[string]string{}
 	}
 	cnr.Annotations[cyclenoderequest.ClientAPIVersionAnnotation] = clientVersion
+}
+
+// SetForceCheckAsgConfig adds apiVersion annotation to the cnr
+func SetForceCheckAsgConfig(cnr *atlassianv1.CycleNodeRequest){
+	if cnr.Annotations == nil {
+		cnr.Annotations = map[string]string{}
+	}
+	cnr.Annotations[transitioner.ForceAsgConfigCheckAnnotation] = "true"
 }
 
 // GenerateCNR creates a setup CNR from a NodeGroup with the specified params
