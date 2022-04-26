@@ -3,6 +3,7 @@ package transitioner
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -110,8 +111,8 @@ func (t *CycleNodeRequestTransitioner) transitionPending() (reconcile.Result, er
 	// get instances inside cloud provider node groups
 	nodeGroupInstances := nodeGroups.Instances()
 
-	forceCheckAsgConfigAnnotations := t.cycleNodeRequest.Annotations[ForceAsgConfigCheckAnnotation]
-	if forceCheckAsgConfigAnnotations == "true" {
+	forceCheckAsgConfigAnnotations, _ := strconv.ParseBool(t.cycleNodeRequest.Annotations[ForceAsgConfigCheckAnnotation])
+	if forceCheckAsgConfigAnnotations {
 		var skipped = true
 		for _, instance := range nodeGroupInstances {
 			outOfDate := instance.OutOfDate()
