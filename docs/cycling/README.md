@@ -3,12 +3,12 @@
 For more concrete examples see [examples](./examples/README.md)
 
 - [Cycling Documentation](#cycling-documentation)
-  - [Cycle Process<a name="cycling"></a>](#cycle-processa-name%22cycling%22a)
+  - [Cycle Process<a name="cycling"></a>](#cycle-process)
     - [CycleNodeRequest](#cyclenoderequest)
     - [CycleNodeStatus](#cyclenodestatus)
   - [State Machine Diagram](#state-machine-diagram)
   - [CycleNodeRequest object](#cyclenoderequest-object)
-  - [Usage <a name="cycling"></a>](#usage-a-name%22cycling%22a)
+  - [Usage <a name="cycling"></a>](#usage-)
     - [Interacting with the CRDs](#interacting-with-the-crds)
       - [Creating](#creating)
       - [GET](#get)
@@ -34,7 +34,7 @@ The CycleNodeRequest CRD handles a request to cycle nodes belonging to a specifi
 
 5. In the **ScalingUp** phase, wait for the cloud provider to bring up the new nodes and then wait for the new nodes to be **Ready** in the Kubernetes API. Wait for the configured health checks on the node succeed. Transition the object to **CordoningNode**.
 
-6. In the **CordoningNode** phase, perform the pre-termination checks and then cordon the selected nodes in the Kubernetes API. Transition the object to **WaitingTermination**.
+6. In the **CordoningNode** phase, cordon the selected nodes in the Kubernetes API then perform the pre-termination checks. Transition the object to **WaitingTermination**.
     
 7. In the **WaitingTermination** phase, create a CycleNodeStatus CRD for every node that was cordoned. Each of these CycleNodeStatuses handles the termination of an individual node. The controller will wait for a number of them to enter the **Successful** or **Failed** phase before moving on.
     
