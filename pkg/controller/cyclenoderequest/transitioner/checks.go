@@ -5,7 +5,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"html/template"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"regexp"
@@ -141,7 +141,7 @@ func (t *CycleNodeRequestTransitioner) makeRequest(httpMethod string, httpClient
 
 	defer resp.Body.Close()
 
-	bytes, err := ioutil.ReadAll(resp.Body)
+	bytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return 0, nil, err
 	}
