@@ -55,9 +55,9 @@ func (t *CycleNodeRequestTransitioner) transitionUndefined() (reconcile.Result, 
 
 // transitionPending transitions any CycleNodeRequests in the pending phase to the initialised phase
 // Does the following:
-// 1. fetches the current nodes by the label selector, and saves them as nodes to be terminated
-// 2. describes the node group and checks that the number of instances in the node group matches the number we
-//    are planning on terminating
+//  1. fetches the current nodes by the label selector, and saves them as nodes to be terminated
+//  2. describes the node group and checks that the number of instances in the node group matches the number we
+//     are planning on terminating
 func (t *CycleNodeRequestTransitioner) transitionPending() (reconcile.Result, error) {
 	// Fetch the node names for the cycleNodeRequest, using the label selector provided
 	t.rm.LogEvent(t.cycleNodeRequest, "SelectingNodes", "Selecting nodes with label selector")
@@ -303,8 +303,8 @@ func (t *CycleNodeRequestTransitioner) transitionScalingUp() (reconcile.Result, 
 
 	// Check we have waited long enough - give the node some time to start up
 	if time.Since(scaleUpStarted.Time) <= scaleUpWait {
-		t.rm.LogEvent(t.cycleNodeRequest, "ScalingUpWaiting", "Waiting for new nodes to be ready")
-		return reconcile.Result{Requeue: true, RequeueAfter: requeueDuration}, nil
+		t.rm.LogEvent(t.cycleNodeRequest, "ScalingUpWaiting", "Waiting for new nodes to be warmed up")
+		return reconcile.Result{Requeue: true, RequeueAfter: scaleUpWait}, nil
 	}
 
 	nodeGroups, err := t.rm.CloudProvider.GetNodeGroups(t.cycleNodeRequest.GetNodeGroupNames())
