@@ -20,6 +20,7 @@ const (
 	validationErrorCode     = "ValidationError"
 	alreadyAttachedMessage  = "is already part of AutoScalingGroup"
 	alreadyDetachingMessage = "is not in InService or Standby"
+	notInCorrectState       = "is not in correct state"
 )
 
 var providerIDRegex = regexp.MustCompile(`aws:\/\/\/[\w-]+\/([\w-]+)`)
@@ -43,6 +44,9 @@ func verifyIfErrorOccured(apiErr error, expectedMessage string) (bool, error) {
 	if awsErr, ok := apiErr.(awserr.Error); ok {
 		// process SDK error: Unfortunately there's no generic ValidationError in the SDK and no FailedAttach/FailedDetach error. Check manually
 		if awsErr.Code() == validationErrorCode && strings.Contains(awsErr.Message(), expectedMessage) {
+			return true, apiErr
+		}
+		if awsErr.Code() == validationErrorCode && strings.Contains(awsErr.Message(), notInCorrectState) {
 			return true, apiErr
 		}
 	}
