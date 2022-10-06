@@ -48,7 +48,8 @@ func (t *CycleNodeStatusTransitioner) transitionUndefined() (reconcile.Result, e
 // RemovingLabelsFromPods phase based on the .Spec.Method provided.
 // Gets the requested node from the cloud provider and from kube and performs sanity checks. Depending on these checks
 // the CycleNodeStatus may go straight to Failed or Successful.
-//    If the node has problems then it will transition straight to Failed.
+//
+//	If the node has problems then it will transition straight to Failed.
 func (t *CycleNodeStatusTransitioner) transitionPending() (reconcile.Result, error) {
 	t.rm.LogEvent(t.cycleNodeStatus, "FetchingNode", "Fetching information about node: %v", t.cycleNodeStatus.Spec.NodeName)
 	node, err := t.rm.GetNode(t.cycleNodeStatus.Spec.NodeName)
