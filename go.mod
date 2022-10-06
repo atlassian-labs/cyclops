@@ -7,6 +7,7 @@ require (
 	github.com/cenkalti/backoff/v4 v4.1.0
 	github.com/go-logr/logr v0.4.0
 	github.com/google/uuid v1.1.5
+	github.com/hashicorp/go-version v1.4.0
 	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/mattn/go-isatty v0.0.12
 	github.com/operator-framework/operator-lib v0.9.0
@@ -24,7 +25,6 @@ require (
 	k8s.io/client-go v0.22.6
 	k8s.io/klog v1.0.0
 	sigs.k8s.io/controller-runtime v0.10.0
-	github.com/hashicorp/go-version v1.4.0
 )
 
 require (
