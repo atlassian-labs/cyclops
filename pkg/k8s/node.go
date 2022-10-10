@@ -8,6 +8,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
@@ -43,7 +44,7 @@ func IsCordoned(name string, client kubernetes.Interface) (bool, error) {
 	if err != nil {
 		// considered node is cordoned when it's removed from kube api
 		if apierrors.IsNotFound(err) {
-			return true, nil
+			return true, err
 		}
 		return false, err
 	}

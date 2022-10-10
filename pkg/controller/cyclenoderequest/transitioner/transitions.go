@@ -10,7 +10,9 @@ import (
 	"github.com/atlassian-labs/cyclops/pkg/k8s"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -416,11 +418,17 @@ func (t *CycleNodeRequestTransitioner) transitionCordoning() (reconcile.Result, 
 		// If the node is not already cordoned, cordon it
 		cordoned, err := k8s.IsCordoned(node.Name, t.rm.RawClient)
 		if err != nil {
+			if apierrors.IsNotFound(err) {
+				continue
+			}
 			t.rm.Logger.Error(err, "failed to check if node is cordoned", "nodeName", node.Name)
 			return t.transitionToHealing(err)
 		}
 		if !cordoned {
 			if err := k8s.CordonNode(node.Name, t.rm.RawClient); err != nil {
+				if apierrors.IsNotFound(err) {
+					continue
+				}
 				return t.transitionToHealing(err)
 			}
 		}
