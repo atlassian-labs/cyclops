@@ -20,7 +20,6 @@ const (
 	validationErrorCode     = "ValidationError"
 	alreadyAttachedMessage  = "is already part of AutoScalingGroup"
 	alreadyDetachingMessage = "is not in InService or Standby"
-	notInCorrectState       = "is not in correct state"
 )
 
 var providerIDRegex = regexp.MustCompile(`aws:\/\/\/[\w-]+\/([\w-]+)`)
@@ -46,12 +45,23 @@ func verifyIfErrorOccured(apiErr error, expectedMessage string) (bool, error) {
 		if awsErr.Code() == validationErrorCode && strings.Contains(awsErr.Message(), expectedMessage) {
 			return true, apiErr
 		}
-		if awsErr.Code() == validationErrorCode && strings.Contains(awsErr.Message(), notInCorrectState) {
-			return true, apiErr
-		}
 	}
 
 	return false, apiErr
+}
+
+func verifyIfErrorOccuredWithDefaults(apiErr error, expectedMessage string) (bool, error) {
+	skip_errs := []string{
+		"is not in correct state",
+	}
+	if awsErr, ok := apiErr.(awserr.Error); ok {
+		for _, skip_err := range skip_errs {
+			if awsErr.Code() == validationErrorCode && strings.Contains(awsErr.Message(), skip_err) {
+				return true, apiErr
+			}
+		}
+	}
+	return verifyIfErrorOccured(apiErr, expectedMessage)
 }
 
 type provider struct {
@@ -291,7 +301,7 @@ func (a *autoscalingGroups) AttachInstance(providerID, nodeGroup string) (alread
 		InstanceIds:          aws.StringSlice([]string{instanceID}),
 	})
 
-	return verifyIfErrorOccured(apiErr, alreadyAttachedMessage)
+	return verifyIfErrorOccuredWithDefaults(apiErr, alreadyAttachedMessage)
 }
 
 func (a *autoscalingGroups) instanceOutOfDate(instance *autoscaling.Instance) bool {
