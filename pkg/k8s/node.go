@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
@@ -40,6 +41,10 @@ func UncordonNode(name string, client kubernetes.Interface) error {
 func IsCordoned(name string, client kubernetes.Interface) (bool, error) {
 	node, err := client.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
+		// considered node is cordoned when it's removed from kube api
+		if apierrors.IsNotFound(err) {
+			return true, nil
+		}
 		return false, err
 	}
 	return node.Spec.Unschedulable, nil
