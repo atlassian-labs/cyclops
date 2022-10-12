@@ -417,18 +417,16 @@ func (t *CycleNodeRequestTransitioner) transitionCordoning() (reconcile.Result, 
 	for _, node := range t.cycleNodeRequest.Status.CurrentNodes {
 		// If the node is not already cordoned, cordon it
 		cordoned, err := k8s.IsCordoned(node.Name, t.rm.RawClient)
+		// Skip handling the node if it doesn't exist
+		if apierrors.IsNotFound(err) {
+			continue
+		}
 		if err != nil {
-			if apierrors.IsNotFound(err) {
-				continue
-			}
 			t.rm.Logger.Error(err, "failed to check if node is cordoned", "nodeName", node.Name)
 			return t.transitionToHealing(err)
 		}
 		if !cordoned {
 			if err := k8s.CordonNode(node.Name, t.rm.RawClient); err != nil {
-				if apierrors.IsNotFound(err) {
-					continue
-				}
 				return t.transitionToHealing(err)
 			}
 		}
@@ -439,14 +437,14 @@ func (t *CycleNodeRequestTransitioner) transitionCordoning() (reconcile.Result, 
 			// Try to send the trigger, if is has already been sent then this will
 			// be skipped in the function. The trigger must only be sent once
 			if err := t.sendPreTerminationTrigger(node); err != nil {
-				return t.transitionToHealing(errors.Wrapf(err, "failed to send pre-termination trigger, %s is still cordononed", node.Name))
+				t.rm.LogEvent(t.cycleNodeRequest, "PreTerminationTriggerFailed", "failed to send pre-termination trigger to %v, err: %v", node.Name, err)
 			}
 
 			// After the trigger has been sent, perform health checks to monitor if the node
 			// can be terminated. If all checks pass then it can be terminated.
 			allHealthChecksPassed, err := t.performPreTerminationHealthChecks(node)
 			if err != nil {
-				return t.transitionToHealing(errors.Wrapf(err, "failed to perform pre-termination health checks, %s is still cordononed", node.Name))
+				t.rm.LogEvent(t.cycleNodeRequest, "PreTerminationHealChecks", "failed to perform pre-termination health checks to %v, err: %v", node.Name, err)
 			}
 
 			// If not all health checks have passed, it is not ready for termination yet
