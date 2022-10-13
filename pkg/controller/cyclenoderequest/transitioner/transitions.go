@@ -438,6 +438,7 @@ func (t *CycleNodeRequestTransitioner) transitionCordoning() (reconcile.Result, 
 			// be skipped in the function. The trigger must only be sent once
 			if err := t.sendPreTerminationTrigger(node); err != nil {
 				t.rm.LogEvent(t.cycleNodeRequest, "PreTerminationTriggerFailed", "failed to send pre-termination trigger to %v, err: %v", node.Name, err)
+				return t.transitionToHealing(errors.Wrapf(err, "failed to send pre-termination trigger to %s is still cordononed", node.Name))
 			}
 
 			// After the trigger has been sent, perform health checks to monitor if the node
@@ -445,6 +446,7 @@ func (t *CycleNodeRequestTransitioner) transitionCordoning() (reconcile.Result, 
 			allHealthChecksPassed, err := t.performPreTerminationHealthChecks(node)
 			if err != nil {
 				t.rm.LogEvent(t.cycleNodeRequest, "PreTerminationHealChecks", "failed to perform pre-termination health checks to %v, err: %v", node.Name, err)
+				return t.transitionToHealing(errors.Wrapf(err, "failed to perform pre-termination health checks to %s", node.Name))
 			}
 
 			// If not all health checks have passed, it is not ready for termination yet
