@@ -160,7 +160,7 @@ func (t *CycleNodeRequestTransitioner) finalReapChildren() (shouldRequeue bool, 
 	}
 
 	switch t.cycleNodeRequest.Status.Phase {
-	case v1.CycleNodeRequestInitialised:
+	case v1.CycleNodeRequestInitialised, v1.CycleNodeRequestFailed:
 		if t.cycleNodeRequest.Status.ActiveChildren == 0 {
 			// No more work to be done, stop processing this request
 			return false, nil

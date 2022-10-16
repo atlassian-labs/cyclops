@@ -39,15 +39,25 @@ func instanceIDToProviderID(instanceID, availabilityZone string) (string, error)
 	return fmt.Sprintf("aws:///%s/%s", availabilityZone, instanceID), nil
 }
 
-func verifyIfErrorOccured(apiErr error, expectedMessage string) (bool, error) {
-	if awsErr, ok := apiErr.(awserr.Error); ok {
-		// process SDK error: Unfortunately there's no generic ValidationError in the SDK and no FailedAttach/FailedDetach error. Check manually
-		if awsErr.Code() == validationErrorCode && strings.Contains(awsErr.Message(), expectedMessage) {
-			return true, apiErr
+func verifyIfErrorOccurred(apiErr error, expectedMessage ...string) (bool, error) {
+	for _, msg := range expectedMessage {
+		if awsErr, ok := apiErr.(awserr.Error); ok {
+			// process SDK error: Unfortunately there's no generic ValidationError in the SDK and no FailedAttach/FailedDetach error. Check manually
+			if awsErr.Code() == validationErrorCode && strings.Contains(awsErr.Message(), msg) {
+				return true, apiErr
+			}
 		}
 	}
-
 	return false, apiErr
+}
+
+func verifyIfErrorOccurredWithDefaults(apiErr error, expectedMessage string) (bool, error) {
+	skip_errs := []string{
+		// default errors we wanted to skip
+		"is not in correct state",
+		expectedMessage,
+	}
+	return verifyIfErrorOccurred(apiErr, skip_errs...)
 }
 
 type provider struct {
@@ -267,7 +277,7 @@ func (a *autoscalingGroups) DetachInstance(providerID string) (alreadyDetaching 
 		ShouldDecrementDesiredCapacity: aws.Bool(false),
 	})
 
-	return verifyIfErrorOccured(apiErr, alreadyDetachingMessage)
+	return verifyIfErrorOccurred(apiErr, alreadyDetachingMessage)
 }
 
 // AttachInstance attaches the instance to the Autoscaling group
@@ -287,7 +297,7 @@ func (a *autoscalingGroups) AttachInstance(providerID, nodeGroup string) (alread
 		InstanceIds:          aws.StringSlice([]string{instanceID}),
 	})
 
-	return verifyIfErrorOccured(apiErr, alreadyAttachedMessage)
+	return verifyIfErrorOccurredWithDefaults(apiErr, alreadyAttachedMessage)
 }
 
 func (a *autoscalingGroups) instanceOutOfDate(instance *autoscaling.Instance) bool {

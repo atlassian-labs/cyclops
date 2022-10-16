@@ -346,7 +346,7 @@ func (t *CycleNodeRequestTransitioner) sendPreTerminationTrigger(node v1.CycleNo
 		}
 
 		// Send the trigger, disregard the response body
-		statusCode, _, err := t.makeRequest(http.MethodPost, httpClient, endpoint)
+		statusCode, res, err := t.makeRequest(http.MethodPost, httpClient, endpoint)
 		if err != nil {
 			return fmt.Errorf("sending trigger failed: %v", err)
 		}
@@ -360,7 +360,7 @@ func (t *CycleNodeRequestTransitioner) sendPreTerminationTrigger(node v1.CycleNo
 		}
 
 		if !statusCodeFound {
-			return fmt.Errorf("got unexpected status code after sending trigger: %d", statusCode)
+			return fmt.Errorf("got unexpected status code after sending trigger: %d, resp: %s", statusCode, res)
 		}
 
 		now := metav1.Now()

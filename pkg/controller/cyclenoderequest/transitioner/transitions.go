@@ -10,7 +10,9 @@ import (
 	"github.com/atlassian-labs/cyclops/pkg/k8s"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -55,9 +57,9 @@ func (t *CycleNodeRequestTransitioner) transitionUndefined() (reconcile.Result, 
 
 // transitionPending transitions any CycleNodeRequests in the pending phase to the initialised phase
 // Does the following:
-// 1. fetches the current nodes by the label selector, and saves them as nodes to be terminated
-// 2. describes the node group and checks that the number of instances in the node group matches the number we
-//    are planning on terminating
+//  1. fetches the current nodes by the label selector, and saves them as nodes to be terminated
+//  2. describes the node group and checks that the number of instances in the node group matches the number we
+//     are planning on terminating
 func (t *CycleNodeRequestTransitioner) transitionPending() (reconcile.Result, error) {
 	// Fetch the node names for the cycleNodeRequest, using the label selector provided
 	t.rm.LogEvent(t.cycleNodeRequest, "SelectingNodes", "Selecting nodes with label selector")
@@ -303,8 +305,8 @@ func (t *CycleNodeRequestTransitioner) transitionScalingUp() (reconcile.Result, 
 
 	// Check we have waited long enough - give the node some time to start up
 	if time.Since(scaleUpStarted.Time) <= scaleUpWait {
-		t.rm.LogEvent(t.cycleNodeRequest, "ScalingUpWaiting", "Waiting for new nodes to be ready")
-		return reconcile.Result{Requeue: true, RequeueAfter: requeueDuration}, nil
+		t.rm.LogEvent(t.cycleNodeRequest, "ScalingUpWaiting", "Waiting for new nodes to be warmed up")
+		return reconcile.Result{Requeue: true, RequeueAfter: scaleUpWait}, nil
 	}
 
 	nodeGroups, err := t.rm.CloudProvider.GetNodeGroups(t.cycleNodeRequest.GetNodeGroupNames())
@@ -374,7 +376,8 @@ func (t *CycleNodeRequestTransitioner) transitionScalingUp() (reconcile.Result, 
 		for i, node := range t.cycleNodeRequest.Status.CurrentNodes {
 			if nodeToRemove.Name == node.Name {
 				t.rm.LogEvent(t.cycleNodeRequest, "RaceCondition", "Node %v was prematurely terminated.", node.Name)
-				t.cycleNodeRequest.Status.CurrentNodes = append(t.cycleNodeRequest.Status.CurrentNodes[:i], t.cycleNodeRequest.Status.CurrentNodes[i+1:]...)
+				t.cycleNodeRequest.Status.CurrentNodes = append(t.cycleNodeRequest.Status.CurrentNodes[:i],
+					t.cycleNodeRequest.Status.CurrentNodes[i+1:]...)
 				break
 			}
 		}
@@ -415,6 +418,10 @@ func (t *CycleNodeRequestTransitioner) transitionCordoning() (reconcile.Result, 
 	for _, node := range t.cycleNodeRequest.Status.CurrentNodes {
 		// If the node is not already cordoned, cordon it
 		cordoned, err := k8s.IsCordoned(node.Name, t.rm.RawClient)
+		// Skip handling the node if it doesn't exist
+		if apierrors.IsNotFound(err) {
+			continue
+		}
 		if err != nil {
 			t.rm.Logger.Error(err, "failed to check if node is cordoned", "nodeName", node.Name)
 			return t.transitionToHealing(err)
@@ -431,14 +438,18 @@ func (t *CycleNodeRequestTransitioner) transitionCordoning() (reconcile.Result, 
 			// Try to send the trigger, if is has already been sent then this will
 			// be skipped in the function. The trigger must only be sent once
 			if err := t.sendPreTerminationTrigger(node); err != nil {
-				return t.transitionToHealing(errors.Wrapf(err, "failed to send pre-termination trigger, %s is still cordononed", node.Name))
+				t.rm.LogEvent(t.cycleNodeRequest,
+					"PreTerminationTriggerFailed", "failed to send pre-termination trigger to %s, err: %v", node.Name, err)
+				return t.transitionToHealing(errors.Wrapf(err, "failed to send pre-termination trigger to %s", node.Name))
 			}
 
 			// After the trigger has been sent, perform health checks to monitor if the node
 			// can be terminated. If all checks pass then it can be terminated.
 			allHealthChecksPassed, err := t.performPreTerminationHealthChecks(node)
 			if err != nil {
-				return t.transitionToHealing(errors.Wrapf(err, "failed to perform pre-termination health checks, %s is still cordononed", node.Name))
+				t.rm.LogEvent(t.cycleNodeRequest, "PreTerminationHealChecks",
+					"failed to perform pre-termination health checks for %v, err: %v", node.Name, err)
+				return t.transitionToHealing(errors.Wrapf(err, "failed to perform pre-termination health checks for %s", node.Name))
 			}
 
 			// If not all health checks have passed, it is not ready for termination yet
@@ -499,7 +510,7 @@ func (t *CycleNodeRequestTransitioner) transitionWaitingTermination() (reconcile
 	return t.transitionObject(desiredPhase)
 }
 
-// transitionFailed handles failed CycleNodeRequests
+// transitionHealing handles healing CycleNodeRequests
 func (t *CycleNodeRequestTransitioner) transitionHealing() (reconcile.Result, error) {
 	nodeGroups, err := t.rm.CloudProvider.GetNodeGroups(t.cycleNodeRequest.GetNodeGroupNames())
 	if err != nil {
@@ -511,6 +522,9 @@ func (t *CycleNodeRequestTransitioner) transitionHealing() (reconcile.Result, er
 		t.rm.LogEvent(t.cycleNodeRequest, "AttachingNodes", "Attaching instances to nodes group: %v", node.Name)
 		alreadyAttached, err := nodeGroups.AttachInstance(node.ProviderID, node.NodeGroupName)
 		if alreadyAttached {
+			t.rm.LogEvent(t.cycleNodeRequest,
+				"AttachingNodes", "Skip re-attaching instances to nodes group: %v, err: %v",
+				node.Name, err)
 			continue
 		}
 		if err != nil {
