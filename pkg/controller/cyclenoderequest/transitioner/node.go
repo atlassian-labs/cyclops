@@ -3,9 +3,10 @@ package transitioner
 import (
 	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
+
 	v1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
 	"github.com/atlassian-labs/cyclops/pkg/cloudprovider"
-	corev1 "k8s.io/api/core/v1"
 )
 
 // listReadyNodes lists nodes that are "ready". By default lists nodes that have also not been touched by Cyclops.
@@ -54,14 +55,14 @@ func (t *CycleNodeRequestTransitioner) getNodesToTerminate(numNodes int64) (node
 		return nil, 0, err
 	}
 
-	for _, nodeToTerminate := range t.cycleNodeRequest.Status.NodesToTerminate {
-		for _, kubeNode := range kubeNodes {
-			// Skip nodes that are already being worked on so we don't duplicate our work
-			if value, ok := kubeNode.Labels[cycleNodeLabel]; ok && value == t.cycleNodeRequest.Name {
-				numNodesInProgress++
-				break
-			}
+	for _, kubeNode := range kubeNodes {
+		// Skip nodes that are already being worked on so we don't duplicate our work
+		if value, ok := kubeNode.Labels[cycleNodeLabel]; ok && value == t.cycleNodeRequest.Name {
+			numNodesInProgress++
+			continue
+		}
 
+		for _, nodeToTerminate := range t.cycleNodeRequest.Status.NodesToTerminate {
 			// Add nodes that need to be terminated but have not yet been actioned
 			if kubeNode.Name == nodeToTerminate.Name && kubeNode.Spec.ProviderID == nodeToTerminate.ProviderID {
 				nodes = append(nodes, &kubeNode)
