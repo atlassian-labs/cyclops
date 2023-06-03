@@ -112,7 +112,7 @@ func (t *CycleNodeRequestTransitioner) reapChildren() (v1.CycleNodeRequestPhase,
 	for _, cycleNodeStatus := range cycleNodeStatusList.Items {
 		switch cycleNodeStatus.Status.Phase {
 		case v1.CycleNodeStatusFailed:
-			nextPhase = v1.CycleNodeRequestFailed
+			nextPhase = v1.CycleNodeRequestHealing
 			t.rm.LogWarningEvent(t.cycleNodeRequest, "ReapChildren", "Failed to cycle node: %v, reason: %v", cycleNodeStatus.Spec.NodeName, cycleNodeStatus.Status.Message)
 			t.rm.Logger.Info("Child has failed", "nodeName", cycleNodeStatus.Name, "status", cycleNodeStatus.Status.Phase, "message", cycleNodeStatus.Status.Message)
 			fallthrough
@@ -143,7 +143,7 @@ func (t *CycleNodeRequestTransitioner) reapChildren() (v1.CycleNodeRequestPhase,
 	// It is assumed that nodes selected for cycling will take roughly the same time to finish
 	// Bringing up multiple nodes together will speed up the whole process as well as spread out pods properly across the new nodes
 	// If the next phase should be failed, skip this since transitioning back to initialised would be flip-flopping behaviour
-	if nextPhase != v1.CycleNodeRequestFailed && t.cycleNodeRequest.Status.ActiveChildren <= t.cycleNodeRequest.Spec.CycleSettings.Concurrency/2 {
+	if nextPhase != v1.CycleNodeRequestHealing && t.cycleNodeRequest.Status.ActiveChildren <= t.cycleNodeRequest.Spec.CycleSettings.Concurrency/2 {
 		t.rm.Logger.Info("Transition back to Initialised to grab more child nodes", "ActiveChildren", t.cycleNodeRequest.Status.ActiveChildren, "Concurrency", t.cycleNodeRequest.Spec.CycleSettings.Concurrency)
 		nextPhase = v1.CycleNodeRequestInitialised
 	}
