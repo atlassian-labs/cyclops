@@ -87,8 +87,8 @@ func (c *cachedNodeList) List(selector labels.Selector) ([]*v1.Node, error) {
 	return nodes, err
 }
 
-// NodeExist checks if a node exists
-func NodeExist(name string, client kubernetes.Interface) (bool, error) {
+// NodeExists checks if a node exists
+func NodeExists(name string, client kubernetes.Interface) (bool, error) {
 	_, err := client.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return false, err

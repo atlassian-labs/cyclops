@@ -520,7 +520,7 @@ func (t *CycleNodeRequestTransitioner) transitionHealing() (reconcile.Result, er
 
 	for _, node := range t.cycleNodeRequest.Status.NodesToTerminate {
 		// nodes in NodesToTerminate may have been terminated, so check if they still exist
-		if nodeExist, err := k8s.NodeExist(node.Name, t.rm.RawClient); err != nil || !nodeExist {
+		if nodeExists, err := k8s.NodeExists(node.Name, t.rm.RawClient); err != nil || !nodeExists {
 			t.rm.LogEvent(t.cycleNodeRequest,
 				"HealingNodes", "Skip healing node: %s, err: %v",
 				node.Name, err)
