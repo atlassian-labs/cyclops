@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	v1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
-	"github.com/atlassian-labs/cyclops/pkg/cloudprovider"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -14,6 +12,9 @@ import (
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	v1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
+	"github.com/atlassian-labs/cyclops/pkg/cloudprovider"
 )
 
 // transitionToHealing transitions the current cycleNodeRequest to healing which will always transiting to failed
@@ -108,7 +109,6 @@ func (t *CycleNodeRequestTransitioner) reapChildren() (v1.CycleNodeRequestPhase,
 
 	// Check all of the children - if any are failed, the whole CycleNodeRequest fails
 	inProgressCount := 0
-	reapedChildren := 0
 	for _, cycleNodeStatus := range cycleNodeStatusList.Items {
 		switch cycleNodeStatus.Status.Phase {
 		case v1.CycleNodeStatusFailed:
@@ -123,7 +123,6 @@ func (t *CycleNodeRequestTransitioner) reapChildren() (v1.CycleNodeRequestPhase,
 			if err != nil {
 				return nextPhase, err
 			}
-			reapedChildren++
 		default:
 			inProgressCount++
 		}
