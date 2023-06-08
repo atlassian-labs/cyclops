@@ -98,6 +98,6 @@ func NodeExists(name string, client kubernetes.Interface) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	
+
 	return true, nil
 }

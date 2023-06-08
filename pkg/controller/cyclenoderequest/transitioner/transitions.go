@@ -520,10 +520,14 @@ func (t *CycleNodeRequestTransitioner) transitionHealing() (reconcile.Result, er
 
 	for _, node := range t.cycleNodeRequest.Status.NodesToTerminate {
 		// nodes in NodesToTerminate may have been terminated, so check if they still exist
-		if nodeExists, err := k8s.NodeExists(node.Name, t.rm.RawClient); err != nil || !nodeExists {
+		nodeExists, err := k8s.NodeExists(node.Name, t.rm.RawClient)
+		if err != nil {
+			return t.transitionToFailed(err)
+		}
+		
+		if !nodeExists {
 			t.rm.LogEvent(t.cycleNodeRequest,
-				"HealingNodes", "Skip healing node: %s, err: %v",
-				node.Name, err)
+				"HealingNodes", "Node does not exist, skip healing node: %s", node.Name)
 			continue
 		}
 
@@ -536,9 +540,7 @@ func (t *CycleNodeRequestTransitioner) transitionHealing() (reconcile.Result, er
 				node.Name, err)
 		}
 		if err != nil {
-			t.rm.LogWarningEvent(t.cycleNodeRequest,
-				"AttachingNodes", "Re-attaching instances to nodes group failed: %v, err: %v",
-				node.Name, err)
+			return t.transitionToFailed(err)
 		}
 
 		// un-cordon after attach as well
@@ -546,9 +548,7 @@ func (t *CycleNodeRequestTransitioner) transitionHealing() (reconcile.Result, er
 		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			return k8s.UncordonNode(node.Name, t.rm.RawClient)
 		}); err != nil {
-			t.rm.LogWarningEvent(t.cycleNodeRequest,
-				"UncordoningNodes", "Uncordoning nodes in node group failed: %v, err: %v",
-				node.Name, err)
+			return t.transitionToFailed(err)
 		}
 	}
 
