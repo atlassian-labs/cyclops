@@ -6,12 +6,13 @@ import (
 	"strings"
 	"time"
 
-	v1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
-	"github.com/atlassian-labs/cyclops/pkg/k8s"
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	v1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
+	"github.com/atlassian-labs/cyclops/pkg/k8s"
+	"github.com/pkg/errors"
 
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/util/retry"
@@ -517,23 +518,32 @@ func (t *CycleNodeRequestTransitioner) transitionHealing() (reconcile.Result, er
 		return t.transitionToFailed(err)
 	}
 
-	// try and re-attach the nodes, if any were un-attached
 	for _, node := range t.cycleNodeRequest.Status.NodesToTerminate {
+		// nodes in NodesToTerminate may have been terminated, so check if they still exist
+		nodeExists, err := k8s.NodeExists(node.Name, t.rm.RawClient)
+		if err != nil {
+			return t.transitionToFailed(err)
+		}
+		
+		if !nodeExists {
+			t.rm.LogEvent(t.cycleNodeRequest,
+				"HealingNodes", "Node does not exist, skip healing node: %s", node.Name)
+			continue
+		}
+
+		// try and re-attach the nodes, if any were un-attached
 		t.rm.LogEvent(t.cycleNodeRequest, "AttachingNodes", "Attaching instances to nodes group: %v", node.Name)
 		alreadyAttached, err := nodeGroups.AttachInstance(node.ProviderID, node.NodeGroupName)
 		if alreadyAttached {
 			t.rm.LogEvent(t.cycleNodeRequest,
 				"AttachingNodes", "Skip re-attaching instances to nodes group: %v, err: %v",
 				node.Name, err)
-			continue
 		}
 		if err != nil {
 			return t.transitionToFailed(err)
 		}
-	}
 
-	// un-cordon after attach as well
-	for _, node := range t.cycleNodeRequest.Status.NodesToTerminate {
+		// un-cordon after attach as well
 		t.rm.LogEvent(t.cycleNodeRequest, "UncordoningNodes", "Uncordoning nodes in node group: %v", node.Name)
 		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			return k8s.UncordonNode(node.Name, t.rm.RawClient)

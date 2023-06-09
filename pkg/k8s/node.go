@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/apimachinery/pkg/labels"
@@ -85,4 +86,18 @@ func (c *cachedNodeList) List(selector labels.Selector) ([]*v1.Node, error) {
 	})
 
 	return nodes, err
+}
+
+// NodeExists checks if a node exists
+func NodeExists(name string, client kubernetes.Interface) (bool, error) {
+	_, err := client.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		return false, nil
+	}
+
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
 }
