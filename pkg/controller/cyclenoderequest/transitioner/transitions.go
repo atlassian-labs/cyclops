@@ -524,7 +524,7 @@ func (t *CycleNodeRequestTransitioner) transitionHealing() (reconcile.Result, er
 		if err != nil {
 			return t.transitionToFailed(err)
 		}
-		
+
 		if !nodeExists {
 			t.rm.LogEvent(t.cycleNodeRequest,
 				"HealingNodes", "Node does not exist, skip healing node: %s", node.Name)
@@ -533,13 +533,12 @@ func (t *CycleNodeRequestTransitioner) transitionHealing() (reconcile.Result, er
 
 		// try and re-attach the nodes, if any were un-attached
 		t.rm.LogEvent(t.cycleNodeRequest, "AttachingNodes", "Attaching instances to nodes group: %v", node.Name)
-		alreadyAttached, err := nodeGroups.AttachInstance(node.ProviderID, node.NodeGroupName)
-		if alreadyAttached {
+		// if the node is already attached, ignore the error and continue to un-cordoning, otherwise return with error
+		if alreadyAttached, err := nodeGroups.AttachInstance(node.ProviderID, node.NodeGroupName); alreadyAttached {
 			t.rm.LogEvent(t.cycleNodeRequest,
 				"AttachingNodes", "Skip re-attaching instances to nodes group: %v, err: %v",
 				node.Name, err)
-		}
-		if err != nil {
+		} else if err != nil {
 			return t.transitionToFailed(err)
 		}
 
