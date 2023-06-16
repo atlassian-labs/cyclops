@@ -534,12 +534,14 @@ func (t *CycleNodeRequestTransitioner) transitionHealing() (reconcile.Result, er
 		// try and re-attach the nodes, if any were un-attached
 		t.rm.LogEvent(t.cycleNodeRequest, "AttachingNodes", "Attaching instances to nodes group: %v", node.Name)
 		// if the node is already attached, ignore the error and continue to un-cordoning, otherwise return with error
-		if alreadyAttached, err := nodeGroups.AttachInstance(node.ProviderID, node.NodeGroupName); alreadyAttached {
+		alreadyAttached, err := nodeGroups.AttachInstance(node.ProviderID, node.NodeGroupName)
+		if err != nil && !alreadyAttached {
+			return t.transitionToFailed(err)
+		}
+		if alreadyAttached {
 			t.rm.LogEvent(t.cycleNodeRequest,
 				"AttachingNodes", "Skip re-attaching instances to nodes group: %v, err: %v",
 				node.Name, err)
-		} else if err != nil {
-			return t.transitionToFailed(err)
 		}
 
 		// un-cordon after attach as well
