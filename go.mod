@@ -1,6 +1,6 @@
 module github.com/atlassian-labs/cyclops
 
-go 1.17
+go 1.20
 
 require (
 	github.com/aws/aws-sdk-go v1.36.27
