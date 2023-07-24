@@ -14,6 +14,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
+	"k8s.io/klog/klogr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/atlassian-labs/cyclops/pkg/apis"
@@ -27,6 +28,7 @@ import (
 var (
 	// replaced by ldflags at buildtime
 	version = "undefined" //nolint:golint,varcheck,deadcode,unused
+	klogger = klogr.New()
 )
 
 // app type holds options for the application from cobra
@@ -168,7 +170,7 @@ func (a *app) createK8SObserver(nodeLister k8s.NodeLister, podLister k8s.PodList
 // createCloudObserver creates a new cloud.Observer with the given cloud provider name
 func (a *app) createCloudObserver(nodeLister k8s.NodeLister) observer.Observer {
 	// Setup the backend cloud provider
-	cloudProvider, err := builder.BuildCloudProvider(*a.cloudProviderName)
+	cloudProvider, err := builder.BuildCloudProvider(*a.cloudProviderName, klogger)
 	if err != nil {
 		klog.Error(err, "Unable to build cloud provider")
 		os.Exit(1)

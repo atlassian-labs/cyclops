@@ -3,14 +3,18 @@ package aws
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/atlassian-labs/cyclops/pkg/cloudprovider"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
+	"github.com/aws/aws-sdk-go/service/autoscaling/autoscalingiface"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
 	"github.com/go-logr/logr"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -20,6 +24,9 @@ const (
 	validationErrorCode     = "ValidationError"
 	alreadyAttachedMessage  = "is already part of AutoScalingGroup"
 	alreadyDetachingMessage = "is not in InService or Standby"
+
+	// launchTemplateLatestVersion defines the launching of the latest version of the template.
+	launchTemplateLatestVersion = "$Latest"
 )
 
 var providerIDRegex = regexp.MustCompile(`aws:\/\/\/[\w-]+\/([\w-]+)`)
@@ -67,7 +74,8 @@ type provider struct {
 }
 
 type autoscalingGroups struct {
-	autoScalingService *autoscaling.AutoScaling
+	autoScalingService autoscalingiface.AutoScalingAPI
+	ec2Service         ec2iface.EC2API
 	groups             []*autoscaling.Group
 	logger             logr.Logger
 }
@@ -100,6 +108,8 @@ func (p *provider) GetNodeGroups(names []string) (cloudprovider.NodeGroups, erro
 	return &autoscalingGroups{
 		groups:             groups,
 		autoScalingService: p.autoScalingService,
+		ec2Service:         p.ec2Service,
+		logger:             p.logger,
 	}, nil
 }
 
@@ -311,6 +321,18 @@ func (a *autoscalingGroups) instanceOutOfDate(instance *autoscaling.Instance) bo
 		groupVersion = aws.StringValue(group.LaunchConfigurationName)
 	case group.LaunchTemplate != nil:
 		groupVersion = aws.StringValue(group.LaunchTemplate.Version)
+
+		if groupVersion == launchTemplateLatestVersion {
+			groupVersion, err = a.getLaunchTemplateLatestVersion(aws.StringValue(group.LaunchTemplate.LaunchTemplateId))
+			if err != nil {
+				a.logger.WithValues(
+					"lt-id", aws.StringValue(group.LaunchTemplate.LaunchTemplateId),
+					"lt-name", aws.StringValue(group.LaunchTemplate.LaunchTemplateName),
+				).Error(err, "[ASG] failed to get latest asg version")
+				return false
+			}
+		}
+
 	case group.MixedInstancesPolicy != nil:
 		if policy := group.MixedInstancesPolicy; policy.LaunchTemplate != nil && policy.LaunchTemplate.LaunchTemplateSpecification != nil {
 			groupVersion = aws.StringValue(policy.LaunchTemplate.LaunchTemplateSpecification.Version)
@@ -325,7 +347,30 @@ func (a *autoscalingGroups) instanceOutOfDate(instance *autoscaling.Instance) bo
 		instanceVersion = aws.StringValue(instance.LaunchTemplate.Version)
 	}
 
+	a.logger.WithValues(
+		"instance", instanceVersion,
+		"asg", groupVersion,
+		"asg-name", aws.StringValue(group.AutoScalingGroupName),
+	).Info("[ASG] out of date version check")
+
 	return groupVersion != instanceVersion
+}
+
+func (a *autoscalingGroups) getLaunchTemplateLatestVersion(id string) (string, error) {
+	input := &ec2.DescribeLaunchTemplateVersionsInput{
+		LaunchTemplateId: aws.String(id),
+		Versions:         aws.StringSlice([]string{launchTemplateLatestVersion}),
+	}
+	out, err := a.ec2Service.DescribeLaunchTemplateVersions(input)
+	if err != nil {
+		return "", err
+	}
+
+	if len(out.LaunchTemplateVersions) == 0 {
+		return "", errors.Wrapf(err, "[ASG ]failed to get latest launch template version %q", id)
+	}
+
+	return strconv.Itoa(int(*out.LaunchTemplateVersions[0].VersionNumber)), nil
 }
 
 // ID returns the ID for the instance
