@@ -367,7 +367,7 @@ func (a *autoscalingGroups) getLaunchTemplateLatestVersion(id string) (string, e
 	}
 
 	if len(out.LaunchTemplateVersions) == 0 {
-		return "", errors.Wrapf(err, "[ASG ]failed to get latest launch template version %q", id)
+		return "", errors.Wrapf(err, "[ASG] failed to get latest launch template version %q", id)
 	}
 
 	return strconv.Itoa(int(*out.LaunchTemplateVersions[0].VersionNumber)), nil
