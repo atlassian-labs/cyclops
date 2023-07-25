@@ -3,11 +3,24 @@ package aws
 import (
 	"testing"
 
+	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
+	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
 )
+
+type mockedEC2 struct {
+	ec2iface.EC2API
+	Resp ec2.DescribeLaunchTemplateVersionsOutput
+}
+
+func (m mockedEC2) DescribeLaunchTemplateVersions(in *ec2.DescribeLaunchTemplateVersionsInput) (*ec2.DescribeLaunchTemplateVersionsOutput, error) {
+	// Only need to return mocked response output
+	return &m.Resp, nil
+}
 
 // Test_providerIDToInstanceID is checking that the regex used is correctly matching the providerID to instanceID format
 // rather than ensuring the correct instanceID format exactly
@@ -123,6 +136,16 @@ func TestInstance_OutOfDate(t *testing.T) {
 	instanceID, anotherID := "i-abcdefghijklmn", "i-anotheridfortest"
 	okConfig, notOkConfig, emptyConfig := "ok-config-name", "not-ok-config-name", ""
 	configV2, configV3 := "2", "3"
+
+	mockedEC2ServiceLatest := &mockedEC2{
+		Resp: ec2.DescribeLaunchTemplateVersionsOutput{
+			LaunchTemplateVersions: []*ec2.LaunchTemplateVersion{
+				{
+					VersionNumber: aws.Int64(3),
+				},
+			},
+		},
+	}
 
 	tests := []struct {
 		name     string
@@ -386,12 +409,36 @@ func TestInstance_OutOfDate(t *testing.T) {
 			buildInstance(&instanceID, &okConfig),
 			true,
 		},
+		{
+			"test asg set to latest should match if instance is latest",
+			&autoscaling.Group{
+				Instances: []*autoscaling.Instance{buildLTInstance(&instanceID, &configV3)},
+				LaunchTemplate: &autoscaling.LaunchTemplateSpecification{
+					Version: aws.String(launchTemplateLatestVersion),
+				},
+			},
+			buildLTInstance(&instanceID, &configV3),
+			false,
+		},
+		{
+			"test asg set to latest should not match if instance not latest",
+			&autoscaling.Group{
+				Instances: []*autoscaling.Instance{buildLTInstance(&instanceID, &configV2)},
+				LaunchTemplate: &autoscaling.LaunchTemplateSpecification{
+					Version: aws.String(launchTemplateLatestVersion),
+				},
+			},
+			buildLTInstance(&instanceID, &configV2),
+			true,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			asg := &autoscalingGroups{
-				groups: []*autoscaling.Group{tt.group},
+				groups:     []*autoscaling.Group{tt.group},
+				ec2Service: mockedEC2ServiceLatest,
+				logger:     logr.Discard(),
 			}
 			outOfDate := asg.instanceOutOfDate(tt.instance)
 			assert.Equal(t, tt.expect, outOfDate)

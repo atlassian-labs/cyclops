@@ -95,7 +95,7 @@ func main() {
 	metrics.Register(mgr.GetClient(), log, *namespace)
 
 	// Setup the cloud provider
-	cloudProvider, err := builder.BuildCloudProvider(*cloudProviderName)
+	cloudProvider, err := builder.BuildCloudProvider(*cloudProviderName, logger)
 	if err != nil {
 		log.Error(err, "Unable to build cloud provider")
 		os.Exit(1)

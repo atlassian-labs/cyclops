@@ -5,12 +5,13 @@ import (
 
 	"github.com/atlassian-labs/cyclops/pkg/cloudprovider"
 	"github.com/atlassian-labs/cyclops/pkg/cloudprovider/aws"
+	"github.com/go-logr/logr"
 )
 
-type builderFunc func() (cloudprovider.CloudProvider, error)
+type builderFunc func(logger logr.Logger) (cloudprovider.CloudProvider, error)
 
 // BuildCloudProvider returns a cloud provider based on the provided name
-func BuildCloudProvider(name string) (cloudprovider.CloudProvider, error) {
+func BuildCloudProvider(name string, logger logr.Logger) (cloudprovider.CloudProvider, error) {
 	buildFuncs := map[string]builderFunc{
 		aws.ProviderName: aws.NewCloudProvider,
 	}
@@ -20,5 +21,5 @@ func BuildCloudProvider(name string) (cloudprovider.CloudProvider, error) {
 		return nil, fmt.Errorf("builder for cloud provider %v not found", name)
 	}
 
-	return builder()
+	return builder(logger)
 }

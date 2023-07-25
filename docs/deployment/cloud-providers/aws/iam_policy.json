@@ -8,7 +8,8 @@
         "autoscaling:DetachInstances",
         "autoscaling:AttachInstances",
         "ec2:TerminateInstances",
-        "ec2:DescribeInstances"
+        "ec2:DescribeInstances",
+        "ec2:DescribeLaunchTemplateVersions"
       ],
       "Resource": "*"
     }
