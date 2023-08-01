@@ -1,4 +1,4 @@
-VERSION = 1.8.3
+VERSION = 1.9.0
 # IMPORTANT! Update api version if a new release affects cnr
 API_VERSION = 1.0.0
 IMAGE = cyclops:$(VERSION)
