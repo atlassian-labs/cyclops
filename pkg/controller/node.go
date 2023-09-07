@@ -65,7 +65,6 @@ func (rm *ResourceManager) DeleteNode(name string) error {
 		return nil
 	}
 
-	// Delete the node
 	return err
 }
 
