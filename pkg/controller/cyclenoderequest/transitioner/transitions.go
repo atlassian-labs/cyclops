@@ -19,10 +19,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-var (
+const (
 	scaleUpWait              = 1 * time.Minute
 	scaleUpLimit             = 20 * time.Minute
 	nodeEquilibriumWaitLimit = 5 * time.Minute
+
+	nodeFinalizerName = "cyclops.atlassian.com/finalizer"
 )
 
 // transitionUndefined transitions any CycleNodeRequests in the undefined phase to the pending phase
@@ -274,6 +276,12 @@ func (t *CycleNodeRequestTransitioner) transitionInitialised() (reconcile.Result
 	var validNodes []v1.CycleNodeRequestNode
 
 	for _, node := range t.cycleNodeRequest.Status.CurrentNodes {
+		// Add the finalizer to the node before detaching it
+		if err := t.rm.AddFinalizerToNode(node.Name, nodeFinalizerName); err != nil {
+			t.rm.LogEvent(t.cycleNodeRequest, "AddFinalizerToNodeError", err.Error())
+			return t.transitionToHealing(err)
+		}
+
 		alreadyDetaching, err := nodeGroups.DetachInstance(node.ProviderID)
 
 		if alreadyDetaching {
@@ -529,6 +537,11 @@ func (t *CycleNodeRequestTransitioner) transitionHealing() (reconcile.Result, er
 			t.rm.LogEvent(t.cycleNodeRequest,
 				"HealingNodes", "Node does not exist, skip healing node: %s", node.Name)
 			continue
+		}
+
+		if err := t.rm.RemoveFinalizerFromNode(node.Name, nodeFinalizerName); err != nil {
+			t.rm.LogEvent(t.cycleNodeRequest, "RemoveFinalizerFromNodeError", err.Error())
+			return t.transitionToFailed(err)
 		}
 
 		// try and re-attach the nodes, if any were un-attached
