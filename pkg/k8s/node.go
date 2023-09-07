@@ -12,6 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 // CordonNode performs a patch operation on a node to mark it as unschedulable
@@ -58,6 +59,20 @@ func AddLabelToNode(nodeName string, labelName string, labelValue string, client
 		},
 	}
 	return PatchNode(nodeName, patches, client)
+}
+
+// AddFinalizerToNode updates a node to add a finalizer to it
+func AddFinalizerToNode(node *v1.Node, finalizerName string, client kubernetes.Interface) error {
+	controllerutil.AddFinalizer(node, finalizerName)
+	_, err := client.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{})
+	return err
+}
+
+// RemoveFinalizerFromNode updates a node to remove a finalizer from it
+func RemoveFinalizerFromNode(node *v1.Node, finalizerName string, client kubernetes.Interface) error {
+	controllerutil.RemoveFinalizer(node, finalizerName)
+	_, err := client.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{})
+	return err
 }
 
 // NodeLister defines an object that can list nodes with a label selector

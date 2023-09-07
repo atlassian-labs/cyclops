@@ -6,9 +6,15 @@ import (
 
 	"github.com/atlassian-labs/cyclops/pkg/k8s"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+const (
+	nodeFinalizerName = "cyclops.atlassian.com/finalizer"
 )
 
 // ListNodes lists nodes from Kubernetes, optionally filtered by a selector.
@@ -41,12 +47,29 @@ func (rm *ResourceManager) GetNode(name string) (*v1.Node, error) {
 func (rm *ResourceManager) DeleteNode(name string) error {
 	// Get the node
 	node, err := rm.GetNode(name)
+
+	// If the node is not found then skip trying to delete it
+	if err != nil && apierrors.IsNotFound(err) {
+		rm.Logger.Info("node already deleted, skip deleting", "node", name)
+		return nil
+	}
+
+	// Account for any other possible errors
 	if err != nil {
 		return err
 	}
 
-	// Delete the node
-	return rm.Client.Delete(context.TODO(), node)
+	// The node exists as of the previous step, try deleting it now
+	err = rm.Client.Delete(context.TODO(), node)
+
+	// Account for possible race conditions with other controllers managing
+	// nodes in the cluster
+	if apierrors.IsNotFound(err) {
+		rm.Logger.Info("node deletion attemp failed, node already deleted", "node", name)
+		return nil
+	}
+
+	return err
 }
 
 // DrainPods drains the pods off the named node.
@@ -70,4 +93,41 @@ func (rm *ResourceManager) DrainPods(nodeName string, unhealthyAfter time.Durati
 	}
 
 	return false, k8s.DrainPods(pods, rm.RawClient, unhealthyAfter)
+}
+
+func (rm *ResourceManager) AddFinalizerToNode(nodeName string) error {
+	return rm.manageFinalizerOnNode(nodeName, k8s.AddFinalizerToNode)
+}
+
+func (rm *ResourceManager) RemoveFinalizerFromNode(nodeName string) error {
+	return rm.manageFinalizerOnNode(nodeName, k8s.RemoveFinalizerFromNode)
+}
+
+func (rm *ResourceManager) manageFinalizerOnNode(nodeName string, fn func(*v1.Node, string, kubernetes.Interface) error) error {
+	// Get the node
+	node, err := rm.GetNode(nodeName)
+
+	// If the node is not found then skip the finalizer operation
+	if err != nil && apierrors.IsNotFound(err) {
+		rm.Logger.Info("node deleted, skip adding finalizer", "node", nodeName)
+		return nil
+	}
+
+	// Account for any other possible errors
+	if err != nil {
+		return err
+	}
+
+	// The node exists as of the previous step, try managing the finalizer for
+	// it now
+	err = fn(node, nodeFinalizerName, rm.RawClient)
+
+	// Account for possible race conditions with other controllers managing
+	// nodes in the cluster
+	if apierrors.IsNotFound(err) {
+		rm.Logger.Info("adding finalizer failed, node already deleted", "node", nodeName)
+		return nil
+	}
+
+	return err
 }
