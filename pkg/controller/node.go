@@ -13,6 +13,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const (
+	nodeFinalizerName = "cyclops.atlassian.com/finalizer"
+)
+
 // ListNodes lists nodes from Kubernetes, optionally filtered by a selector.
 func (rm *ResourceManager) ListNodes(selector labels.Selector) ([]v1.Node, error) {
 	// List the nodes
@@ -91,15 +95,15 @@ func (rm *ResourceManager) DrainPods(nodeName string, unhealthyAfter time.Durati
 	return false, k8s.DrainPods(pods, rm.RawClient, unhealthyAfter)
 }
 
-func (rm *ResourceManager) AddFinalizerToNode(nodeName, finalizerName string) error {
-	return rm.manageFinalizerOnNode(nodeName, finalizerName, k8s.AddFinalizerToNode)
+func (rm *ResourceManager) AddFinalizerToNode(nodeName string) error {
+	return rm.manageFinalizerOnNode(nodeName, k8s.AddFinalizerToNode)
 }
 
-func (rm *ResourceManager) RemoveFinalizerFromNode(nodeName, finalizerName string) error {
-	return rm.manageFinalizerOnNode(nodeName, finalizerName, k8s.RemoveFinalizerFromNode)
+func (rm *ResourceManager) RemoveFinalizerFromNode(nodeName string) error {
+	return rm.manageFinalizerOnNode(nodeName, k8s.RemoveFinalizerFromNode)
 }
 
-func (rm *ResourceManager) manageFinalizerOnNode(nodeName, finalizerName string, fn func(*v1.Node, string, kubernetes.Interface) error) error {
+func (rm *ResourceManager) manageFinalizerOnNode(nodeName string, fn func(*v1.Node, string, kubernetes.Interface) error) error {
 	// Get the node
 	node, err := rm.GetNode(nodeName)
 
@@ -116,7 +120,7 @@ func (rm *ResourceManager) manageFinalizerOnNode(nodeName, finalizerName string,
 
 	// The node exists as of the previous step, try managing the finalizer for
 	// it now
-	err = fn(node, finalizerName, rm.RawClient)
+	err = fn(node, nodeFinalizerName, rm.RawClient)
 
 	// Account for possible race conditions with other controllers managing
 	// nodes in the cluster

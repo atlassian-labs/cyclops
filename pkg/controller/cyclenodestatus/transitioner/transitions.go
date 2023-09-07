@@ -173,11 +173,17 @@ func (t *CycleNodeStatusTransitioner) transitionDraining() (reconcile.Result, er
 }
 
 // transitionDeleting transitions any CycleNodeStatuses in the Deleting phase to the Terminating phase
-// It will delete the node out of the Kubernetes API.
+// It will delete the node out of the Kubernetes API and remove the finalizer.
 func (t *CycleNodeStatusTransitioner) transitionDeleting() (reconcile.Result, error) {
 	t.rm.LogEvent(t.cycleNodeStatus, "DeletingNode", "Deleting node: %v", t.cycleNodeStatus.Status.CurrentNode.Name)
 	err := t.rm.DeleteNode(t.cycleNodeStatus.Status.CurrentNode.Name)
 	if err != nil {
+		return t.transitionToFailed(err)
+	}
+
+	// Remove the finalizer to allow the node to be deleted
+	if err := t.rm.RemoveFinalizerFromNode(t.cycleNodeStatus.Status.CurrentNode.Name); err != nil {
+		t.rm.LogEvent(t.cycleNodeStatus, "RemoveFinalizerFromNodeError", err.Error())
 		return t.transitionToFailed(err)
 	}
 
