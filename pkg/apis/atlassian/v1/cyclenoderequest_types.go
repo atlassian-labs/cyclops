@@ -181,8 +181,9 @@ type CycleNodeRequest struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   CycleNodeRequestSpec   `json:"spec,omitempty"`
-	Status CycleNodeRequestStatus `json:"status,omitempty"`
+	ClusterName string                 `json:"clusterName,omitempty"`
+	Spec        CycleNodeRequestSpec   `json:"spec,omitempty"`
+	Status      CycleNodeRequestStatus `json:"status,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
