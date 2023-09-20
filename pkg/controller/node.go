@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -104,30 +105,32 @@ func (rm *ResourceManager) RemoveFinalizerFromNode(nodeName string) error {
 }
 
 func (rm *ResourceManager) manageFinalizerOnNode(nodeName string, fn func(*v1.Node, string, kubernetes.Interface) error) error {
-	// Get the node
-	node, err := rm.GetNode(nodeName)
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		// Get the node
+		node, err := rm.GetNode(nodeName)
 
-	// If the node is not found then skip the finalizer operation
-	if err != nil && apierrors.IsNotFound(err) {
-		rm.Logger.Info("node deleted, skip adding finalizer", "node", nodeName)
-		return nil
-	}
+		// If the node is not found then skip the finalizer operation
+		if err != nil && apierrors.IsNotFound(err) {
+			rm.Logger.Info("node deleted, skip adding finalizer", "node", nodeName)
+			return nil
+		}
 
-	// Account for any other possible errors
-	if err != nil {
+		// Account for any other possible errors
+		if err != nil {
+			return err
+		}
+
+		// The node exists as of the previous step, try managing the finalizer for
+		// it now
+		err = fn(node, nodeFinalizerName, rm.RawClient)
+
+		// Account for possible race conditions with other controllers managing
+		// nodes in the cluster
+		if apierrors.IsNotFound(err) {
+			rm.Logger.Info("updating finalizer failed, node already deleted", "node", nodeName)
+			return nil
+		}
+
 		return err
-	}
-
-	// The node exists as of the previous step, try managing the finalizer for
-	// it now
-	err = fn(node, nodeFinalizerName, rm.RawClient)
-
-	// Account for possible race conditions with other controllers managing
-	// nodes in the cluster
-	if apierrors.IsNotFound(err) {
-		rm.Logger.Info("adding finalizer failed, node already deleted", "node", nodeName)
-		return nil
-	}
-
-	return err
+	})
 }
