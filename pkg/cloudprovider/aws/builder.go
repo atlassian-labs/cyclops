@@ -10,10 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/go-logr/logr"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
-
-var defaultLogger = logf.Log.WithName("aws")
 
 // NewCloudProvider returns a new AWS cloud provider
 func NewCloudProvider(logger logr.Logger) (cloudprovider.CloudProvider, error) {
@@ -28,15 +25,10 @@ func NewCloudProvider(logger logr.Logger) (cloudprovider.CloudProvider, error) {
 	ec2Service := ec2.New(sess, config)
 	autoScalingService := autoscaling.New(sess, config)
 
-	var log = defaultLogger
-	if logger != nil {
-		log = logger
-	}
-
 	p := &provider{
 		autoScalingService: autoScalingService,
 		ec2Service:         ec2Service,
-		logger:             log,
+		logger:             logger,
 	}
 
 	// Log the provider we used
@@ -44,7 +36,7 @@ func NewCloudProvider(logger logr.Logger) (cloudprovider.CloudProvider, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Info(fmt.Sprintf("aws session created successfully, using provider %v", credValue.ProviderName))
+	logger.Info(fmt.Sprintf("aws session created successfully, using provider %v", credValue.ProviderName))
 
 	return p, nil
 }

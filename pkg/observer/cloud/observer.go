@@ -10,7 +10,7 @@ import (
 	"github.com/atlassian-labs/cyclops/pkg/observer"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // cloudObserver is an observer that detects changes in cloud provider instances from their ASG configuration
