@@ -179,6 +179,7 @@ func (t *CycleNodeRequestTransitioner) performHealthCheck(node v1.CycleNodeReque
 
 	// Still within the waiting period here, must trigger requeueing this phase
 	if err := healthCheckPassed(healthCheck, statusCode, body); err != nil {
+		t.rm.Logger.Error(err, "Health check did not pass", "endpoint", endpoint, "error", err)
 		return true, fmt.Errorf("health check did not pass for the endpoint %s, got: (%d) %s", endpoint, statusCode, string(body))
 	}
 
