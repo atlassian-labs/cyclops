@@ -44,8 +44,7 @@ func NewNotifier() (notifications.Notifier, error) {
 
 func getSlackChannelID() (string, bool) {
 	// Read channel ID from env var
-	channelID, ok := os.LookupEnv(slackChannelID)
-	return channelID, ok
+	return os.LookupEnv(slackChannelID)
 }
 
 func getSlackBotToken() (string, bool) {
@@ -54,8 +53,7 @@ func getSlackBotToken() (string, bool) {
 
 	// If env var for token file is not set, read token from env var directly
 	if !ok {
-		token, ok := os.LookupEnv(slackBotUserOAuthAccessToken)
-		return token, ok
+		return os.LookupEnv(slackBotUserOAuthAccessToken)
 	}
 
 	token, err := os.ReadFile(tokenFile)
