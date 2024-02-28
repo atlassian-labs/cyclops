@@ -23,9 +23,9 @@ import (
 )
 
 const (
-	controllerName       = "cyclenoderequest.controller"
-	eventName            = "cyclops"
-	reconcileConcurrency = 1
+	controllerName             = "cyclenoderequest.controller"
+	eventName                  = "cyclops"
+	reconcileConcurrency       = 1
 	clusterNameEnv             = "CLUSTER_NAME"
 	ClientAPIVersionAnnotation = "client.api.version"
 )
@@ -81,7 +81,7 @@ func NewReconciler(
 
 	// Initialise the controller's required watches
 	err = cnrController.Watch(
-		&source.Kind{Type: &v1.CycleNodeRequest{}},
+		source.Kind(mgr.GetCache(), &v1.CycleNodeRequest{}),
 		&handler.EnqueueRequestForObject{},
 		cyclecontroller.NewNamespacePredicate(namespace),
 	)
