@@ -3,7 +3,7 @@ module github.com/atlassian-labs/cyclops
 go 1.20
 
 require (
-	github.com/aws/aws-sdk-go v1.36.27
+	github.com/aws/aws-sdk-go v1.50.31
 	github.com/cenkalti/backoff/v4 v4.1.3
 	github.com/go-logr/logr v1.2.4
 	github.com/google/uuid v1.3.0
