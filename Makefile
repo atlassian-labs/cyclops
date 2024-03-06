@@ -2,6 +2,7 @@ VERSION = 1.9.1
 # IMPORTANT! Update api version if a new release affects cnr
 API_VERSION = 1.0.0
 IMAGE = cyclops:$(VERSION)
+ENVVAR ?= CGO_ENABLED=0
 ARCH=$(if $(TARGETPLATFORM),$(lastword $(subst /, ,$(TARGETPLATFORM))),amd64)
 BASE_PACKAGE = github.com/atlassian-labs/cyclops/pkg
 CLI_BUILD_LD_FLAGS= -X 'main.version=${VERSION}' -X '${BASE_PACKAGE}/cli.apiVersion=${API_VERSION}'
@@ -30,13 +31,13 @@ build-cli:
 build: build-manager build-cli build-observer
 
 build-manager-linux:
-	CGO_ENABLED=0 GOOS=linux GOARCH=$(ARCH) go build -a -installsuffix cgo -o bin/linux/${MANAGER_BIN} -ldflags="${MANAGER_BUILD_LD_FLAGS}" cmd/manager/main.go
+	$(ENVVAR) GOOS=linux GOARCH=$(ARCH) go build -a -installsuffix cgo -o bin/linux/${MANAGER_BIN} -ldflags="${MANAGER_BUILD_LD_FLAGS}" cmd/manager/main.go
 
 build-cli-linux:
-	CGO_ENABLED=0 GOOS=linux GOARCH=$(ARCH) go build -a -installsuffix cgo -o bin/linux/${CLI_BIN} -ldflags="${CLI_BUILD_LD_FLAGS}" cmd/cli/main.go
+	$(ENVVAR) GOOS=linux GOARCH=$(ARCH) go build -a -installsuffix cgo -o bin/linux/${CLI_BIN} -ldflags="${CLI_BUILD_LD_FLAGS}" cmd/cli/main.go
 
 build-observer-linux:
-	CGO_ENABLED=0 GOOS=linux GOARCH=$(ARCH) go build -a -installsuffix cgo -o bin/linux/${OBSERVER_BIN} -ldflags="${OBSERVER_BUILD_LD_FLAGS}" cmd/observer/main.go
+	$(ENVVAR) GOOS=linux GOARCH=$(ARCH) go build -a -installsuffix cgo -o bin/linux/${OBSERVER_BIN} -ldflags="${OBSERVER_BUILD_LD_FLAGS}" cmd/observer/main.go
 
 build-linux: build-manager-linux build-cli-linux build-observer-linux
 
@@ -57,7 +58,7 @@ lint:
 	golangci-lint run
 
 docker:
-	docker buildx build -t $(IMAGE) --platform linux/$(ARCH) .
+	docker buildx build --build-arg ENVVAR="$(ENVVAR)" -t $(IMAGE) --platform linux/$(ARCH) .
 
 # New version of operator-sdk no longer support generate CRDs directly
 # Build from release v0.19.0 with commit hash 

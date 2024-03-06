@@ -1,10 +1,11 @@
 FROM --platform=$BUILDPLATFORM golang:1.20 as builder
 ARG TARGETPLATFORM
+ARG ENVVAR
 WORKDIR /go/src/github.com/atlassian-labs/cyclops
 COPY go.mod go.sum Makefile ./
 COPY cmd cmd
 COPY pkg pkg
-RUN make build-linux
+RUN make build-linux ENVVAR=$ENVVAR
 
 FROM scratch
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
