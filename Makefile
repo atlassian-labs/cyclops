@@ -1,4 +1,4 @@
-VERSION = 1.9.1
+VERSION = 1.10.0
 # IMPORTANT! Update api version if a new release affects cnr
 API_VERSION = 1.0.0
 IMAGE = cyclops:$(VERSION)
@@ -61,7 +61,7 @@ docker:
 	docker buildx build --build-arg ENVVAR="$(ENVVAR)" -t $(IMAGE) --platform linux/$(ARCH) .
 
 # New version of operator-sdk no longer support generate CRDs directly
-# Build from release v0.19.0 with commit hash 
+# Build from release v0.19.0 with commit hash
 install-operator-sdk:
 	mkdir -p $(GOPATH)/src/github.com/operator-framework
 	-cd $(GOPATH)/src/github.com/operator-framework && git clone https://github.com/operator-framework/operator-sdk
