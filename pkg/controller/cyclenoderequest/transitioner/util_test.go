@@ -45,17 +45,17 @@ func TestFindOffendingNodes(t *testing.T) {
 
 	tests := []struct {
 		name                   string
-		knodes                 []corev1.Node
+		knodes                 map[string]corev1.Node
 		cnodes                 map[string]cloudprovider.Instance
 		expectNotInCPNodeGroup []string
 		expectNotInKube        []string
 	}{
 		{
 			"kube nodes match cloud provider nodes",
-			[]corev1.Node{
-				buildNode(dummyInstanceA),
-				buildNode(dummyInstanceB),
-				buildNode(dummyInstanceC),
+			map[string]corev1.Node{
+				dummyInstanceA.providerID: buildNode(dummyInstanceA),
+				dummyInstanceB.providerID: buildNode(dummyInstanceB),
+				dummyInstanceC.providerID: buildNode(dummyInstanceC),
 			},
 			map[string]cloudprovider.Instance{
 				dummyInstanceA.providerID: &dummyInstanceA,
@@ -67,10 +67,10 @@ func TestFindOffendingNodes(t *testing.T) {
 		},
 		{
 			"more nodes in kube than cloud provider",
-			[]corev1.Node{
-				buildNode(dummyInstanceA),
-				buildNode(dummyInstanceB),
-				buildNode(dummyInstanceC),
+			map[string]corev1.Node{
+				dummyInstanceA.providerID: buildNode(dummyInstanceA),
+				dummyInstanceB.providerID: buildNode(dummyInstanceB),
+				dummyInstanceC.providerID: buildNode(dummyInstanceC),
 			},
 			map[string]cloudprovider.Instance{
 				dummyInstanceA.providerID: &dummyInstanceA,
@@ -81,9 +81,9 @@ func TestFindOffendingNodes(t *testing.T) {
 		},
 		{
 			"more nodes in cloud provider than kube",
-			[]corev1.Node{
-				buildNode(dummyInstanceA),
-				buildNode(dummyInstanceB),
+			map[string]corev1.Node{
+				dummyInstanceA.providerID: buildNode(dummyInstanceA),
+				dummyInstanceB.providerID: buildNode(dummyInstanceB),
 			},
 			map[string]cloudprovider.Instance{
 				dummyInstanceA.providerID: &dummyInstanceA,
@@ -95,9 +95,9 @@ func TestFindOffendingNodes(t *testing.T) {
 		},
 		{
 			"no nodes in cloud provider",
-			[]corev1.Node{
-				buildNode(dummyInstanceA),
-				buildNode(dummyInstanceB),
+			map[string]corev1.Node{
+				dummyInstanceA.providerID: buildNode(dummyInstanceA),
+				dummyInstanceB.providerID: buildNode(dummyInstanceB),
 			},
 			map[string]cloudprovider.Instance{},
 			[]string{"id \"aws:///us-east-1a/i-abcdefghijk\"", "id \"aws:///us-east-1b/i-bbcdefghijk\""},
@@ -105,7 +105,7 @@ func TestFindOffendingNodes(t *testing.T) {
 		},
 		{
 			"no nodes in kube",
-			[]corev1.Node{},
+			make(map[string]corev1.Node),
 			map[string]cloudprovider.Instance{
 				dummyInstanceA.providerID: &dummyInstanceA,
 				dummyInstanceB.providerID: &dummyInstanceB,
@@ -115,7 +115,7 @@ func TestFindOffendingNodes(t *testing.T) {
 		},
 		{
 			"both cloud provider and kube nodes are empty",
-			[]corev1.Node{},
+			make(map[string]corev1.Node),
 			map[string]cloudprovider.Instance{},
 			[]string{},
 			[]string{},
