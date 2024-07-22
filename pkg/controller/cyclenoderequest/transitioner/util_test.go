@@ -1,6 +1,7 @@
 package transitioner
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/atlassian-labs/cyclops/pkg/cloudprovider"
@@ -47,8 +48,8 @@ func TestFindOffendingNodes(t *testing.T) {
 		name                   string
 		knodes                 map[string]corev1.Node
 		cnodes                 map[string]cloudprovider.Instance
-		expectNotInCPNodeGroup []string
-		expectNotInKube        []string
+		expectNotInCPNodeGroup map[string]corev1.Node
+		expectNotInKube        map[string]cloudprovider.Instance
 	}{
 		{
 			"kube nodes match cloud provider nodes",
@@ -62,8 +63,8 @@ func TestFindOffendingNodes(t *testing.T) {
 				dummyInstanceB.providerID: &dummyInstanceB,
 				dummyInstanceC.providerID: &dummyInstanceC,
 			},
-			[]string{},
-			[]string{},
+			make(map[string]corev1.Node),
+			make(map[string]cloudprovider.Instance),
 		},
 		{
 			"more nodes in kube than cloud provider",
@@ -76,8 +77,10 @@ func TestFindOffendingNodes(t *testing.T) {
 				dummyInstanceA.providerID: &dummyInstanceA,
 				dummyInstanceB.providerID: &dummyInstanceB,
 			},
-			[]string{"id \"aws:///us-east-1c/i-cbcdefghijk\""},
-			[]string{},
+			map[string]corev1.Node{
+				dummyInstanceC.providerID: buildNode(dummyInstanceC),
+			},
+			make(map[string]cloudprovider.Instance),
 		},
 		{
 			"more nodes in cloud provider than kube",
@@ -90,8 +93,10 @@ func TestFindOffendingNodes(t *testing.T) {
 				dummyInstanceB.providerID: &dummyInstanceB,
 				dummyInstanceC.providerID: &dummyInstanceC,
 			},
-			[]string{},
-			[]string{"id \"aws:///us-east-1c/i-cbcdefghijk\" in \"GroupC\""},
+			make(map[string]corev1.Node),
+			map[string]cloudprovider.Instance{
+				dummyInstanceC.providerID: &dummyInstanceC,
+			},
 		},
 		{
 			"no nodes in cloud provider",
@@ -99,9 +104,12 @@ func TestFindOffendingNodes(t *testing.T) {
 				dummyInstanceA.providerID: buildNode(dummyInstanceA),
 				dummyInstanceB.providerID: buildNode(dummyInstanceB),
 			},
-			map[string]cloudprovider.Instance{},
-			[]string{"id \"aws:///us-east-1a/i-abcdefghijk\"", "id \"aws:///us-east-1b/i-bbcdefghijk\""},
-			[]string{},
+			make(map[string]cloudprovider.Instance),
+			map[string]corev1.Node{
+				dummyInstanceA.providerID: buildNode(dummyInstanceA),
+				dummyInstanceB.providerID: buildNode(dummyInstanceB),
+			},
+			make(map[string]cloudprovider.Instance),
 		},
 		{
 			"no nodes in kube",
@@ -110,23 +118,26 @@ func TestFindOffendingNodes(t *testing.T) {
 				dummyInstanceA.providerID: &dummyInstanceA,
 				dummyInstanceB.providerID: &dummyInstanceB,
 			},
-			[]string{},
-			[]string{"id \"aws:///us-east-1a/i-abcdefghijk\" in \"GroupA\"", "id \"aws:///us-east-1b/i-bbcdefghijk\" in \"GroupB\""},
+			make(map[string]corev1.Node),
+			map[string]cloudprovider.Instance{
+				dummyInstanceA.providerID: &dummyInstanceA,
+				dummyInstanceB.providerID: &dummyInstanceB,
+			},
 		},
 		{
 			"both cloud provider and kube nodes are empty",
 			make(map[string]corev1.Node),
-			map[string]cloudprovider.Instance{},
-			[]string{},
-			[]string{},
+			make(map[string]cloudprovider.Instance),
+			make(map[string]corev1.Node),
+			make(map[string]cloudprovider.Instance),
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			nodesNotInCPNodeGroup, nodesNotInKube := findOffendingNodes(test.knodes, test.cnodes)
-			assert.ElementsMatch(t, test.expectNotInCPNodeGroup, nodesNotInCPNodeGroup)
-			assert.ElementsMatch(t, test.expectNotInKube, nodesNotInKube)
+			assert.Equal(t, true, reflect.DeepEqual(test.expectNotInCPNodeGroup, nodesNotInCPNodeGroup))
+			assert.Equal(t, true, reflect.DeepEqual(test.expectNotInKube, nodesNotInKube))
 		})
 	}
 }

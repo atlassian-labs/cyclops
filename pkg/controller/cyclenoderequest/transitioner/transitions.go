@@ -111,8 +111,16 @@ func (t *CycleNodeRequestTransitioner) transitionPending() (reconcile.Result, er
 		nodesNotInCPNodeGroup, nodesNotInKube := findOffendingNodes(kubeNodes, nodeGroupInstances)
 
 		if len(nodesNotInCPNodeGroup) > 0 {
+			providerIDs := make([]string, 0)
+
+			for providerID := range nodesNotInCPNodeGroup {
+				providerIDs = append(providerIDs,
+					fmt.Sprintf("id %q", providerID),
+				)
+			}
+
 			offendingNodesInfo += "nodes not in node group: "
-			offendingNodesInfo += strings.Join(nodesNotInCPNodeGroup, ",")
+			offendingNodesInfo += strings.Join(providerIDs, ",")
 		}
 
 		if len(nodesNotInKube) > 0 {
@@ -120,8 +128,16 @@ func (t *CycleNodeRequestTransitioner) transitionPending() (reconcile.Result, er
 				offendingNodesInfo += ";"
 			}
 
+			providerIDs := make([]string, 0)
+
+			for providerID, node := range nodesNotInKube {
+				providerIDs = append(providerIDs,
+					fmt.Sprintf("id %q in %q", providerID, node.NodeGroupName()),
+				)
+			}
+
 			offendingNodesInfo += "nodes not inside cluster: "
-			offendingNodesInfo += strings.Join(nodesNotInKube, ",")
+			offendingNodesInfo += strings.Join(providerIDs, ",")
 		}
 
 		t.rm.LogEvent(t.cycleNodeRequest, "NodeCountMismatch",
