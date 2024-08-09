@@ -8,7 +8,9 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
+	"github.com/aws/aws-sdk-go/service/autoscaling/autoscalingiface"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
 	"github.com/go-logr/logr"
 )
 
@@ -39,4 +41,12 @@ func NewCloudProvider(logger logr.Logger) (cloudprovider.CloudProvider, error) {
 	logger.Info(fmt.Sprintf("aws session created successfully, using provider %v", credValue.ProviderName))
 
 	return p, nil
+}
+
+// NewMockCloudProvider returns a new mock AWS cloud provider
+func NewMockCloudProvider(autoscalingiface autoscalingiface.AutoScalingAPI, ec2iface ec2iface.EC2API) cloudprovider.CloudProvider {
+	return &provider{
+		autoScalingService: autoscalingiface,
+		ec2Service:         ec2iface,
+	}
 }

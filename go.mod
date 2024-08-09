@@ -10,7 +10,6 @@ require (
 	github.com/hashicorp/go-version v1.4.0
 	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/mattn/go-isatty v0.0.12
-	github.com/operator-framework/operator-lib v0.9.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.15.1
 	github.com/prometheus/common v0.42.0
