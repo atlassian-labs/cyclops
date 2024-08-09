@@ -122,19 +122,6 @@ func addCustomSchemes(scheme *runtime.Scheme) error {
 	return nil
 }
 
-// func generateCloudProviderInstances(nodes []*Node) ([]runtime.Object, []client.Object) {
-// 	runtimeNodes := make([]runtime.Object, 0)
-// 	clientNodes := make([]client.Object, 0)
-
-// 	for _, node := range nodes {
-// 		kubeNode := buildKubeNode(node)
-// 		runtimeNodes = append(runtimeNodes, kubeNode)
-// 		clientNodes = append(clientNodes, kubeNode)
-// 	}
-
-// 	return runtimeNodes, clientNodes
-// }
-
 func generateKubeNodes(nodes []*Node) ([]runtime.Object, []client.Object) {
 	runtimeNodes := make([]runtime.Object, 0)
 	clientNodes := make([]client.Object, 0)
