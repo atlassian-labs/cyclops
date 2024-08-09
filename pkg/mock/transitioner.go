@@ -11,7 +11,6 @@ import (
 	"github.com/atlassian-labs/cyclops/pkg/controller/cyclenoderequest/transitioner"
 
 	"github.com/aws/aws-sdk-go/service/autoscaling/autoscalingiface"
-	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
 
 	fakerawclient "k8s.io/client-go/kubernetes/fake"
@@ -59,8 +58,6 @@ type MockClient struct {
 	// AWS
 	Autoscaling autoscalingiface.AutoScalingAPI
 	Ec2         ec2iface.EC2API
-
-	launchTemplates []*ec2.LaunchTemplate
 
 	// KUBE
 	K8sClient client.Client
