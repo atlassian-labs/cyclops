@@ -54,7 +54,7 @@ type Client struct {
 	RawClient kubernetes.Interface
 }
 
-func NewClient(kubeNodes []*Node, cloudProviderInstances []*Node, extraKubeObjects ...client.Object) *Client {
+func NewClient(kubeNodes []*Node, cloudProviderNodes []*Node, extraKubeObjects ...client.Object) *Client {
 	t := &Client{}
 
 	// Add the providerID to all nodes
@@ -62,7 +62,7 @@ func NewClient(kubeNodes []*Node, cloudProviderInstances []*Node, extraKubeObjec
 		node.ProviderID = fakeaws.GenerateProviderID(node.InstanceID)
 	}
 
-	for _, node := range cloudProviderInstances {
+	for _, node := range cloudProviderNodes {
 		node.ProviderID = fakeaws.GenerateProviderID(node.InstanceID)
 	}
 
@@ -77,9 +77,19 @@ func NewClient(kubeNodes []*Node, cloudProviderInstances []*Node, extraKubeObjec
 	t.K8sClient = fakeclient.NewClientBuilder().WithScheme(scheme).WithObjects(kubeObjects...).Build()
 	t.RawClient = fakerawclient.NewSimpleClientset(runtimeNodes...)
 
-	t.CloudProvider = aws.NewFakeCloudProvider(
-		generateFakeInstances(cloudProviderInstances),
-	)
+	cloudProviderInstances := generateFakeInstances(cloudProviderNodes)
+
+	autoscalingiface := &fakeaws.Autoscaling{
+		Instances: cloudProviderInstances,
+	}
+
+	ec2iface := &fakeaws.Ec2{
+		Instances: cloudProviderInstances,
+	}
+
+	t.Autoscaling = autoscalingiface
+	t.Ec2 = ec2iface
+	t.CloudProvider = aws.NewGenericCloudProvider(autoscalingiface, ec2iface)
 
 	return t
 }
@@ -96,18 +106,18 @@ func addCustomSchemes(scheme *runtime.Scheme) error {
 	return nil
 }
 
-func generateFakeInstances(nodes []*Node) *[]*fakeaws.Instance {
-	var instances = make([]*fakeaws.Instance, 0)
+func generateFakeInstances(nodes []*Node) map[string]*fakeaws.Instance {
+	var instances = make(map[string]*fakeaws.Instance, 0)
 
 	for _, node := range nodes {
-		instances = append(instances, &fakeaws.Instance{
+		instances[node.InstanceID] = &fakeaws.Instance{
 			InstanceID:           node.InstanceID,
 			AutoscalingGroupName: node.Nodegroup,
 			State:                node.CloudProviderState,
-		})
+		}
 	}
 
-	return &instances
+	return instances
 }
 
 func generateKubeNodes(nodes []*Node) ([]runtime.Object, []client.Object) {

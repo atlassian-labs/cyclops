@@ -24,13 +24,13 @@ type Instance struct {
 type Ec2 struct {
 	ec2iface.EC2API
 
-	Instances *[]*Instance
+	Instances map[string]*Instance
 }
 
 type Autoscaling struct {
 	autoscalingiface.AutoScalingAPI
 
-	Instances *[]*Instance
+	Instances map[string]*Instance
 }
 
 func GenerateProviderID(instanceID string) string {
@@ -71,7 +71,7 @@ func (m *Autoscaling) DescribeAutoScalingGroups(input *autoscaling.DescribeAutoS
 		asgNameLookup[*asgName] = nil
 	}
 
-	for _, instance := range *m.Instances {
+	for _, instance := range m.Instances {
 		if instance.AutoscalingGroupName == "" {
 			continue
 		}
@@ -121,7 +121,7 @@ func (m *Ec2) DescribeInstances(input *ec2.DescribeInstancesInput) (*ec2.Describ
 		instanceIds[*instanceId] = nil
 	}
 
-	for _, instance := range *m.Instances {
+	for _, instance := range m.Instances {
 		if _, ok := instanceIds[instance.InstanceID]; input.InstanceIds != nil && !ok {
 			continue
 		}
