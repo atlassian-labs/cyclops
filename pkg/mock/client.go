@@ -2,13 +2,12 @@ package mock
 
 import (
 	"fmt"
-	"net/http"
 	"time"
 
 	v1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
+	"github.com/atlassian-labs/cyclops/pkg/cloudprovider"
 	"github.com/atlassian-labs/cyclops/pkg/cloudprovider/aws"
-	"github.com/atlassian-labs/cyclops/pkg/controller"
-	"github.com/atlassian-labs/cyclops/pkg/controller/cyclenoderequest/transitioner"
+	fakeaws "github.com/atlassian-labs/cyclops/pkg/cloudprovider/aws/fake"
 
 	"github.com/aws/aws-sdk-go/service/autoscaling/autoscalingiface"
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
@@ -19,11 +18,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"k8s.io/client-go/kubernetes"
-
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -41,72 +38,49 @@ type Node struct {
 	CPU int64
 	Mem int64
 
-	state      string
-	providerID string
+	CloudProviderState string
+	ProviderID         string
 }
 
-type MockClient struct {
-	*transitioner.CycleNodeRequestTransitioner
-
-	Cnr     *v1.CycleNodeRequest
-	rm      *controller.ResourceManager
-	options transitioner.Options
-
-	cloudProviderInstances []*Node
-	kubeNodes              []*Node
-
+type Client struct {
 	// AWS
 	Autoscaling autoscalingiface.AutoScalingAPI
 	Ec2         ec2iface.EC2API
+
+	cloudprovider.CloudProvider
 
 	// KUBE
 	K8sClient client.Client
 	RawClient kubernetes.Interface
 }
 
-func NewMockTransitioner(opts ...Option) MockClient {
-	t := MockClient{}
+func NewClient(kubeNodes []*Node, cloudProviderInstances []*Node, extraKubeObjects ...client.Object) *Client {
+	t := &Client{}
 
-	for _, opt := range opts {
-		opt(&t)
+	// Add the providerID to all nodes
+	for _, node := range kubeNodes {
+		node.ProviderID = fakeaws.GenerateProviderID(node.InstanceID)
 	}
 
-	for _, node := range t.kubeNodes {
-		generateProviderID(node)
+	for _, node := range cloudProviderInstances {
+		node.ProviderID = fakeaws.GenerateProviderID(node.InstanceID)
 	}
 
-	for _, node := range t.cloudProviderInstances {
-		generateProviderID(node)
-		node.state = "running"
-	}
-
-	runtimeNodes, clientNodes := generateKubeNodes(t.kubeNodes)
+	runtimeNodes, clientNodes := generateKubeNodes(kubeNodes)
 
 	scheme := runtime.NewScheme()
 	utilruntime.Must(addCustomSchemes(scheme))
 
 	kubeObjects := clientNodes
-	kubeObjects = append(kubeObjects, t.Cnr)
+	kubeObjects = append(kubeObjects, extraKubeObjects...)
 
 	t.K8sClient = fakeclient.NewClientBuilder().WithScheme(scheme).WithObjects(kubeObjects...).Build()
 	t.RawClient = fakerawclient.NewSimpleClientset(runtimeNodes...)
 
-	t.Autoscaling = &MockAutoscaling{
-		cloudProviderInstances: &t.cloudProviderInstances,
-	}
+	t.CloudProvider = aws.NewFakeCloudProvider(
+		generateFakeInstances(cloudProviderInstances),
+	)
 
-	t.Ec2 = &MockEc2{
-		cloudProviderInstances: &t.cloudProviderInstances,
-	}
-
-	t.rm = &controller.ResourceManager{
-		Client:        t.K8sClient,
-		RawClient:     t.RawClient,
-		HttpClient:    http.DefaultClient,
-		CloudProvider: aws.NewMockCloudProvider(t.Autoscaling, t.Ec2),
-	}
-
-	t.CycleNodeRequestTransitioner = transitioner.NewCycleNodeRequestTransitioner(t.Cnr, t.rm, t.options)
 	return t
 }
 
@@ -120,6 +94,20 @@ func addCustomSchemes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(corev1.SchemeGroupVersion, &corev1.Node{})
 	scheme.AddKnownTypes(corev1.SchemeGroupVersion, &corev1.NodeList{})
 	return nil
+}
+
+func generateFakeInstances(nodes []*Node) *[]*fakeaws.Instance {
+	var instances = make([]*fakeaws.Instance, 0)
+
+	for _, node := range nodes {
+		instances = append(instances, &fakeaws.Instance{
+			InstanceID:           node.InstanceID,
+			AutoscalingGroupName: node.Nodegroup,
+			State:                node.CloudProviderState,
+		})
+	}
+
+	return &instances
 }
 
 func generateKubeNodes(nodes []*Node) ([]runtime.Object, []client.Object) {
@@ -156,7 +144,7 @@ func buildKubeNode(node *Node) *corev1.Node {
 			CreationTimestamp: metav1.NewTime(node.Creation),
 		},
 		Spec: corev1.NodeSpec{
-			ProviderID: node.providerID,
+			ProviderID: node.ProviderID,
 			Taints:     taints,
 		},
 		Status: corev1.NodeStatus{

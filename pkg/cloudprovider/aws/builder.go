@@ -4,13 +4,12 @@ import (
 	"fmt"
 
 	"github.com/atlassian-labs/cyclops/pkg/cloudprovider"
+	fakeaws "github.com/atlassian-labs/cyclops/pkg/cloudprovider/aws/fake"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
-	"github.com/aws/aws-sdk-go/service/autoscaling/autoscalingiface"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
 	"github.com/go-logr/logr"
 )
 
@@ -43,8 +42,16 @@ func NewCloudProvider(logger logr.Logger) (cloudprovider.CloudProvider, error) {
 	return p, nil
 }
 
-// NewMockCloudProvider returns a new mock AWS cloud provider
-func NewMockCloudProvider(autoscalingiface autoscalingiface.AutoScalingAPI, ec2iface ec2iface.EC2API) cloudprovider.CloudProvider {
+// NewFakeCloudProvider returns a new mock AWS cloud provider
+func NewFakeCloudProvider(instances *[]*fakeaws.Instance) cloudprovider.CloudProvider {
+	autoscalingiface := &fakeaws.Autoscaling{
+		Instances: instances,
+	}
+
+	ec2iface := &fakeaws.Ec2{
+		Instances: instances,
+	}
+
 	return &provider{
 		autoScalingService: autoscalingiface,
 		ec2Service:         ec2iface,

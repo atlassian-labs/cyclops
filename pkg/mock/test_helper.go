@@ -9,7 +9,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-func generateRandomInstanceId() (string, error) {
+func GenerateRandomInstanceId() (string, error) {
 	numBytes := 9
 	randomBytes := make([]byte, numBytes)
 
@@ -22,24 +22,25 @@ func generateRandomInstanceId() (string, error) {
 	return "i-" + hexString, nil
 }
 
-func newNodegroup(name string, num int) ([]*Node, error) {
+func NewNodegroup(name string, num int) ([]*Node, error) {
 	nodes := make([]*Node, 0)
 
 	for i := 0; i < num; i++ {
-		instanceID, err := generateRandomInstanceId()
+		instanceID, err := GenerateRandomInstanceId()
 		if err != nil {
 			return nil, err
 		}
 
 		node := &Node{
-			Name:       fmt.Sprintf("node-%d", i),
-			LabelKey:   "customer",
-			LabelValue: "kitt",
-			Creation:   time.Now(),
-			Tainted:    false,
-			NodeReady:  corev1.ConditionTrue,
-			Nodegroup:  name,
-			InstanceID: instanceID,
+			Name:               fmt.Sprintf("%s-node-%d", name, i),
+			LabelKey:           "customer",
+			LabelValue:         "kitt",
+			Creation:           time.Now(),
+			Tainted:            false,
+			NodeReady:          corev1.ConditionTrue,
+			Nodegroup:          name,
+			InstanceID:         instanceID,
+			CloudProviderState: "running",
 		}
 
 		nodes = append(nodes, node)
