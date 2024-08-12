@@ -61,10 +61,14 @@ func (rm *ResourceManager) UpdateObject(obj client.Object) error {
 
 // LogEvent creates an event on the current object
 func (rm *ResourceManager) LogEvent(obj runtime.Object, reason, messageFmt string, args ...interface{}) {
-	rm.Recorder.Eventf(obj, coreV1.EventTypeNormal, reason, messageFmt, args...)
+	if rm.Recorder != nil {
+		rm.Recorder.Eventf(obj, coreV1.EventTypeNormal, reason, messageFmt, args...)
+	}
 }
 
 // LogWarningEvent creates a warning event on the current object
 func (rm *ResourceManager) LogWarningEvent(obj runtime.Object, reason, messageFmt string, args ...interface{}) {
-	rm.Recorder.Eventf(obj, coreV1.EventTypeWarning, reason, messageFmt, args...)
+	if rm.Recorder != nil {
+		rm.Recorder.Eventf(obj, coreV1.EventTypeWarning, reason, messageFmt, args...)
+	}
 }

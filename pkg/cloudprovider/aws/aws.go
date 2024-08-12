@@ -68,8 +68,8 @@ func verifyIfErrorOccurredWithDefaults(apiErr error, expectedMessage string) (bo
 }
 
 type provider struct {
-	autoScalingService *autoscaling.AutoScaling
-	ec2Service         *ec2.EC2
+	autoScalingService autoscalingiface.AutoScalingAPI
+	ec2Service         ec2iface.EC2API
 	logger             logr.Logger
 }
 

@@ -92,10 +92,20 @@ func (t *CycleNodeRequestTransitioner) transitionPending() (reconcile.Result, er
 
 	kubeNodes = existingKubeNodes
 
-	// Describe the node group for the request
-	t.rm.LogEvent(t.cycleNodeRequest, "FetchingNodeGroup", "Fetching node group: %v", t.cycleNodeRequest.GetNodeGroupNames())
+	if len(kubeNodes) == 0 {
+		return t.transitionToHealing(fmt.Errorf("no existing nodes in cloud provider matched selector"))
+	}
 
-	nodeGroups, err := t.rm.CloudProvider.GetNodeGroups(t.cycleNodeRequest.GetNodeGroupNames())
+	nodeGroupNames := t.cycleNodeRequest.GetNodeGroupNames()
+
+	// Describe the node group for the request
+	t.rm.LogEvent(t.cycleNodeRequest, "FetchingNodeGroup", "Fetching node group: %v", nodeGroupNames)
+
+	if len(nodeGroupNames) == 0 {
+		return t.transitionToHealing(fmt.Errorf("must have at least one nodegroup name defined"))
+	}
+
+	nodeGroups, err := t.rm.CloudProvider.GetNodeGroups(nodeGroupNames)
 	if err != nil {
 		return t.transitionToHealing(err)
 	}
