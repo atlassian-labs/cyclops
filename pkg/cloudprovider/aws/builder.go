@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/atlassian-labs/cyclops/pkg/cloudprovider"
+	fakeaws "github.com/atlassian-labs/cyclops/pkg/cloudprovider/aws/fake"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -39,4 +40,12 @@ func NewCloudProvider(logger logr.Logger) (cloudprovider.CloudProvider, error) {
 	logger.Info(fmt.Sprintf("aws session created successfully, using provider %v", credValue.ProviderName))
 
 	return p, nil
+}
+
+// NewGenericCloudProvider returns a new mock AWS cloud provider
+func NewGenericCloudProvider(autoscalingiface *fakeaws.Autoscaling, ec2iface *fakeaws.Ec2) cloudprovider.CloudProvider {
+	return &provider{
+		autoScalingService: autoscalingiface,
+		ec2Service:         ec2iface,
+	}
 }

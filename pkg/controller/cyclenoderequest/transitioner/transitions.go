@@ -100,15 +100,23 @@ func (t *CycleNodeRequestTransitioner) transitionPending() (reconcile.Result, er
 		return t.transitionToHealing(fmt.Errorf("no existing nodes in cloud provider matched selector"))
 	}
 
+	nodeGroupNames := t.cycleNodeRequest.GetNodeGroupNames()
+
 	// Describe the node group for the request
-	t.rm.LogEvent(t.cycleNodeRequest, "FetchingNodeGroup", "Fetching node group: %v", t.cycleNodeRequest.GetNodeGroupNames())
-	nodeGroups, err := t.rm.CloudProvider.GetNodeGroups(t.cycleNodeRequest.GetNodeGroupNames())
+	t.rm.LogEvent(t.cycleNodeRequest, "FetchingNodeGroup", "Fetching node group: %v", nodeGroupNames)
+
+	if len(nodeGroupNames) == 0 {
+		return t.transitionToHealing(fmt.Errorf("must have at least one nodegroup name defined"))
+	}
+
+	nodeGroups, err := t.rm.CloudProvider.GetNodeGroups(nodeGroupNames)
 	if err != nil {
 		return t.transitionToHealing(err)
 	}
 
 	// get instances inside cloud provider node groups
 	nodeGroupInstances := nodeGroups.Instances()
+
 	// Do some sanity checking before we start filtering things
 	// Check the instance count of the node group matches the number of nodes found in Kubernetes
 	if len(kubeNodes) != len(nodeGroupInstances) {
