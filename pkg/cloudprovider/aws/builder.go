@@ -44,14 +44,6 @@ func NewCloudProvider(logger logr.Logger) (cloudprovider.CloudProvider, error) {
 
 // NewGenericCloudProvider returns a new mock AWS cloud provider
 func NewGenericCloudProvider(autoscalingiface *fakeaws.Autoscaling, ec2iface *fakeaws.Ec2) cloudprovider.CloudProvider {
-	// autoscalingiface := &fakeaws.Autoscaling{
-	// 	Instances: instances,
-	// }
-
-	// ec2iface := &fakeaws.Ec2{
-	// 	Instances: instances,
-	// }
-
 	return &provider{
 		autoScalingService: autoscalingiface,
 		ec2Service:         ec2iface,
