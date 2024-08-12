@@ -1,16 +1,31 @@
-package faketransitioner
+package transitioner
 
 import (
 	"net/http"
 
 	v1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
 	"github.com/atlassian-labs/cyclops/pkg/controller"
-	"github.com/atlassian-labs/cyclops/pkg/controller/cyclenoderequest/transitioner"
 	"github.com/atlassian-labs/cyclops/pkg/mock"
 )
 
+type Option func(t *Transitioner)
+
+func WithCloudProviderInstances(nodes []*mock.Node) Option {
+	return func(t *Transitioner) {
+		t.cloudProviderInstances = append(t.cloudProviderInstances, nodes...)
+	}
+}
+
+func WithKubeNodes(nodes []*mock.Node) Option {
+	return func(t *Transitioner) {
+		t.kubeNodes = append(t.kubeNodes, nodes...)
+	}
+}
+
+// ************************************************************************** //
+
 type Transitioner struct {
-	*transitioner.CycleNodeRequestTransitioner
+	*CycleNodeRequestTransitioner
 	*mock.Client
 
 	cloudProviderInstances []*mock.Node
@@ -38,8 +53,8 @@ func NewFakeTransitioner(cnr *v1.CycleNodeRequest, opts ...Option) *Transitioner
 		CloudProvider: t.CloudProvider,
 	}
 
-	t.CycleNodeRequestTransitioner = transitioner.NewCycleNodeRequestTransitioner(
-		cnr, rm, transitioner.Options{},
+	t.CycleNodeRequestTransitioner = NewCycleNodeRequestTransitioner(
+		cnr, rm, Options{},
 	)
 
 	return t
