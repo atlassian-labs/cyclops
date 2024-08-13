@@ -44,6 +44,8 @@ spec:
               of an object. Servers should convert recognized schemas to the latest
               internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
             type: string
+          clusterName:
+            type: string
           kind:
             description: 'Kind is a string value representing the REST resource this
               object represents. Servers may infer this from the endpoint the client
@@ -101,6 +103,13 @@ spec:
                     - Drain
                     - Wait
                     type: string
+                  strictValidation:
+                    description: StrictValidation is a boolean which determines whether
+                      named nodes selected in a CNR must exist and be valid nodes
+                      before cycling can begin. If set to true when invalid nodes
+                      are selected the CNR will be transitioned to the "Failed" phase
+                      before cycling can begin again.
+                    type: boolean
                 required:
                 - method
                 type: object

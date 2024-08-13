@@ -46,6 +46,11 @@ type CycleSettings struct {
 	// in-progress CNS request timeout from the time it's worked on by the controller.
 	// If no cyclingTimeout is provided, CNS will use the default controller CNS cyclingTimeout.
 	CyclingTimeout *metav1.Duration `json:"cyclingTimeout,omitempty"`
+
+	// StrictValidation is a boolean which determines whether named nodes selected in a CNR must
+	// exist and be valid nodes before cycling can begin. If set to true when invalid nodes are
+	// selected the CNR will be transitioned to the "Failed" phase before cycling can begin again.
+	StrictValidation bool `json:"strictValidation,omitempty"`
 }
 
 // HealthCheck defines the health check configuration for the NodeGroup

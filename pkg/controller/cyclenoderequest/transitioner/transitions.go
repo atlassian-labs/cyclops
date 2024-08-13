@@ -70,6 +70,10 @@ func (t *CycleNodeRequestTransitioner) transitionPending() (reconcile.Result, er
 		return t.transitionToHealing(err)
 	}
 
+	if len(kubeNodes) == 0 {
+		return t.transitionToHealing(fmt.Errorf("no nodes matched selector"))
+	}
+
 	// Only retain nodes which still exist inside cloud provider
 	var nodeProviderIDs []string
 
@@ -176,7 +180,10 @@ func (t *CycleNodeRequestTransitioner) transitionPending() (reconcile.Result, er
 	if len(t.cycleNodeRequest.Spec.NodeNames) > 0 {
 		// If specific node names are provided, check they actually exist in the node group
 		t.rm.LogEvent(t.cycleNodeRequest, "SelectingNodes", "Adding named nodes to NodesToTerminate")
-		t.addNamedNodesToTerminate(kubeNodes, nodeGroupInstances)
+		err := t.addNamedNodesToTerminate(kubeNodes, nodeGroupInstances)
+		if err != nil {
+			return t.transitionToHealing(err)
+		}
 	} else {
 		// Otherwise just add all the nodes in the node group
 		t.rm.LogEvent(t.cycleNodeRequest, "SelectingNodes", "Adding all node group nodes to NodesToTerminate")

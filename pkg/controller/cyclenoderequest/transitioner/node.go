@@ -105,7 +105,7 @@ func (t *CycleNodeRequestTransitioner) getNodesToTerminate(numNodes int64) (node
 
 // addNamedNodesToTerminate adds the named nodes for this CycleNodeRequest to the list of nodes to terminate.
 // Skips any named node that does not exist in the node group for this CycleNodeRequest.
-func (t *CycleNodeRequestTransitioner) addNamedNodesToTerminate(kubeNodes map[string]corev1.Node, nodeGroupInstances map[string]cloudprovider.Instance) {
+func (t *CycleNodeRequestTransitioner) addNamedNodesToTerminate(kubeNodes map[string]corev1.Node, nodeGroupInstances map[string]cloudprovider.Instance) error {
 	kubeNodesMap := make(map[string]corev1.Node)
 
 	for _, node := range kubeNodes {
@@ -117,6 +117,11 @@ func (t *CycleNodeRequestTransitioner) addNamedNodesToTerminate(kubeNodes map[st
 
 		if !found {
 			t.rm.Logger.Info("could not find node by name, skipping", "nodeName", namedNode)
+
+			if t.cycleNodeRequest.Spec.CycleSettings.StrictValidation {
+				return fmt.Errorf("could not find node by name: %v", namedNode)
+			}
+
 			continue
 		}
 
@@ -130,6 +135,8 @@ func (t *CycleNodeRequestTransitioner) addNamedNodesToTerminate(kubeNodes map[st
 			newCycleNodeRequestNode(&kubeNode, nodeGroupInstances[kubeNode.Spec.ProviderID].NodeGroupName()),
 		)
 	}
+
+	return nil
 }
 
 // newCycleNodeRequestNode converts a corev1.Node to a v1.CycleNodeRequestNode. This is done multiple
