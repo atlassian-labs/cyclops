@@ -311,6 +311,19 @@ spec:
                 description: SkipPreTerminationChecks is an optional flag to skip
                   pre-termination checks during cycling
                 type: boolean
+              validationOptions:
+                description: ValidationOptions stores the settings to use for validating
+                  state of nodegroups in kube and the cloud provider for cycling the
+                  nodes.
+                properties:
+                  skipMissingNamedNodes:
+                    description: SkipMissingNodeNames is a boolean which determines
+                      whether named nodes selected in a CNR must exist and be valid
+                      nodes before cycling can begin. If set to true named nodes which
+                      don't exist will be ignored rather than transitioning the CNR
+                      to the failed phase.
+                    type: boolean
+                type: object
             required:
             - cycleSettings
             - nodeGroupName

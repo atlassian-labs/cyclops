@@ -462,6 +462,7 @@ func (in *NodeGroupSpec) DeepCopyInto(out *NodeGroupSpec) {
 	}
 	in.NodeSelector.DeepCopyInto(&out.NodeSelector)
 	in.CycleSettings.DeepCopyInto(&out.CycleSettings)
+	out.ValidationOptions = in.ValidationOptions
 	if in.HealthChecks != nil {
 		in, out := &in.HealthChecks, &out.HealthChecks
 		*out = make([]HealthCheck, len(*in))

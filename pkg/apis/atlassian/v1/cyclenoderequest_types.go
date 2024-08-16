@@ -111,15 +111,6 @@ type CycleNodeRequestNode struct {
 	PrivateIP string `json:"privateIp,omitempty"`
 }
 
-// ValidationOptions stores the settings to use for validating state of nodegroups
-// in kube and the cloud provider for cycling the nodes.
-type ValidationOptions struct {
-	// SkipMissingNodeNames is a boolean which determines whether named nodes selected in a CNR must
-	// exist and be valid nodes before cycling can begin. If set to true named nodes which don't exist
-	// will be ignored rather than transitioning the CNR to the failed phase.
-	SkipMissingNamedNodes bool `json:"skipMissingNamedNodes,omitempty"`
-}
-
 // HealthCheckStatus groups all health checks status information for a node
 type HealthCheckStatus struct {
 	// Ready keeps track of the first timestamp at which the node status was reported as "ready"

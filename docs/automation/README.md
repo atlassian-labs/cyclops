@@ -34,6 +34,8 @@ spec:
   cycleSettings:
     method: Drain
     concurrency: 1
+  validationOptions:
+    skipMissingNamedNodes: true
   healthChecks:
   - endpoint: http://{{ .NodeIP }}:8080/ready
     regexMatch: Ready
