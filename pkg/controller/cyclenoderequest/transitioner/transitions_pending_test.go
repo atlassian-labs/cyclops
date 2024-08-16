@@ -114,7 +114,7 @@ func TestPendingWithNamedNode(t *testing.T) {
 // does not match any of the nodes matching the node selector if strict
 // validation is not enabled. It will just select the select the nodes that
 // exist.
-func TestPendingWrongNamedNode(t *testing.T) {
+func TestPendingWrongNamedNodeSkipMissingNamedNodes(t *testing.T) {
 	nodegroup, err := mock.NewNodegroup("ng-1", 2)
 	if err != nil {
 		assert.NoError(t, err)
@@ -130,6 +130,9 @@ func TestPendingWrongNamedNode(t *testing.T) {
 			CycleSettings: v1.CycleSettings{
 				Concurrency: 1,
 				Method:      v1.CycleNodeRequestMethodDrain,
+			},
+			ValidationOptions: v1.ValidationOptions{
+				SkipMissingNamedNodes: true,
 			},
 			Selector: metav1.LabelSelector{
 				MatchLabels: map[string]string{
@@ -166,7 +169,7 @@ func TestPendingWrongNamedNode(t *testing.T) {
 // Test to ensure the Pending phase will reject a CNR with a named node that
 // does not match any of the nodes matching the node selector if strict
 // validation is enabled. It should error out immediately.
-func TestPendingWrongNamedNodeStrictValidation(t *testing.T) {
+func TestPendingWrongNamedNode(t *testing.T) {
 	nodegroup, err := mock.NewNodegroup("ng-1", 2)
 	if err != nil {
 		assert.NoError(t, err)
@@ -180,9 +183,8 @@ func TestPendingWrongNamedNodeStrictValidation(t *testing.T) {
 		Spec: v1.CycleNodeRequestSpec{
 			NodeGroupsList: []string{"ng-1"},
 			CycleSettings: v1.CycleSettings{
-				Concurrency:      1,
-				Method:           v1.CycleNodeRequestMethodDrain,
-				StrictValidation: true,
+				Concurrency: 1,
+				Method:      v1.CycleNodeRequestMethodDrain,
 			},
 			Selector: metav1.LabelSelector{
 				MatchLabels: map[string]string{

@@ -118,10 +118,11 @@ func (t *CycleNodeRequestTransitioner) addNamedNodesToTerminate(kubeNodes map[st
 		if !found {
 			t.rm.Logger.Info("could not find node by name, skipping", "nodeName", namedNode)
 
-			if t.cycleNodeRequest.Spec.CycleSettings.StrictValidation {
+			if !t.cycleNodeRequest.Spec.ValidationOptions.SkipMissingNamedNodes {
 				return fmt.Errorf("could not find node by name: %v", namedNode)
 			}
 
+			t.rm.LogEvent(t.cycleNodeRequest, "SkipMissingNamedNode", "Named node %s not found", namedNode)
 			continue
 		}
 
