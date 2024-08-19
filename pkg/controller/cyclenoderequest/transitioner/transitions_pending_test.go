@@ -405,10 +405,11 @@ func TestPendingReattachedCloudProviderNode(t *testing.T) {
 
 	assert.NoError(t, err)
 
-	// "re-attach" one instance from the asg
+	// "re-attach" the instance to the asg
 	fakeTransitioner.cloudProviderInstances[0].Nodegroup = "ng-1"
 
-	// This time should transition to the healing phase
+	// This time should transition to the healing phase even though the state
+	// is correct because the timeout check happens first
 	_, err = fakeTransitioner.Run()
 	assert.Error(t, err)
 	assert.Equal(t, v1.CycleNodeRequestHealing, cnr.Status.Phase)
