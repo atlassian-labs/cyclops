@@ -398,10 +398,12 @@ func TestPendingReattachedCloudProviderNode(t *testing.T) {
 		Time: time.Now().Add(-nodeEquilibriumWaitLimit - time.Second),
 	}
 
-	fakeTransitioner.Autoscaling.AttachInstances(&autoscaling.AttachInstancesInput{
+	_, err = fakeTransitioner.Autoscaling.AttachInstances(&autoscaling.AttachInstancesInput{
 		AutoScalingGroupName: aws.String("ng-1"),
 		InstanceIds:          aws.StringSlice([]string{nodegroup[0].InstanceID}),
 	})
+
+	assert.NoError(t, err)
 
 	// "re-attach" one instance from the asg
 	fakeTransitioner.cloudProviderInstances[0].Nodegroup = "ng-1"
