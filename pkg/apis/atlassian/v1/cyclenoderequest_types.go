@@ -26,6 +26,10 @@ type CycleNodeRequestSpec struct {
 	// CycleSettings stores the settings to use for cycling the nodes.
 	CycleSettings CycleSettings `json:"cycleSettings"`
 
+	// ValidationOptions stores the settings to use for validating state of nodegroups
+	// in kube and the cloud provider for cycling the nodes.
+	ValidationOptions ValidationOptions `json:"validationOptions,omitempty"`
+
 	// HealthChecks stores the settings to configure instance custom health checks
 	HealthChecks []HealthCheck `json:"healthChecks,omitempty"`
 

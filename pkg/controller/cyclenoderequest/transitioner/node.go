@@ -11,12 +11,15 @@ import (
 
 // listReadyNodes lists nodes that are "ready". By default lists nodes that have also not been touched by Cyclops.
 // A label is used to determine whether nodes have been touched by this CycleNodeRequest.
-func (t *CycleNodeRequestTransitioner) listReadyNodes(includeInProgress bool) (nodes []corev1.Node, err error) {
+func (t *CycleNodeRequestTransitioner) listReadyNodes(includeInProgress bool) (map[string]corev1.Node, error) {
+	nodes := make(map[string]corev1.Node)
+
 	// Get the nodes
 	selector, err := t.cycleNodeRequest.NodeLabelSelector()
 	if err != nil {
 		return nodes, err
 	}
+
 	nodeList, err := t.rm.ListNodes(selector)
 	if err != nil {
 		return nodes, err
@@ -30,14 +33,16 @@ func (t *CycleNodeRequestTransitioner) listReadyNodes(includeInProgress bool) (n
 				continue
 			}
 		}
+
 		// Only add "Ready" nodes
 		for _, cond := range node.Status.Conditions {
 			if cond.Type == corev1.NodeReady && cond.Status == corev1.ConditionTrue {
-				nodes = append(nodes, node)
+				nodes[node.Spec.ProviderID] = node
 				break
 			}
 		}
 	}
+
 	return nodes, nil
 }
 
@@ -56,29 +61,34 @@ func (t *CycleNodeRequestTransitioner) getNodesToTerminate(numNodes int64) (node
 	}
 
 	for _, kubeNode := range kubeNodes {
-		// Skip nodes that are already being worked on so we don't duplicate our work
 		if value, ok := kubeNode.Labels[cycleNodeLabel]; ok && value == t.cycleNodeRequest.Name {
 			numNodesInProgress++
+		}
+	}
+
+	for _, nodeToTerminate := range t.cycleNodeRequest.Status.NodesToTerminate {
+		kubeNode, found := kubeNodes[nodeToTerminate.ProviderID]
+
+		if !found {
 			continue
 		}
 
-		for _, nodeToTerminate := range t.cycleNodeRequest.Status.NodesToTerminate {
-			// Add nodes that need to be terminated but have not yet been actioned
-			if kubeNode.Name == nodeToTerminate.Name && kubeNode.Spec.ProviderID == nodeToTerminate.ProviderID {
-				nodes = append(nodes, &kubeNode)
+		// Skip nodes that are already being worked on so we don't duplicate our work
+		if value, ok := kubeNode.Labels[cycleNodeLabel]; ok && value == t.cycleNodeRequest.Name {
+			continue
+		}
 
-				for i := 0; i < len(t.cycleNodeRequest.Status.NodesAvailable); i++ {
-					if kubeNode.Name == t.cycleNodeRequest.Status.NodesAvailable[i].Name {
-						// Remove nodes from available if they are also scheduled for termination
-						// Slice syntax removes this node at `i` from the array
-						t.cycleNodeRequest.Status.NodesAvailable = append(
-							t.cycleNodeRequest.Status.NodesAvailable[:i],
-							t.cycleNodeRequest.Status.NodesAvailable[i+1:]...,
-						)
+		// Add nodes that need to be terminated but have not yet been actioned
+		nodes = append(nodes, &kubeNode)
 
-						break
-					}
-				}
+		for i := 0; i < len(t.cycleNodeRequest.Status.NodesAvailable); i++ {
+			if kubeNode.Name == t.cycleNodeRequest.Status.NodesAvailable[i].Name {
+				// Remove nodes from available if they are also scheduled for termination
+				// Slice syntax removes this node at `i` from the array
+				t.cycleNodeRequest.Status.NodesAvailable = append(
+					t.cycleNodeRequest.Status.NodesAvailable[:i],
+					t.cycleNodeRequest.Status.NodesAvailable[i+1:]...,
+				)
 
 				break
 			}
@@ -94,32 +104,39 @@ func (t *CycleNodeRequestTransitioner) getNodesToTerminate(numNodes int64) (node
 }
 
 // addNamedNodesToTerminate adds the named nodes for this CycleNodeRequest to the list of nodes to terminate.
-// Returns an error if any named node does not exist in the node group for this CycleNodeRequest.
-func (t *CycleNodeRequestTransitioner) addNamedNodesToTerminate(kubeNodes []corev1.Node, nodeGroupInstances map[string]cloudprovider.Instance) error {
-	for _, namedNode := range t.cycleNodeRequest.Spec.NodeNames {
-		foundNode := false
-		for _, kubeNode := range kubeNodes {
-			if kubeNode.Name == namedNode {
-				foundNode = true
+// Skips any named node that does not exist in the node group for this CycleNodeRequest.
+func (t *CycleNodeRequestTransitioner) addNamedNodesToTerminate(kubeNodes map[string]corev1.Node, nodeGroupInstances map[string]cloudprovider.Instance) error {
+	nodeLookupByName := make(map[string]corev1.Node)
 
-				t.cycleNodeRequest.Status.NodesAvailable = append(
-					t.cycleNodeRequest.Status.NodesAvailable,
-					newCycleNodeRequestNode(&kubeNode, nodeGroupInstances[kubeNode.Spec.ProviderID].NodeGroupName()),
-				)
-
-				t.cycleNodeRequest.Status.NodesToTerminate = append(
-					t.cycleNodeRequest.Status.NodesToTerminate,
-					newCycleNodeRequestNode(&kubeNode, nodeGroupInstances[kubeNode.Spec.ProviderID].NodeGroupName()),
-				)
-
-				break
-			}
-		}
-
-		if !foundNode {
-			return fmt.Errorf("could not find node by name: %v", namedNode)
-		}
+	for _, node := range kubeNodes {
+		nodeLookupByName[node.Name] = node
 	}
+
+	for _, namedNode := range t.cycleNodeRequest.Spec.NodeNames {
+		kubeNode, found := nodeLookupByName[namedNode]
+
+		if !found {
+			t.rm.Logger.Info("could not find node by name, skipping", "nodeName", namedNode)
+
+			if !t.cycleNodeRequest.Spec.ValidationOptions.SkipMissingNamedNodes {
+				return fmt.Errorf("could not find node by name: %v", namedNode)
+			}
+
+			t.rm.LogEvent(t.cycleNodeRequest, "SkipMissingNamedNode", "Named node %s not found", namedNode)
+			continue
+		}
+
+		t.cycleNodeRequest.Status.NodesAvailable = append(
+			t.cycleNodeRequest.Status.NodesAvailable,
+			newCycleNodeRequestNode(&kubeNode, nodeGroupInstances[kubeNode.Spec.ProviderID].NodeGroupName()),
+		)
+
+		t.cycleNodeRequest.Status.NodesToTerminate = append(
+			t.cycleNodeRequest.Status.NodesToTerminate,
+			newCycleNodeRequestNode(&kubeNode, nodeGroupInstances[kubeNode.Spec.ProviderID].NodeGroupName()),
+		)
+	}
+
 	return nil
 }
 

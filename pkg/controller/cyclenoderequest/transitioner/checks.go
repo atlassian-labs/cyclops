@@ -189,7 +189,7 @@ func (t *CycleNodeRequestTransitioner) performHealthCheck(node v1.CycleNodeReque
 
 // performInitialHealthChecks on the nodes selected to be terminated before cycling begin. If any health
 // check fails return an error to prevent cycling from starting
-func (t *CycleNodeRequestTransitioner) performInitialHealthChecks(kubeNodes []corev1.Node) error {
+func (t *CycleNodeRequestTransitioner) performInitialHealthChecks(kubeNodes map[string]corev1.Node) error {
 	// Build a set of ready nodes from which to check below
 	readyNodesSet := make(map[string]v1.CycleNodeRequestNode)
 
@@ -241,7 +241,7 @@ func (t *CycleNodeRequestTransitioner) performInitialHealthChecks(kubeNodes []co
 
 // performCyclingHealthChecks before terminating an instance selected for termination. Cycling pauses
 // until all health checks pass for the new instance before terminating the old one
-func (t *CycleNodeRequestTransitioner) performCyclingHealthChecks(kubeNodes []corev1.Node) (bool, error) {
+func (t *CycleNodeRequestTransitioner) performCyclingHealthChecks(kubeNodes map[string]corev1.Node) (bool, error) {
 	var allHealthChecksPassed bool = true
 
 	// Find new instsances attached to the nodegroup and perform health checks on them

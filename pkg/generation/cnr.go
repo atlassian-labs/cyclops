@@ -3,8 +3,9 @@ package generation
 import (
 	"context"
 	"fmt"
-	"github.com/atlassian-labs/cyclops/pkg/controller/cyclenoderequest"
 	"strings"
+
+	"github.com/atlassian-labs/cyclops/pkg/controller/cyclenoderequest"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -73,8 +74,9 @@ func GiveReason(cnr *atlassianv1.CycleNodeRequest, reason string) {
 	}
 	cnr.Annotations[cnrReasonAnnotationKey] = reason
 }
+
 // SetAPIVersion adds apiVersion annotation to the cnr
-func SetAPIVersion(cnr *atlassianv1.CycleNodeRequest, clientVersion string){
+func SetAPIVersion(cnr *atlassianv1.CycleNodeRequest, clientVersion string) {
 	if cnr.Annotations == nil {
 		cnr.Annotations = map[string]string{}
 	}
@@ -110,6 +112,7 @@ func GenerateCNR(nodeGroup atlassianv1.NodeGroup, nodes []string, name, namespac
 			PreTerminationChecks:     nodeGroup.Spec.PreTerminationChecks,
 			SkipInitialHealthChecks:  nodeGroup.Spec.SkipInitialHealthChecks,
 			SkipPreTerminationChecks: nodeGroup.Spec.SkipPreTerminationChecks,
+			ValidationOptions:        nodeGroup.Spec.ValidationOptions,
 		},
 	}
 }

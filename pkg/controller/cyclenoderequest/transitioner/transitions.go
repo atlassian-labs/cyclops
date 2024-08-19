@@ -64,10 +64,12 @@ func (t *CycleNodeRequestTransitioner) transitionUndefined() (reconcile.Result, 
 func (t *CycleNodeRequestTransitioner) transitionPending() (reconcile.Result, error) {
 	// Fetch the node names for the cycleNodeRequest, using the label selector provided
 	t.rm.LogEvent(t.cycleNodeRequest, "SelectingNodes", "Selecting nodes with label selector")
+
 	kubeNodes, err := t.listReadyNodes(true)
 	if err != nil {
 		return t.transitionToHealing(err)
 	}
+
 	if len(kubeNodes) == 0 {
 		return t.transitionToHealing(fmt.Errorf("no nodes matched selector"))
 	}
@@ -83,14 +85,12 @@ func (t *CycleNodeRequestTransitioner) transitionPending() (reconcile.Result, er
 	if err != nil {
 		return t.transitionToHealing(errors.Wrap(err, "failed to check instances that exist from cloud provider"))
 	}
-	var existingKubeNodes []corev1.Node
 
-	for _, node := range kubeNodes {
-		for _, validProviderID := range existingProviderIDs {
-			if node.Spec.ProviderID == validProviderID {
-				existingKubeNodes = append(existingKubeNodes, node)
-				break
-			}
+	existingKubeNodes := make(map[string]corev1.Node)
+
+	for _, validProviderID := range existingProviderIDs {
+		if node, found := kubeNodes[validProviderID]; found {
+			existingKubeNodes[node.Spec.ProviderID] = node
 		}
 	}
 
@@ -120,19 +120,40 @@ func (t *CycleNodeRequestTransitioner) transitionPending() (reconcile.Result, er
 	// Do some sanity checking before we start filtering things
 	// Check the instance count of the node group matches the number of nodes found in Kubernetes
 	if len(kubeNodes) != len(nodeGroupInstances) {
-		nodesNotInCPNodeGroup, nodesNotInKube := findOffendingNodes(kubeNodes, nodeGroupInstances)
 		var offendingNodesInfo string
+
+		nodesNotInCPNodeGroup, nodesNotInKube := findOffendingNodes(kubeNodes, nodeGroupInstances)
+
 		if len(nodesNotInCPNodeGroup) > 0 {
+			providerIDs := make([]string, 0)
+
+			for providerID := range nodesNotInCPNodeGroup {
+				providerIDs = append(providerIDs,
+					fmt.Sprintf("id %q", providerID),
+				)
+			}
+
 			offendingNodesInfo += "nodes not in node group: "
-			offendingNodesInfo += strings.Join(nodesNotInCPNodeGroup, ",")
+			offendingNodesInfo += strings.Join(providerIDs, ",")
 		}
+
 		if len(nodesNotInKube) > 0 {
 			if offendingNodesInfo != "" {
 				offendingNodesInfo += ";"
 			}
+
+			providerIDs := make([]string, 0)
+
+			for providerID, node := range nodesNotInKube {
+				providerIDs = append(providerIDs,
+					fmt.Sprintf("id %q in %q", providerID, node.NodeGroupName()),
+				)
+			}
+
 			offendingNodesInfo += "nodes not inside cluster: "
-			offendingNodesInfo += strings.Join(nodesNotInKube, ",")
+			offendingNodesInfo += strings.Join(providerIDs, ",")
 		}
+
 		t.rm.LogEvent(t.cycleNodeRequest, "NodeCountMismatch",
 			"node group: %v, kube: %v. %v",
 			len(nodeGroupInstances), len(kubeNodes), offendingNodesInfo)
@@ -142,12 +163,16 @@ func (t *CycleNodeRequestTransitioner) transitionPending() (reconcile.Result, er
 		if err != nil {
 			return t.transitionToHealing(err)
 		}
+
 		if timedOut {
 			err := fmt.Errorf(
-				"node count mismatch, number of kubernetes of nodes does not match number of cloud provider instances after %v",
-				nodeEquilibriumWaitLimit)
+				"node count mismatch, number of kubernetes nodes does not match number of cloud provider instances after %v",
+				nodeEquilibriumWaitLimit,
+			)
+
 			return t.transitionToHealing(err)
 		}
+
 		return reconcile.Result{Requeue: true, RequeueAfter: requeueDuration}, nil
 	}
 
@@ -162,6 +187,7 @@ func (t *CycleNodeRequestTransitioner) transitionPending() (reconcile.Result, er
 	} else {
 		// Otherwise just add all the nodes in the node group
 		t.rm.LogEvent(t.cycleNodeRequest, "SelectingNodes", "Adding all node group nodes to NodesToTerminate")
+
 		for _, kubeNode := range kubeNodes {
 			// Check to ensure the kubeNode object maps to an existing node in the ASG
 			// If this isn't the case, this is a phantom node. Fail the cnr to be safe.
@@ -213,7 +239,9 @@ func (t *CycleNodeRequestTransitioner) transitionInitialised() (reconcile.Result
 	// The maximum nodes we can select are bounded by our concurrency. We take into account the number
 	// of nodes we are already working on, and only introduce up to our concurrency cap more nodes in this step.
 	maxNodesToSelect := t.cycleNodeRequest.Spec.CycleSettings.Concurrency - t.cycleNodeRequest.Status.ActiveChildren
+
 	t.rm.Logger.Info("Selecting nodes to terminate", "numNodes", maxNodesToSelect)
+
 	nodes, numNodesInProgress, err := t.getNodesToTerminate(maxNodesToSelect)
 	if err != nil {
 		return t.transitionToHealing(err)

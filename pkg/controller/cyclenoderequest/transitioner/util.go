@@ -242,6 +242,7 @@ func (t *CycleNodeRequestTransitioner) checkIfTransitioning(numNodesToCycle, num
 			transition, err := t.transitionObject(v1.CycleNodeRequestWaitingTermination)
 			return true, transition, err
 		}
+
 		// otherwise, we have finished everything, so transition to Successful
 		transition, err := t.transitionToSuccessful()
 		return true, transition, err
@@ -252,21 +253,19 @@ func (t *CycleNodeRequestTransitioner) checkIfTransitioning(numNodesToCycle, num
 
 // findOffendingNodes finds the offending nodes information which cause number of nodes mismatch between
 // cloud provider node group and nodes inside kubernetes cluster using label selector
-func findOffendingNodes(kubeNodes []corev1.Node, cloudProviderNodes map[string]cloudprovider.Instance) ([]string, []string) {
-	kubeNodesMap := make(map[string]corev1.Node)
-	var nodesNotInCPNodeGroup []string
-	var nodesNotInKube []string
+func findOffendingNodes(kubeNodes map[string]corev1.Node, cloudProviderNodes map[string]cloudprovider.Instance) (map[string]corev1.Node, map[string]cloudprovider.Instance) {
+	var nodesNotInCPNodeGroup = make(map[string]corev1.Node)
+	var nodesNotInKube = make(map[string]cloudprovider.Instance)
+
 	for _, kubeNode := range kubeNodes {
-		kubeNodesMap[kubeNode.Spec.ProviderID] = kubeNode
 		if _, ok := cloudProviderNodes[kubeNode.Spec.ProviderID]; !ok {
-			nodesNotInCPNodeGroup = append(nodesNotInCPNodeGroup, fmt.Sprintf("id %q", kubeNode.Spec.ProviderID))
+			nodesNotInCPNodeGroup[kubeNode.Spec.ProviderID] = kubeNode
 		}
 	}
-	for cpNode := range cloudProviderNodes {
-		if _, ok := kubeNodesMap[cpNode]; !ok {
-			nodesNotInKube = append(nodesNotInKube, fmt.Sprintf("id %q in %q",
-				cpNode,
-				cloudProviderNodes[cpNode].NodeGroupName()))
+
+	for providerID, cpNode := range cloudProviderNodes {
+		if _, ok := kubeNodes[providerID]; !ok {
+			nodesNotInKube[providerID] = cpNode
 		}
 	}
 
