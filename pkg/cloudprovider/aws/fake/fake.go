@@ -111,6 +111,16 @@ func (m *Autoscaling) DescribeAutoScalingGroups(input *autoscaling.DescribeAutoS
 	}, nil
 }
 
+func (m *Autoscaling) AttachInstances(input *autoscaling.AttachInstancesInput) (*autoscaling.AttachInstancesOutput, error) {
+	for _, instanceId := range input.InstanceIds {
+		if instance, exists := m.Instances[*instanceId]; exists {
+			instance.AutoscalingGroupName = *input.AutoScalingGroupName
+		}
+	}
+
+	return &autoscaling.AttachInstancesOutput{}, nil
+}
+
 // *************** EC2 *************** //
 
 func (m *Ec2) DescribeInstances(input *ec2.DescribeInstancesInput) (*ec2.DescribeInstancesOutput, error) {

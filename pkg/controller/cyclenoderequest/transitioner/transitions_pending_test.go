@@ -6,6 +6,8 @@ import (
 
 	v1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
 	"github.com/atlassian-labs/cyclops/pkg/mock"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/stretchr/testify/assert"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -339,6 +341,70 @@ func TestPendingDetachedCloudProviderNode(t *testing.T) {
 	cnr.Status.EquilibriumWaitStarted = &metav1.Time{
 		Time: time.Now().Add(-nodeEquilibriumWaitLimit - time.Second),
 	}
+
+	// This time should transition to the healing phase
+	_, err = fakeTransitioner.Run()
+	assert.Error(t, err)
+	assert.Equal(t, v1.CycleNodeRequestHealing, cnr.Status.Phase)
+}
+
+// Test to ensure that Cyclops will not proceed if there is node detached from
+// the nodegroup on the cloud provider. It should wait and especially should not
+// succeed if the instance is re-attached by the final requeuing of the Pending
+// phase which would occur after the timeout period.
+func TestPendingReattachedCloudProviderNode(t *testing.T) {
+	nodegroup, err := mock.NewNodegroup("ng-1", 2)
+	if err != nil {
+		assert.NoError(t, err)
+	}
+
+	// "detach" one instance from the asg
+	nodegroup[0].Nodegroup = ""
+
+	cnr := &v1.CycleNodeRequest{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "cnr-1",
+			Namespace: "kube-system",
+		},
+		Spec: v1.CycleNodeRequestSpec{
+			NodeGroupsList: []string{"ng-1"},
+			CycleSettings: v1.CycleSettings{
+				Concurrency: 1,
+				Method:      v1.CycleNodeRequestMethodDrain,
+			},
+			Selector: metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"customer": "kitt",
+				},
+			},
+		},
+		Status: v1.CycleNodeRequestStatus{
+			Phase: v1.CycleNodeRequestPending,
+		},
+	}
+
+	fakeTransitioner := NewFakeTransitioner(cnr,
+		WithKubeNodes(nodegroup),
+		WithCloudProviderInstances(nodegroup),
+	)
+
+	// Should requeue while it tries to wait
+	_, err = fakeTransitioner.Run()
+	assert.NoError(t, err)
+	assert.Equal(t, v1.CycleNodeRequestPending, cnr.Status.Phase)
+
+	// Simulate waiting for 1s more than the wait limit
+	cnr.Status.EquilibriumWaitStarted = &metav1.Time{
+		Time: time.Now().Add(-nodeEquilibriumWaitLimit - time.Second),
+	}
+
+	fakeTransitioner.Autoscaling.AttachInstances(&autoscaling.AttachInstancesInput{
+		AutoScalingGroupName: aws.String("ng-1"),
+		InstanceIds:          aws.StringSlice([]string{nodegroup[0].InstanceID}),
+	})
+
+	// "re-attach" one instance from the asg
+	fakeTransitioner.cloudProviderInstances[0].Nodegroup = "ng-1"
 
 	// This time should transition to the healing phase
 	_, err = fakeTransitioner.Run()
