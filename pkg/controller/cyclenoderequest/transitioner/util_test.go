@@ -135,7 +135,7 @@ func TestFindOffendingNodes(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			nodesNotInCPNodeGroup, nodesNotInKube := findOffendingNodes(test.knodes, test.cnodes)
+			nodesNotInCPNodeGroup, nodesNotInKube := findProblemNodes(test.knodes, test.cnodes)
 			assert.Equal(t, true, reflect.DeepEqual(test.expectNotInCPNodeGroup, nodesNotInCPNodeGroup))
 			assert.Equal(t, true, reflect.DeepEqual(test.expectNotInKube, nodesNotInKube))
 		})

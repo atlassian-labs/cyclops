@@ -251,25 +251,48 @@ func (t *CycleNodeRequestTransitioner) checkIfTransitioning(numNodesToCycle, num
 	return false, reconcile.Result{}, nil
 }
 
-// findOffendingNodes finds the offending nodes information which cause number of nodes mismatch between
-// cloud provider node group and nodes inside kubernetes cluster using label selector
-func findOffendingNodes(kubeNodes map[string]corev1.Node, cloudProviderNodes map[string]cloudprovider.Instance) (map[string]corev1.Node, map[string]cloudprovider.Instance) {
-	var nodesNotInCPNodeGroup = make(map[string]corev1.Node)
-	var nodesNotInKube = make(map[string]cloudprovider.Instance)
+// findValidNodes performs an AND operation on the two sets of nodes. It finds all the nodes
+// in both kube and the cloud provider nodegroups. This is considered the valid set of nodes
+// that can be operated on.
+func findValidNodes(kubeNodes map[string]corev1.Node, nodeGroupInstances map[string]cloudprovider.Instance) (map[string]corev1.Node, map[string]cloudprovider.Instance) {
+	validKubeNodes := make(map[string]corev1.Node)
+	validNodegroupInstances := make(map[string]cloudprovider.Instance)
 
-	for _, kubeNode := range kubeNodes {
-		if _, ok := cloudProviderNodes[kubeNode.Spec.ProviderID]; !ok {
-			nodesNotInCPNodeGroup[kubeNode.Spec.ProviderID] = kubeNode
+	for providerId, kubeNode := range kubeNodes {
+		if _, exists := nodeGroupInstances[providerId]; exists {
+			validKubeNodes[providerId] = kubeNode
 		}
 	}
 
-	for providerID, cpNode := range cloudProviderNodes {
-		if _, ok := kubeNodes[providerID]; !ok {
-			nodesNotInKube[providerID] = cpNode
+	for providerId, nodeGroupInstance := range nodeGroupInstances {
+		if _, exists := nodeGroupInstances[providerId]; exists {
+			validNodegroupInstances[providerId] = nodeGroupInstance
 		}
 	}
 
-	return nodesNotInCPNodeGroup, nodesNotInKube
+	return validKubeNodes, validNodegroupInstances
+}
+
+// findProblemNodes performs an XOR operation on the two sets of nodes. It finds all the nodes
+// in either kube or the cloud provider nodegroups, but not both. These are considered the
+// problems sets of nodes that need to be dealt with before cycling can occur.
+func findProblemNodes(kubeNodes map[string]corev1.Node, nodeGroupInstances map[string]cloudprovider.Instance) (map[string]corev1.Node, map[string]cloudprovider.Instance) {
+	problemKubeNodes := make(map[string]corev1.Node)
+	problemNodegroupInstances := make(map[string]cloudprovider.Instance)
+
+	for providerId, kubeNode := range kubeNodes {
+		if _, exists := nodeGroupInstances[providerId]; !exists {
+			problemKubeNodes[providerId] = kubeNode
+		}
+	}
+
+	for providerId, nodeGroupInstance := range nodeGroupInstances {
+		if _, exists := kubeNodes[providerId]; !exists {
+			problemNodegroupInstances[providerId] = nodeGroupInstance
+		}
+	}
+
+	return problemKubeNodes, problemNodegroupInstances
 }
 
 // transitionToUnsuccessful transitions the current cycleNodeRequest to healing/failed
