@@ -3,6 +3,8 @@ package transitioner
 import (
 	"fmt"
 
+	"github.com/pkg/errors"
+
 	corev1 "k8s.io/api/core/v1"
 
 	v1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
@@ -138,6 +140,62 @@ func (t *CycleNodeRequestTransitioner) addNamedNodesToTerminate(kubeNodes map[st
 	}
 
 	return nil
+}
+
+// Find all the nodes in kube and the cloud provider that match the node selector and nodegroups
+// specified in the CNR. These are two separate sets and the contents of one does not affect the
+// contents of the other.
+func (t *CycleNodeRequestTransitioner) findAllNodesForCycle() (kubeNodes map[string]corev1.Node, cloudProviderInstances map[string]cloudprovider.Instance, err error) {
+	kubeNodes, err = t.listReadyNodes(true)
+	if err != nil {
+		return kubeNodes, cloudProviderInstances, err
+	}
+
+	if len(kubeNodes) == 0 {
+		return kubeNodes, cloudProviderInstances, fmt.Errorf("no nodes matched selector")
+	}
+
+	// Only retain nodes which still exist inside cloud provider
+	var nodeProviderIDs []string
+
+	for _, node := range kubeNodes {
+		nodeProviderIDs = append(nodeProviderIDs, node.Spec.ProviderID)
+	}
+
+	existingProviderIDs, err := t.rm.CloudProvider.InstancesExist(nodeProviderIDs)
+	if err != nil {
+		return kubeNodes, cloudProviderInstances, errors.Wrap(err, "failed to check instances that exist from cloud provider")
+	}
+
+	existingKubeNodes := make(map[string]corev1.Node)
+
+	for _, validProviderID := range existingProviderIDs {
+		if node, found := kubeNodes[validProviderID]; found {
+			existingKubeNodes[node.Spec.ProviderID] = node
+		}
+	}
+
+	kubeNodes = existingKubeNodes
+
+	if len(kubeNodes) == 0 {
+		return kubeNodes, cloudProviderInstances, fmt.Errorf("no existing nodes in cloud provider matched selector")
+	}
+
+	nodeGroupNames := t.cycleNodeRequest.GetNodeGroupNames()
+
+	// Describe the node group for the request
+	t.rm.LogEvent(t.cycleNodeRequest, "FetchingNodeGroup", "Fetching node group: %v", nodeGroupNames)
+
+	if len(nodeGroupNames) == 0 {
+		return kubeNodes, cloudProviderInstances, fmt.Errorf("must have at least one nodegroup name defined")
+	}
+
+	nodeGroups, err := t.rm.CloudProvider.GetNodeGroups(nodeGroupNames)
+	if err != nil {
+		return kubeNodes, cloudProviderInstances, err
+	}
+
+	return kubeNodes, nodeGroups.Instances(), nil
 }
 
 // newCycleNodeRequestNode converts a corev1.Node to a v1.CycleNodeRequestNode. This is done multiple
