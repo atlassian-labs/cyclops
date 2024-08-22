@@ -524,9 +524,11 @@ func TestPendingTimeoutReached(t *testing.T) {
 	assert.Equal(t, v1.CycleNodeRequestPending, cnr.Status.Phase)
 
 	// Keep the node detached
-	fakeTransitioner.Autoscaling.DetachInstances(&autoscaling.DetachInstancesInput{
+	_, err = fakeTransitioner.Autoscaling.DetachInstances(&autoscaling.DetachInstancesInput{
 		InstanceIds: aws.StringSlice([]string{nodegroup[0].InstanceID}),
 	})
+
+	assert.NoError(t, err)
 
 	output, err = fakeTransitioner.Autoscaling.DescribeAutoScalingGroups(&autoscaling.DescribeAutoScalingGroupsInput{})
 	assert.NoError(t, err)
