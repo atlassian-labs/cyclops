@@ -55,6 +55,7 @@ func generateAutoscalingInstance(instance *Instance) *autoscaling.Instance {
 	autoscalingInstance := &autoscaling.Instance{
 		InstanceId:       aws.String(instance.InstanceID),
 		AvailabilityZone: aws.String(defaultAvailabilityZone),
+		LifecycleState:   aws.String(autoscaling.LifecycleStateInService),
 	}
 
 	return autoscalingInstance
@@ -76,7 +77,13 @@ func (m *Autoscaling) DescribeAutoScalingGroups(input *autoscaling.DescribeAutoS
 			continue
 		}
 
-		if _, exists := asgNameLookup[instance.AutoscalingGroupName]; !exists {
+		if instance.State != ec2.InstanceStateNameRunning {
+			continue
+		}
+
+		// Ensure to continue if the ASG name matching one of the ones from the
+		// input. If the input is empty then match all ASGs
+		if _, exists := asgNameLookup[instance.AutoscalingGroupName]; !exists && len(asgNameLookup) > 0 {
 			continue
 		}
 
@@ -121,6 +128,16 @@ func (m *Autoscaling) AttachInstances(input *autoscaling.AttachInstancesInput) (
 	return &autoscaling.AttachInstancesOutput{}, nil
 }
 
+func (m *Autoscaling) DetachInstances(input *autoscaling.DetachInstancesInput) (*autoscaling.DetachInstancesOutput, error) {
+	for _, instanceId := range input.InstanceIds {
+		if instance, exists := m.Instances[*instanceId]; exists {
+			instance.AutoscalingGroupName = ""
+		}
+	}
+
+	return &autoscaling.DetachInstancesOutput{}, nil
+}
+
 // *************** EC2 *************** //
 
 func (m *Ec2) DescribeInstances(input *ec2.DescribeInstancesInput) (*ec2.DescribeInstancesOutput, error) {
@@ -149,4 +166,14 @@ func (m *Ec2) DescribeInstances(input *ec2.DescribeInstancesInput) (*ec2.Describ
 			},
 		},
 	}, nil
+}
+
+func (m *Ec2) TerminateInstances(input *ec2.TerminateInstancesInput) (*ec2.TerminateInstancesOutput, error) {
+	for _, instanceId := range input.InstanceIds {
+		if instance, exists := m.Instances[*instanceId]; exists {
+			instance.State = ec2.InstanceStateNameTerminated
+		}
+	}
+
+	return &ec2.TerminateInstancesOutput{}, nil
 }

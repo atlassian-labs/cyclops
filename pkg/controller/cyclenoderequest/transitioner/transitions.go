@@ -61,19 +61,11 @@ func (t *CycleNodeRequestTransitioner) transitionUndefined() (reconcile.Result, 
 //  2. describes the node group and checks that the number of instances in the node group matches the number we
 //     are planning on terminating
 func (t *CycleNodeRequestTransitioner) transitionPending() (reconcile.Result, error) {
-	// Start the equilibrium wait timer, if this times out as the set of nodes in kube and
-	// the cloud provider is not considered valid, then transition to the Healing phase as
-	// cycling should not proceed.
-	timedOut, err := t.equilibriumWaitTimedOut()
-	if err != nil {
+	// Start the equilibrium wait timer, if this times out then the set of nodes in kube and
+	// the cloud provider is not considered valid. Transition to the Healing phase as cycling
+	// should not proceed.
+	if err := t.errorIfEquilibriumTimeoutReached(); err != nil {
 		return t.transitionToHealing(err)
-	}
-
-	if timedOut {
-		return t.transitionToHealing(fmt.Errorf(
-			"node count mismatch, number of kubernetes nodes does not match number of cloud provider instances after %v",
-			nodeEquilibriumWaitLimit,
-		))
 	}
 
 	// Fetch the node names for the cycleNodeRequest, using the label selector provided
@@ -95,49 +87,46 @@ func (t *CycleNodeRequestTransitioner) transitionPending() (reconcile.Result, er
 	// The nodes in the cloud provider can either not exist or be detached from one of the nodegroups
 	// and this will be determined when dealt with. This is an XOR condition on the two initial sets
 	// of nodes.
-	nodesNotInCloudProvider, nodesNotInKube := findProblemNodes(kubeNodes, nodeGroupInstances)
+	nodesNotInCloudProviderNodegroup, instancesNotInKube := findProblemNodes(kubeNodes, nodeGroupInstances)
 
-	// Do some sanity checking before we start filtering things
-	// Check the instance count of the node group matches the number of nodes found in Kubernetes
-	if len(nodesNotInCloudProvider) > 0 || len(nodesNotInKube) > 0 {
-		var offendingNodesInfo string
+	// If the node state isn't correct then go through and attempt to fix it. The steps in this block
+	// attempt to fix the node state and then requeues the Pending phase to re-check. It is very
+	// possible that the node state changes during the steps and it cannot be fixed. Hopefully after
+	// a few runs the state can be fixed.
+	if len(nodesNotInCloudProviderNodegroup) > 0 || len(instancesNotInKube) > 0 {
+		t.logProblemNodes(nodesNotInCloudProviderNodegroup, instancesNotInKube)
 
-		if len(nodesNotInCloudProvider) > 0 {
-			providerIDs := make([]string, 0)
-
-			for providerID := range nodesNotInCloudProvider {
-				providerIDs = append(providerIDs,
-					fmt.Sprintf("id %q", providerID),
-				)
-			}
-
-			offendingNodesInfo += "nodes not in node group: "
-			offendingNodesInfo += strings.Join(providerIDs, ",")
+		// Try to fix the case where there are 1 or more instances matching the node selector for the
+		// nodegroup in kube but are not attached to the nodegroup in the cloud provider by
+		// re-attaching them.
+		if err := t.reattachAnyDetachedInstances(nodesNotInCloudProviderNodegroup); err != nil {
+			return t.transitionToHealing(err)
 		}
 
-		if len(nodesNotInKube) > 0 {
-			if offendingNodesInfo != "" {
-				offendingNodesInfo += ";"
-			}
-
-			providerIDs := make([]string, 0)
-
-			for providerID, node := range nodesNotInKube {
-				providerIDs = append(providerIDs,
-					fmt.Sprintf("id %q in %q", providerID, node.NodeGroupName()),
-				)
-			}
-
-			offendingNodesInfo += "nodes not inside cluster: "
-			offendingNodesInfo += strings.Join(providerIDs, ",")
+		// Try to fix the case where there are 1 or more kube node objects without any matching
+		// running instances in the cloud provider. This could be because of the finalizer that
+		// was added during a previous failed cycle.
+		if err := t.deleteAnyOrphanedKubeNodes(nodesNotInCloudProviderNodegroup); err != nil {
+			return t.transitionToHealing(err)
 		}
 
-		t.rm.LogEvent(t.cycleNodeRequest, "NodeCountMismatch",
-			"node group: %v, kube: %v. %v",
-			len(validNodeGroupInstances), len(validKubeNodes), offendingNodesInfo)
-
+		// After working through these attempts, requeue to run through the Pending phase from the
+		// beginning to check the full state of nodes again. If there are any problem nodes we should
+		// not proceed and keep requeuing until the state is fixed or the timeout has been reached.
 		return reconcile.Result{Requeue: true, RequeueAfter: requeueDuration}, nil
 	}
+
+	valid, err := t.validateInstanceState(validNodeGroupInstances)
+	if err != nil {
+		return t.transitionToHealing(err)
+	}
+
+	if !valid {
+		t.rm.Logger.Info("instance state not valid, requeuing")
+		return reconcile.Result{Requeue: true, RequeueAfter: requeueDuration}, nil
+	}
+
+	t.rm.Logger.Info("instance state valid, proceeding")
 
 	// make a list of the nodes to terminate
 	if len(t.cycleNodeRequest.Spec.NodeNames) > 0 {
@@ -281,6 +270,14 @@ func (t *CycleNodeRequestTransitioner) transitionInitialised() (reconcile.Result
 			return t.transitionToHealing(err)
 		}
 
+		t.rm.Logger.Info("Adding annotation to node", "node", node.Name)
+
+		// Add the nodegroup annotation to the node before detaching it
+		if err := t.rm.AddNodegroupAnnotationToNode(node.Name, node.NodeGroupName); err != nil {
+			t.rm.LogEvent(t.cycleNodeRequest, "AddAnnotationToNodeError", err.Error())
+			return t.transitionToHealing(err)
+		}
+
 		alreadyDetaching, err := nodeGroups.DetachInstance(node.ProviderID)
 
 		if alreadyDetaching {
@@ -345,16 +342,7 @@ func (t *CycleNodeRequestTransitioner) transitionScalingUp() (reconcile.Result, 
 
 	// Increase the kubeNode count requirement by the number of nodes which are observed to have been removed prematurely
 	for _, node := range t.cycleNodeRequest.Status.CurrentNodes {
-		var instanceFound bool = false
-
-		for _, kubeNode := range kubeNodes {
-			if node.Name == kubeNode.Name {
-				instanceFound = true
-				break
-			}
-		}
-
-		if !instanceFound {
+		if _, instanceFound := kubeNodes[node.ProviderID]; !instanceFound {
 			nodesToRemove = append(nodesToRemove, node)
 			numKubeNodesReady++
 		}

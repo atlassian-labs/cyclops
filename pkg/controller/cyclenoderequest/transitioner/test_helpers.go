@@ -12,13 +12,13 @@ type Option func(t *Transitioner)
 
 func WithCloudProviderInstances(nodes []*mock.Node) Option {
 	return func(t *Transitioner) {
-		t.cloudProviderInstances = append(t.cloudProviderInstances, nodes...)
+		t.CloudProviderInstances = append(t.CloudProviderInstances, nodes...)
 	}
 }
 
 func WithKubeNodes(nodes []*mock.Node) Option {
 	return func(t *Transitioner) {
-		t.kubeNodes = append(t.kubeNodes, nodes...)
+		t.KubeNodes = append(t.KubeNodes, nodes...)
 	}
 }
 
@@ -28,23 +28,23 @@ type Transitioner struct {
 	*CycleNodeRequestTransitioner
 	*mock.Client
 
-	cloudProviderInstances []*mock.Node
-	kubeNodes              []*mock.Node
+	CloudProviderInstances []*mock.Node
+	KubeNodes              []*mock.Node
 }
 
 func NewFakeTransitioner(cnr *v1.CycleNodeRequest, opts ...Option) *Transitioner {
 	t := &Transitioner{
 		// By default there are no nodes and each test will
 		// override these as needed
-		cloudProviderInstances: make([]*mock.Node, 0),
-		kubeNodes:              make([]*mock.Node, 0),
+		CloudProviderInstances: make([]*mock.Node, 0),
+		KubeNodes:              make([]*mock.Node, 0),
 	}
 
 	for _, opt := range opts {
 		opt(t)
 	}
 
-	t.Client = mock.NewClient(t.kubeNodes, t.cloudProviderInstances, cnr)
+	t.Client = mock.NewClient(t.KubeNodes, t.CloudProviderInstances, cnr)
 
 	rm := &controller.ResourceManager{
 		Client:        t.K8sClient,
