@@ -6,19 +6,33 @@ import (
 	v1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
 	"github.com/atlassian-labs/cyclops/pkg/controller"
 	"github.com/atlassian-labs/cyclops/pkg/mock"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type Option func(t *Transitioner)
 
 func WithCloudProviderInstances(nodes []*mock.Node) Option {
 	return func(t *Transitioner) {
-		t.cloudProviderInstances = append(t.cloudProviderInstances, nodes...)
+		t.CloudProviderInstances = append(t.CloudProviderInstances, nodes...)
 	}
 }
 
 func WithKubeNodes(nodes []*mock.Node) Option {
 	return func(t *Transitioner) {
-		t.kubeNodes = append(t.kubeNodes, nodes...)
+		t.KubeNodes = append(t.KubeNodes, nodes...)
+	}
+}
+
+func WithExtraKubeObject(extraKubeObject client.Object) Option {
+	return func(t *Transitioner) {
+		t.extrakubeObjects = append(t.extrakubeObjects, extraKubeObject)
+	}
+}
+
+func WithTransitionerOptions(options Options) Option {
+	return func(t *Transitioner) {
+		t.transitionerOptions = options
 	}
 }
 
@@ -28,23 +42,31 @@ type Transitioner struct {
 	*CycleNodeRequestTransitioner
 	*mock.Client
 
-	cloudProviderInstances []*mock.Node
-	kubeNodes              []*mock.Node
+	CloudProviderInstances []*mock.Node
+	KubeNodes              []*mock.Node
+
+	extrakubeObjects []client.Object
+
+	transitionerOptions Options
 }
 
 func NewFakeTransitioner(cnr *v1.CycleNodeRequest, opts ...Option) *Transitioner {
 	t := &Transitioner{
 		// By default there are no nodes and each test will
 		// override these as needed
-		cloudProviderInstances: make([]*mock.Node, 0),
-		kubeNodes:              make([]*mock.Node, 0),
+		CloudProviderInstances: make([]*mock.Node, 0),
+		KubeNodes:              make([]*mock.Node, 0),
+		extrakubeObjects:       []client.Object{cnr},
+		transitionerOptions:    Options{},
 	}
 
 	for _, opt := range opts {
 		opt(t)
 	}
 
-	t.Client = mock.NewClient(t.kubeNodes, t.cloudProviderInstances, cnr)
+	t.Client = mock.NewClient(
+		t.KubeNodes, t.CloudProviderInstances, t.extrakubeObjects...,
+	)
 
 	rm := &controller.ResourceManager{
 		Client:        t.K8sClient,
@@ -54,7 +76,7 @@ func NewFakeTransitioner(cnr *v1.CycleNodeRequest, opts ...Option) *Transitioner
 	}
 
 	t.CycleNodeRequestTransitioner = NewCycleNodeRequestTransitioner(
-		cnr, rm, Options{},
+		cnr, rm, t.transitionerOptions,
 	)
 
 	return t

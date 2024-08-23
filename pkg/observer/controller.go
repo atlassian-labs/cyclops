@@ -230,21 +230,42 @@ func (c *controller) inProgressCNRs() v1.CycleNodeRequestList {
 
 // dropInProgressNodeGroups matches nodeGroups to CNRs and filters out any that match
 func (c *controller) dropInProgressNodeGroups(nodeGroups v1.NodeGroupList, cnrs v1.CycleNodeRequestList) v1.NodeGroupList {
-	// filter out nodegroups that aren't current in progress with a cnr
+	// Filter out nodegroups that aren't currently in progress with a cnr. Count
+	// failed CNRs only if they don't outnumber the max threshold defined for
+	// the nodegroup
 	var restingNodeGroups v1.NodeGroupList
+
 	for i, nodeGroup := range nodeGroups.Items {
-		var found bool
+		var dropNodeGroup bool
+		var failedCNRsFound uint
+
 		for _, cnr := range cnrs.Items {
-			if sameNodeGroups(cnr.GetNodeGroupNames(), nodeGroup.GetNodeGroupNames()) {
-				found = true
-				break
+			// CNR doesn't match nodegroup, skip it
+			if !sameNodeGroups(cnr.GetNodeGroupNames(), nodeGroup.GetNodeGroupNames()) {
+				continue
+			}
+
+			// Count the Failed CNRs separately, they need to be counted before
+			// they can be considered to drop the nodegroup
+			if cnr.Status.Phase == v1.CycleNodeRequestFailed {
+				failedCNRsFound++
+			} else {
+				dropNodeGroup = true
+			}
+
+			// If the number of Failed CNRs crossed the thrshold in the
+			// nodegroup then drop it
+			if failedCNRsFound >= nodeGroup.Spec.MaxFailedCycleNodeRequests {
+				dropNodeGroup = true
 			}
 		}
-		if found {
+
+		if dropNodeGroup {
 			klog.Warningf("nodegroup %q has an in progress CNR.. skipping this nodegroup", nodeGroup.Name)
 			c.NodeGroupsLocked.WithLabelValues(nodeGroup.Name).Inc()
 			continue
 		}
+
 		restingNodeGroups.Items = append(restingNodeGroups.Items, nodeGroups.Items[i])
 	}
 

@@ -149,6 +149,11 @@ spec:
                   - waitPeriod
                   type: object
                 type: array
+              maxFailedCycleNodeRequests:
+                description: MaxFailedCycleNodeRequests defines the maximum number
+                  of allowed failed CNRs for a nodegroup before the observer stops
+                  generating them.
+                type: integer
               nodeGroupName:
                 description: NodeGroupName is the name of the node group in the cloud
                   provider that corresponds to this NodeGroup resource.

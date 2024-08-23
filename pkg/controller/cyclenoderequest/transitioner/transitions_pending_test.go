@@ -406,7 +406,7 @@ func TestPendingReattachedCloudProviderNode(t *testing.T) {
 	assert.NoError(t, err)
 
 	// "re-attach" the instance to the asg
-	fakeTransitioner.cloudProviderInstances[0].Nodegroup = "ng-1"
+	fakeTransitioner.CloudProviderInstances[0].Nodegroup = "ng-1"
 
 	// The CNR should transition to the Initialised phase because the state of
 	// the nodes is now correct and this happened within the timeout period.
@@ -474,7 +474,7 @@ func TestPendingReattachedCloudProviderNodeTooLate(t *testing.T) {
 	assert.NoError(t, err)
 
 	// "re-attach" the instance to the asg
-	fakeTransitioner.cloudProviderInstances[0].Nodegroup = "ng-1"
+	fakeTransitioner.CloudProviderInstances[0].Nodegroup = "ng-1"
 
 	// This time should transition to the healing phase even though the state
 	// is correct because the timeout check happens first

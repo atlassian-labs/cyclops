@@ -323,3 +323,61 @@ func (t *CycleNodeRequestTransitioner) transitionToUnsuccessful(phase v1.CycleNo
 
 	return reconcile.Result{}, err
 }
+
+// deleteFailedSiblingCNRs finds the CNRs generated for the same nodegroup as
+// the one in the calling transitioner. It filters for deleted CNRs in the same
+// namespace and deletes them.
+func (t *CycleNodeRequestTransitioner) deleteFailedSiblingCNRs() error {
+	ctx := context.TODO()
+	nodegroupList := t.cycleNodeRequest.GetNodeGroupNames()
+
+	var list v1.CycleNodeRequestList
+
+	err := t.rm.Client.List(ctx, &list, &client.ListOptions{
+		Namespace: t.cycleNodeRequest.Namespace,
+	})
+
+	if err != nil {
+		return err
+	}
+
+	for _, cnr := range list.Items {
+		// Filter out CNRs generated for another Nodegroup
+		if !sameNodeGroups(nodegroupList, cnr.GetNodeGroupNames()) {
+			continue
+		}
+
+		// Filter out CNRs not in the Failed phase
+		if cnr.Status.Phase != v1.CycleNodeRequestFailed {
+			continue
+		}
+
+		if err := t.rm.Client.Delete(ctx, &cnr); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// sameNodeGroups compares two lists of nodegroup names and check they are the
+// same. Ordering does not affect equality.
+func sameNodeGroups(groupA, groupB []string) bool {
+	if len(groupA) != len(groupB) {
+		return false
+	}
+
+	groupMap := make(map[string]struct{})
+
+	for _, group := range groupA {
+		groupMap[group] = struct{}{}
+	}
+
+	for _, group := range groupB {
+		if _, ok := groupMap[group]; !ok {
+			return false
+		}
+	}
+
+	return true
+}
