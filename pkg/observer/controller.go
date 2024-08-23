@@ -253,9 +253,9 @@ func (c *controller) dropInProgressNodeGroups(nodeGroups v1.NodeGroupList, cnrs 
 				dropNodeGroup = true
 			}
 
-			// If the number of Failed CNRs crossed the thrshold in the
+			// If the number of Failed CNRs exceeds the threshold in the
 			// nodegroup then drop it
-			if failedCNRsFound >= nodeGroup.Spec.MaxFailedCycleNodeRequests {
+			if failedCNRsFound > nodeGroup.Spec.MaxFailedCycleNodeRequests {
 				dropNodeGroup = true
 			}
 		}

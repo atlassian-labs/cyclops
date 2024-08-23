@@ -3,8 +3,9 @@ package observer
 import (
 	"context"
 	"fmt"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"testing"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	atlassianv1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
 	"github.com/atlassian-labs/cyclops/pkg/test"
@@ -190,7 +191,7 @@ func Test_inProgressCNRs(t *testing.T) {
 	}
 }
 
-func Test_dropInProgressNodeGroups(t *testing.T) {
+func TestScenarios_dropInProgressNodeGroups(t *testing.T) {
 
 	scenario := test.BuildTestScenario(test.ScenarioOpts{
 		Keys:         []string{"a", "b", "c"},
@@ -275,6 +276,110 @@ func Test_dropInProgressNodeGroups(t *testing.T) {
 
 			got := c.dropInProgressNodeGroups(tt.ng, tt.cnrs)
 			assert.ElementsMatch(t, tt.expect.Items, got.Items)
+		})
+	}
+}
+
+func Test_dropInProgressNodeGroups(t *testing.T) {
+	nodegroup := atlassianv1.NodeGroup{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      "ng-1",
+			Namespace: "kube-system",
+		},
+		Spec: atlassianv1.NodeGroupSpec{
+			NodeGroupName: "ng-1",
+		},
+	}
+
+	cnr1 := atlassianv1.CycleNodeRequest{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      "cnr-1",
+			Namespace: "kube-system",
+		},
+		Spec: atlassianv1.CycleNodeRequestSpec{
+			NodeGroupName: "ng-1",
+		},
+		Status: atlassianv1.CycleNodeRequestStatus{
+			Phase: atlassianv1.CycleNodeRequestPending,
+		},
+	}
+
+	cnr2 := atlassianv1.CycleNodeRequest{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      "cnr-2",
+			Namespace: "kube-system",
+		},
+		Spec: atlassianv1.CycleNodeRequestSpec{
+			NodeGroupName: "ng-1",
+		},
+		Status: atlassianv1.CycleNodeRequestStatus{
+			Phase: atlassianv1.CycleNodeRequestFailed,
+		},
+	}
+
+	tests := []struct {
+		name          string
+		threshold     int
+		CNRs          []atlassianv1.CycleNodeRequest
+		dropNodegroup bool
+	}{
+		{
+			"test no CNRs for nodegroups",
+			0,
+			[]atlassianv1.CycleNodeRequest{},
+			false,
+		},
+		{
+			"test Pending CNR for nodegroup",
+			0,
+			[]atlassianv1.CycleNodeRequest{cnr1},
+			true,
+		},
+		{
+			"test less failed CNRs than threshold",
+			2,
+			[]atlassianv1.CycleNodeRequest{cnr2},
+			false,
+		},
+		{
+			"test same number of failed CNRs as threshold",
+			1,
+			[]atlassianv1.CycleNodeRequest{cnr2},
+			false,
+		},
+		{
+			"test more failed CNRs than threshold",
+			0,
+			[]atlassianv1.CycleNodeRequest{cnr2},
+			true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := controller{
+				client:  nil,
+				Options: Options{},
+				metrics: newMetrics(),
+			}
+
+			nodegroup.Spec.MaxFailedCycleNodeRequests = uint(tt.threshold)
+
+			nodegroupList := atlassianv1.NodeGroupList{
+				Items: []atlassianv1.NodeGroup{nodegroup},
+			}
+
+			cnrList := atlassianv1.CycleNodeRequestList{
+				Items: tt.CNRs,
+			}
+
+			got := c.dropInProgressNodeGroups(nodegroupList, cnrList)
+
+			if tt.dropNodegroup {
+				assert.Len(t, got.Items, 0)
+			} else {
+				assert.Len(t, got.Items, 1)
+			}
 		})
 	}
 }
