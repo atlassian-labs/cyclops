@@ -166,18 +166,34 @@ spec:
         - stickypod  
 ```
 
-This example shows the usage of the `Wait` method which opposed to `Drain` which attempts to remove pods from the node before terminating, will wait for all pods to leave the node naturally by themselves. This is useful for situations where you cannot forcefully remove pods, such as high churn jobs which need to be run to completion.
+This example shows the usage of the `Wait` method which as opposed to `Drain`, which attempts to remove pods from the node before terminating, will wait for pods with the `cyclops.atlassian.com/do-not-disrupt=true` annotation to leave the node naturally by themselves. This is useful for situations where you cannot forcefully remove pods, such as high churn jobs which need to be run to completion.
+
+```yaml
+# Pod example
+apiVersion: v1
+kind: Pod
+metadata:
+  name: do-not-disrupt
+  annotations:
+    cyclops.atlassian.com/do-not-disrupt: "true"
+spec:
+  containers:
+  - name: sleep
+    image: alpine
+    command: ["sleep", "3600"]
+```
+
+Cyclops provides an option to ignore pods with specific labels in order to support nodes that may run pods that will never exit themselves. In this example, the pod with label `name=stickypod` would be ignore when waiting for all other pods to terminate. The node will be terminated while `name=stickypod` is running, and all others have finished.
 
 ```yaml
   cycleSettings:
     method: "Wait"
     ignorePodsLabels:
       name:
-        - stickypod  
+        - stickypod
 ```
 
-Cyclops provides an option to ignore pods with specific labels in order to support nodes that may run pods that will never exit themselves. In this example, the pod with label `name=stickypod` would be ignore when waiting for all other pods to terminate. The node will be terminated while `name=stickypod` is running, and all others have finished.
-
+The label selector to ignore pods will take precedence over selecting pods with the `cyclops.atlassian.com/do-not-disrupt=true` annotation, which means a pod with both the annotation and the label will be ignored.
 
 ## Example 5 - Concurrency within multiple cloud provider node groups
 

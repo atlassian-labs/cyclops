@@ -16,6 +16,7 @@ import (
 
 const (
 	podConditionTypeForUnhealthy = v1.PodReady
+	doNotDisruptAnnotation       = "cyclops.atlassian.com/do-not-disrupt"
 )
 
 var log = logf.Log.WithName("k8s.pod.go")
@@ -84,6 +85,25 @@ func PodIsDaemonSet(pod *v1.Pod) bool {
 			return true
 		}
 	}
+
+	return false
+}
+
+// PodCannotBeDisrupted returns true if the pod cannot be forcibly drained from
+// a node.
+func PodCannotBeDisrupted(pod *v1.Pod) bool {
+	for annotationName, annotationValue := range pod.ObjectMeta.Annotations {
+		if annotationName != doNotDisruptAnnotation {
+			continue
+		}
+
+		if annotationValue != "true" {
+			continue
+		}
+
+		return true
+	}
+
 	return false
 }
 
