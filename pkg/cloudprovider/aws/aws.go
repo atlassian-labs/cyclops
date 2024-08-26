@@ -114,9 +114,10 @@ func (p *provider) GetNodeGroups(names []string) (cloudprovider.NodeGroups, erro
 }
 
 // InstancesExist returns a list of the instances that exist
-func (p *provider) InstancesExist(providerIDs []string) (validProviderIDs []string, err error) {
-	instanceIDSet := map[string]string{}
-	instanceIDs := []string{}
+func (p *provider) InstancesExist(providerIDs []string) (map[string]interface{}, error) {
+	validProviderIDs := make(map[string]interface{})
+	instanceIDSet := make(map[string]string)
+	instanceIDs := make([]string, 0)
 
 	for _, providerID := range providerIDs {
 		instanceID, err := providerIDToInstanceID(providerID)
@@ -140,8 +141,12 @@ func (p *provider) InstancesExist(providerIDs []string) (validProviderIDs []stri
 
 	for _, reservation := range output.Reservations {
 		for _, instance := range reservation.Instances {
+			if *instance.State.Name == ec2.InstanceStateNameTerminated {
+				continue
+			}
+
 			if providerID, ok := instanceIDSet[aws.StringValue(instance.InstanceId)]; ok {
-				validProviderIDs = append(validProviderIDs, providerID)
+				validProviderIDs[providerID] = nil
 			}
 		}
 	}
@@ -190,7 +195,7 @@ func (a *autoscalingGroups) ReadyInstances() map[string]cloudprovider.Instance {
 	instances := make(map[string]cloudprovider.Instance)
 	for _, group := range a.groups {
 		for _, i := range group.Instances {
-			if aws.StringValue(i.LifecycleState) != "InService" {
+			if aws.StringValue(i.LifecycleState) != autoscaling.LifecycleStateInService {
 				continue
 			}
 			providerID, err := instanceIDToProviderID(aws.StringValue(i.InstanceId), *i.AvailabilityZone)
@@ -214,7 +219,7 @@ func (a *autoscalingGroups) NotReadyInstances() map[string]cloudprovider.Instanc
 	instances := make(map[string]cloudprovider.Instance)
 	for _, group := range a.groups {
 		for _, i := range group.Instances {
-			if aws.StringValue(i.LifecycleState) != "InService" {
+			if aws.StringValue(i.LifecycleState) != autoscaling.LifecycleStateInService {
 				providerID, err := instanceIDToProviderID(aws.StringValue(i.InstanceId), aws.StringValue(i.AvailabilityZone))
 				if err != nil {
 					a.logger.Info("[NotReadyInstances] skip instance which failed instanceID to providerID conversion: %v", aws.StringValue(i.InstanceId))

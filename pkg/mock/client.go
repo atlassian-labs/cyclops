@@ -26,12 +26,15 @@ import (
 
 type Node struct {
 	Name       string
-	LabelKey   string
-	LabelValue string
 	Creation   time.Time
 	Tainted    bool
 	Nodegroup  string
 	InstanceID string
+
+	LabelKey        string
+	LabelValue      string
+	AnnotationKey   string
+	AnnotationValue string
 
 	NodeReady corev1.ConditionStatus
 
@@ -150,6 +153,9 @@ func buildKubeNode(node *Node) *corev1.Node {
 			SelfLink: fmt.Sprintf("/api/v1/nodes/%s", node.Name),
 			Labels: map[string]string{
 				node.LabelKey: node.LabelValue,
+			},
+			Annotations: map[string]string{
+				node.AnnotationKey: node.AnnotationValue,
 			},
 			CreationTimestamp: metav1.NewTime(node.Creation),
 		},

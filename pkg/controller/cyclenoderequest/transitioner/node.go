@@ -3,17 +3,16 @@ package transitioner
 import (
 	"fmt"
 
-	"github.com/pkg/errors"
-
 	corev1 "k8s.io/api/core/v1"
 
 	v1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
 	"github.com/atlassian-labs/cyclops/pkg/cloudprovider"
 )
 
-// listReadyNodes lists nodes that are "ready". By default lists nodes that have also not been touched by Cyclops.
-// A label is used to determine whether nodes have been touched by this CycleNodeRequest.
-func (t *CycleNodeRequestTransitioner) listReadyNodes(includeInProgress bool) (map[string]corev1.Node, error) {
+// listNodes lists nodes matching the node selector. By default lists nodes that have also
+// not been touched by Cyclops. A label is used to determine whether nodes have been touched
+// by this CycleNodeRequest.
+func (t *CycleNodeRequestTransitioner) listNodes(includeInProgress bool) (map[string]corev1.Node, error) {
 	nodes := make(map[string]corev1.Node)
 
 	// Get the nodes
@@ -36,12 +35,31 @@ func (t *CycleNodeRequestTransitioner) listReadyNodes(includeInProgress bool) (m
 			}
 		}
 
-		// Only add "Ready" nodes
+		nodes[node.Spec.ProviderID] = node
+	}
+
+	return nodes, nil
+}
+
+// listReadyNodes lists nodes that are "ready". By default lists nodes that have also not been touched by Cyclops.
+// A label is used to determine whether nodes have been touched by this CycleNodeRequest.
+func (t *CycleNodeRequestTransitioner) listReadyNodes(includeInProgress bool) (map[string]corev1.Node, error) {
+	nodes, err := t.listNodes(includeInProgress)
+	if err != nil {
+		return nil, err
+	}
+
+	for providerID, node := range nodes {
+		nodeReady := false
+
 		for _, cond := range node.Status.Conditions {
 			if cond.Type == corev1.NodeReady && cond.Status == corev1.ConditionTrue {
-				nodes[node.Spec.ProviderID] = node
-				break
+				nodeReady = true
 			}
+		}
+
+		if !nodeReady {
+			delete(nodes, providerID)
 		}
 	}
 
@@ -146,39 +164,13 @@ func (t *CycleNodeRequestTransitioner) addNamedNodesToTerminate(kubeNodes map[st
 // specified in the CNR. These are two separate sets and the contents of one does not affect the
 // contents of the other.
 func (t *CycleNodeRequestTransitioner) findAllNodesForCycle() (kubeNodes map[string]corev1.Node, cloudProviderInstances map[string]cloudprovider.Instance, err error) {
-	kubeNodes, err = t.listReadyNodes(true)
+	kubeNodes, err = t.listNodes(true)
 	if err != nil {
 		return kubeNodes, cloudProviderInstances, err
 	}
 
 	if len(kubeNodes) == 0 {
 		return kubeNodes, cloudProviderInstances, fmt.Errorf("no nodes matched selector")
-	}
-
-	// Only retain nodes which still exist inside cloud provider
-	var nodeProviderIDs []string
-
-	for _, node := range kubeNodes {
-		nodeProviderIDs = append(nodeProviderIDs, node.Spec.ProviderID)
-	}
-
-	existingProviderIDs, err := t.rm.CloudProvider.InstancesExist(nodeProviderIDs)
-	if err != nil {
-		return kubeNodes, cloudProviderInstances, errors.Wrap(err, "failed to check instances that exist from cloud provider")
-	}
-
-	existingKubeNodes := make(map[string]corev1.Node)
-
-	for _, validProviderID := range existingProviderIDs {
-		if node, found := kubeNodes[validProviderID]; found {
-			existingKubeNodes[node.Spec.ProviderID] = node
-		}
-	}
-
-	kubeNodes = existingKubeNodes
-
-	if len(kubeNodes) == 0 {
-		return kubeNodes, cloudProviderInstances, fmt.Errorf("no existing nodes in cloud provider matched selector")
 	}
 
 	nodeGroupNames := t.cycleNodeRequest.GetNodeGroupNames()

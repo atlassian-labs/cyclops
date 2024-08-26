@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/atlassian-labs/cyclops/pkg/k8s"
@@ -15,7 +16,8 @@ import (
 )
 
 const (
-	nodeFinalizerName = "cyclops.atlassian.com/finalizer"
+	nodeFinalizerName       = "cyclops.atlassian.com/finalizer"
+	nodegroupAnnotationName = "cyclops.atlassian.com/nodegroup"
 )
 
 // ListNodes lists nodes from Kubernetes, optionally filtered by a selector.
@@ -96,12 +98,60 @@ func (rm *ResourceManager) DrainPods(nodeName string, unhealthyAfter time.Durati
 	return false, k8s.DrainPods(pods, rm.RawClient, unhealthyAfter)
 }
 
+func (rm *ResourceManager) AddNodegroupAnnotationToNode(nodeName, nodegroupName string) error {
+	return rm.AddAnnotationToNode(nodeName, nodegroupAnnotationName, nodegroupName)
+}
+
+func (rm *ResourceManager) GetNodegroupFromNodeAnnotation(nodeName string) (string, error) {
+	// Get the node
+	node, err := rm.GetNode(nodeName)
+	if err != nil {
+		return "", err
+	}
+
+	nodegroupName, exists := node.Annotations[nodegroupAnnotationName]
+
+	if !exists {
+		return "", fmt.Errorf("node %s does not contain the %s annotation",
+			nodeName,
+			nodegroupAnnotationName,
+		)
+	}
+
+	return nodegroupName, nil
+}
+
+func (rm *ResourceManager) AddAnnotationToNode(nodeName, annotationName, annotationValue string) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		// Let the caller account for the node not being found
+		return k8s.AddAnnotationToNode(nodeName, annotationName, annotationValue, rm.RawClient)
+	})
+}
+
 func (rm *ResourceManager) AddFinalizerToNode(nodeName string) error {
 	return rm.manageFinalizerOnNode(nodeName, k8s.AddFinalizerToNode)
 }
 
 func (rm *ResourceManager) RemoveFinalizerFromNode(nodeName string) error {
 	return rm.manageFinalizerOnNode(nodeName, k8s.RemoveFinalizerFromNode)
+}
+
+func (rm *ResourceManager) NodeContainsNonCyclingFinalizer(nodeName string) (bool, error) {
+	node, err := rm.GetNode(nodeName)
+
+	// If the node is not found then skip the finalizer check
+	if err != nil && apierrors.IsNotFound(err) {
+		rm.Logger.Info("node deleted, skip adding finalizer", "node", nodeName)
+		return false, nil
+	}
+
+	for _, finalizer := range node.Finalizers {
+		if finalizer != nodeFinalizerName {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func (rm *ResourceManager) manageFinalizerOnNode(nodeName string, fn func(*v1.Node, string, kubernetes.Interface) error) error {
