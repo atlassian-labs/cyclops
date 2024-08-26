@@ -106,6 +106,11 @@ spec:
     - "node-name-A"
     - "node-name-B"
 
+  # Optional section - collection of validation options to define stricter or more lenient validation during cycling.
+  validationOptions:
+    # Optional field - Skip node names defined in the CNR that do not match any existing nodes in the Kubernetes API.
+    skipMissingNamedNodes: true|false
+
   cycleNodeSettings:
       # Method can be "Wait" or "Drain", defaults to "Drain" if not provided
       # "Wait" will wait for pods with the "cyclops.atlassian.com/do-not-disrupt=true"
