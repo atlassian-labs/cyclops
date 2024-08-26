@@ -3,9 +3,12 @@ package transitioner
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -30,6 +33,35 @@ func (t *CycleNodeRequestTransitioner) transitionToFailed(err error) (reconcile.
 	}
 
 	return t.transitionToUnsuccessful(v1.CycleNodeRequestFailed, err)
+}
+
+// transitionToUnsuccessful transitions the current cycleNodeRequest to healing/failed
+func (t *CycleNodeRequestTransitioner) transitionToUnsuccessful(phase v1.CycleNodeRequestPhase, err error) (reconcile.Result, error) {
+	t.cycleNodeRequest.Status.Phase = phase
+	// don't try to append message if it's nil
+	if err != nil {
+		if t.cycleNodeRequest.Status.Message != "" {
+			t.cycleNodeRequest.Status.Message += ", "
+		}
+
+		t.cycleNodeRequest.Status.Message += err.Error()
+	}
+
+	// handle conflicts before complaining
+	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		return t.rm.UpdateObject(t.cycleNodeRequest)
+	}); err != nil {
+		t.rm.Logger.Error(err, "unable to update cycleNodeRequest")
+	}
+
+	// Notify that the cycling has transitioned phase
+	if t.rm.Notifier != nil {
+		if err := t.rm.Notifier.PhaseTransitioned(t.cycleNodeRequest); err != nil {
+			t.rm.Logger.Error(err, "Unable to post message to messaging provider", "phase", t.cycleNodeRequest.Status.Phase)
+		}
+	}
+
+	return reconcile.Result{}, err
 }
 
 // transitionToSuccessful transitions the current cycleNodeRequest to successful
@@ -74,12 +106,15 @@ func (t *CycleNodeRequestTransitioner) equilibriumWaitTimedOut() (bool, error) {
 	// If the timer isn't initialised, initialise it and save it to the object
 	if t.cycleNodeRequest.Status.EquilibriumWaitStarted.IsZero() {
 		t.rm.Logger.Info("started equilibrium wait")
+
 		currentTime := metav1.Now()
 		t.cycleNodeRequest.Status.EquilibriumWaitStarted = &currentTime
+
 		if err := t.rm.UpdateObject(t.cycleNodeRequest); err != nil {
 			return false, err
 		}
 	}
+
 	return time.Now().After(t.cycleNodeRequest.Status.EquilibriumWaitStarted.Time.Add(nodeEquilibriumWaitLimit)), nil
 }
 
@@ -295,33 +330,204 @@ func findProblemNodes(kubeNodes map[string]corev1.Node, nodeGroupInstances map[s
 	return problemKubeNodes, problemNodegroupInstances
 }
 
-// transitionToUnsuccessful transitions the current cycleNodeRequest to healing/failed
-func (t *CycleNodeRequestTransitioner) transitionToUnsuccessful(phase v1.CycleNodeRequestPhase, err error) (reconcile.Result, error) {
-	t.cycleNodeRequest.Status.Phase = phase
-	// don't try to append message if it's nil
+// reattachAnyDetachedInstances re-attaches any instances which are detached from the cloud
+// provider nodegroups defined in the CNR using the cycling annotation to identify which one.
+func (t *CycleNodeRequestTransitioner) reattachAnyDetachedInstances(nodesNotInCloudProviderNodegroup map[string]corev1.Node) error {
+	var nodeProviderIDs []string
+
+	if len(nodesNotInCloudProviderNodegroup) == 0 {
+		return nil
+	}
+
+	for _, node := range nodesNotInCloudProviderNodegroup {
+		nodeProviderIDs = append(nodeProviderIDs, node.Spec.ProviderID)
+	}
+
+	existingProviderIDs, err := t.rm.CloudProvider.InstancesExist(nodeProviderIDs)
 	if err != nil {
-		if t.cycleNodeRequest.Status.Message != "" {
-			t.cycleNodeRequest.Status.Message += ", "
+		return errors.Wrap(err, "failed to check instances that exist from cloud provider")
+	}
+
+	nodeGroups, err := t.rm.CloudProvider.GetNodeGroups(t.cycleNodeRequest.GetNodeGroupNames())
+	if err != nil {
+		return err
+	}
+
+	for providerID, node := range nodesNotInCloudProviderNodegroup {
+		_, instanceExists := existingProviderIDs[providerID]
+
+		if !instanceExists {
+			continue
 		}
 
-		t.cycleNodeRequest.Status.Message += err.Error()
-	}
+		// The kube node is now established to be backed by an instance in the cloud provider
+		// that is detached from it's nodegroup. Use the nodegroup annotation from the kube
+		// node set as part of a previous cycle to re-attach it.
+		nodegroupName, err := t.rm.GetNodegroupFromNodeAnnotation(node.Name)
 
-	// handle conflicts before complaining
-	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		return t.rm.UpdateObject(t.cycleNodeRequest)
-	}); err != nil {
-		t.rm.Logger.Error(err, "unable to update cycleNodeRequest")
-	}
+		// If there is an error because the kube node no longer exists then simply skip any
+		// more action on the node and go to the next one. This case can be fixed in the next
+		// run of the Pending phase.
+		if apierrors.IsNotFound(err) {
+			continue
+		}
 
-	// Notify that the cycling has transitioned phase
-	if t.rm.Notifier != nil {
-		if err := t.rm.Notifier.PhaseTransitioned(t.cycleNodeRequest); err != nil {
-			t.rm.Logger.Error(err, "Unable to post message to messaging provider", "phase", t.cycleNodeRequest.Status.Phase)
+		// Otherwise error out to end the cycle. This includes if the cycling annotation is
+		// missing since there is no link between the original cloud provider instance and it's
+		// nodegroup so there's no way to re-attach it.
+		if err != nil {
+			return err
+		}
+
+		// AttachInstance does not error out if the instance does not exist so no need to handle
+		// it here. Error out on any error that can't be fixed by repeating the attempts to fix
+		// the instance state.
+		alreadyAttached, err := nodeGroups.AttachInstance(node.Spec.ProviderID, nodegroupName)
+		if err != nil && !alreadyAttached {
+			return err
 		}
 	}
 
-	return reconcile.Result{}, err
+	return nil
+}
+
+// deleteAnyOrphanedKubeNodes filters through the kube nodes without instances in the cloud provider
+// nodegroups which don't have an instance in the cloud provider at all. It removes the cycling
+// finalizer and deletes the node.
+func (t *CycleNodeRequestTransitioner) deleteAnyOrphanedKubeNodes(nodesNotInCloudProviderNodegroup map[string]corev1.Node) error {
+	var nodeProviderIDs []string
+
+	if len(nodesNotInCloudProviderNodegroup) == 0 {
+		return nil
+	}
+
+	for _, node := range nodesNotInCloudProviderNodegroup {
+		nodeProviderIDs = append(nodeProviderIDs, node.Spec.ProviderID)
+	}
+
+	existingProviderIDs, err := t.rm.CloudProvider.InstancesExist(nodeProviderIDs)
+	if err != nil {
+		return errors.Wrap(err, "failed to check instances that exist from cloud provider")
+	}
+
+	// Find all the orphaned kube nodes from the set of nodes without matching instance in the
+	// cloud provider nodegroup.
+	for providerID, node := range nodesNotInCloudProviderNodegroup {
+		_, instanceExists := existingProviderIDs[providerID]
+
+		if instanceExists {
+			continue
+		}
+
+		// The kube node is now established to be orphaned. Check the finalizers on the node
+		// object and ensure that only the Cyclops finalizer exists on it. If another finalizer
+		// exists then it's from another controller and it should not be deleted.
+		containsNonCyclingFinalizer, err := t.rm.NodeContainsNonCyclingFinalizer(node.Name)
+		if err != nil {
+			return errors.Wrap(err,
+				fmt.Sprintf("failed to check if node %s contains a non-cycling finalizer", node.Name),
+			)
+		}
+
+		if containsNonCyclingFinalizer {
+			return fmt.Errorf("can't delete node %s because it contains non-cycling finalizers: %v",
+				node.Name,
+				node.Finalizers,
+			)
+		}
+
+		// The cycling finalizer is the only one on the node so remove it.
+		if err := t.rm.RemoveFinalizerFromNode(node.Name); err != nil {
+			return err
+		}
+
+		// Delete the node to ensure it gets removed from kube. It is possible that the finalizer
+		// was preventing the node object from being deleted and the node is deleted by the time
+		// this delete call is reached. Don't if the node is already deleted since that is desired
+		// effect.
+		if err := t.rm.DeleteNode(node.Name); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// errorIfEquilibriumTimeoutReached reduces the footprint of this check in the
+// Pending transition
+func (t *CycleNodeRequestTransitioner) errorIfEquilibriumTimeoutReached() error {
+	timedOut, err := t.equilibriumWaitTimedOut()
+	if err != nil {
+		return err
+	}
+
+	if timedOut {
+		return fmt.Errorf(
+			"node count mismatch, number of kubernetes nodes does not match number of cloud provider instances after %v",
+			nodeEquilibriumWaitLimit,
+		)
+	}
+
+	return nil
+}
+
+// logProblemNodes generates event message describing any issues with the node state prior
+// to cycling.
+func (t *CycleNodeRequestTransitioner) logProblemNodes(nodesNotInCloudProviderNodegroup map[string]corev1.Node, instancesNotInKube map[string]cloudprovider.Instance) {
+	var offendingNodesInfo string
+
+	if len(nodesNotInCloudProviderNodegroup) > 0 {
+		providerIDs := make([]string, 0)
+
+		for providerID := range nodesNotInCloudProviderNodegroup {
+			providerIDs = append(providerIDs,
+				fmt.Sprintf("id %q", providerID),
+			)
+		}
+
+		offendingNodesInfo += "nodes not in node group: "
+		offendingNodesInfo += strings.Join(providerIDs, ",")
+	}
+
+	if len(instancesNotInKube) > 0 {
+		if offendingNodesInfo != "" {
+			offendingNodesInfo += ";"
+		}
+
+		providerIDs := make([]string, 0)
+
+		for providerID, node := range instancesNotInKube {
+			providerIDs = append(providerIDs,
+				fmt.Sprintf("id %q in %q", providerID, node.NodeGroupName()),
+			)
+		}
+
+		offendingNodesInfo += "nodes not inside cluster: "
+		offendingNodesInfo += strings.Join(providerIDs, ",")
+	}
+
+	t.rm.LogEvent(t.cycleNodeRequest, "NodeStateInvalid",
+		"instances missing: %v, kube nodes missing: %v. %v",
+		len(nodesNotInCloudProviderNodegroup), len(instancesNotInKube), offendingNodesInfo,
+	)
+}
+
+// validateInstanceState performs final validation on the nodegroup to ensure
+// that all the cloud provider instances are ready in the nodegroup.
+func (t *CycleNodeRequestTransitioner) validateInstanceState(validNodeGroupInstances map[string]cloudprovider.Instance) (bool, error) {
+	nodeGroups, err := t.rm.CloudProvider.GetNodeGroups(
+		t.cycleNodeRequest.GetNodeGroupNames(),
+	)
+
+	if err != nil {
+		return false, err
+	}
+
+	if len(nodeGroups.ReadyInstances()) == len(validNodeGroupInstances) {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 // deleteFailedSiblingCNRs finds the CNRs generated for the same nodegroup as

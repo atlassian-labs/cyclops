@@ -22,7 +22,7 @@ func GenerateRandomInstanceId() (string, error) {
 	return "i-" + hexString, nil
 }
 
-func NewNodegroup(name string, num int) ([]*Node, error) {
+func NewNodegroup(nodegroupName string, num int) ([]*Node, error) {
 	nodes := make([]*Node, 0)
 
 	for i := 0; i < num; i++ {
@@ -32,13 +32,15 @@ func NewNodegroup(name string, num int) ([]*Node, error) {
 		}
 
 		node := &Node{
-			Name:               fmt.Sprintf("%s-node-%d", name, i),
+			Name:               fmt.Sprintf("%s-node-%d", nodegroupName, i),
 			LabelKey:           "customer",
 			LabelValue:         "kitt",
+			AnnotationKey:      "cyclops.atlassian.com/nodegroup",
+			AnnotationValue:    nodegroupName,
 			Creation:           time.Now(),
 			Tainted:            false,
 			NodeReady:          corev1.ConditionTrue,
-			Nodegroup:          name,
+			Nodegroup:          nodegroupName,
 			InstanceID:         instanceID,
 			CloudProviderState: "running",
 		}

@@ -3,7 +3,7 @@ package cloudprovider
 // CloudProvider provides an interface to interact with a cloud provider, e.g. AWS, GCP etc.
 type CloudProvider interface {
 	Name() string
-	InstancesExist([]string) ([]string, error)
+	InstancesExist([]string) (map[string]interface{}, error)
 	GetNodeGroups([]string) (NodeGroups, error)
 	TerminateInstance(string) error
 }
