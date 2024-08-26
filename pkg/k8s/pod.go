@@ -15,9 +15,9 @@ import (
 )
 
 const (
-	podConditionTypeForUnhealthy       = v1.PodReady
-	doNotDisruptAnnotation             = "cyclops.atlassian.com/do-not-disrupt"
-	doNotDisruptAnnotationRequredValue = "true"
+	podConditionTypeForUnhealthy        = v1.PodReady
+	doNotDisruptAnnotation              = "cyclops.atlassian.com/do-not-disrupt"
+	doNotDisruptAnnotationRequiredValue = "true"
 )
 
 var log = logf.Log.WithName("k8s.pod.go")
@@ -94,7 +94,7 @@ func PodIsDaemonSet(pod *v1.Pod) bool {
 // a node.
 func PodCannotBeDisrupted(pod *v1.Pod) bool {
 	for annotationName, annotationValue := range pod.ObjectMeta.Annotations {
-		if annotationName == doNotDisruptAnnotation && annotationValue == doNotDisruptAnnotationRequredValue {
+		if annotationName == doNotDisruptAnnotation && annotationValue == doNotDisruptAnnotationRequiredValue {
 			return true
 		}
 	}
