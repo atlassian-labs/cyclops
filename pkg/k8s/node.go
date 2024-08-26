@@ -61,6 +61,19 @@ func AddLabelToNode(nodeName string, labelName string, labelValue string, client
 	return PatchNode(nodeName, patches, client)
 }
 
+// AddAnnotationToNode performs a patch operation on a node to add an annotation to the node
+func AddAnnotationToNode(nodeName string, annotationName string, annotationValue string, client kubernetes.Interface) error {
+	patches := []Patch{
+		{
+			Op: "add",
+			// json patch spec maps "~1" to "/" as an escape sequence, so we do the translation here...
+			Path:  fmt.Sprintf("/metadata/annotations/%s", strings.Replace(annotationName, "/", "~1", -1)),
+			Value: annotationValue,
+		},
+	}
+	return PatchNode(nodeName, patches, client)
+}
+
 // AddFinalizerToNode updates a node to add a finalizer to it
 func AddFinalizerToNode(node *v1.Node, finalizerName string, client kubernetes.Interface) error {
 	controllerutil.AddFinalizer(node, finalizerName)
