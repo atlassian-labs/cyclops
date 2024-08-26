@@ -30,6 +30,8 @@ The CycleNodeRequest CRD handles a request to cycle nodes belonging to a specifi
 
 3. In the **Pending** phase, store the nodes that will need to be cycled so we can keep track of them. Describe the node group in the cloud provider and check it to ensure it matches the nodes in Kubernetes. It will wait for a brief period for the nodes to match, in case the cluster has just scaled up or down. Transition the object to **Initialised**.
 
+3. In the **Pending** phase, store the nodes that will need to be cycled so we can keep track of them. Describe the node group in the cloud provider and check it to ensure it matches the nodes in Kubernetes. It will wait for a brief period and proactively clean up any orphaned node objects, re-attach any instances that have been detached from the cloud provider node group, and then wait for the nodes to match in case the cluster has just scaled up or down. Transition the object to **Initialised**.
+
 4. In the **Initialised** phase, detach a number of nodes (governed by the concurrency of the CycleNodeRequest) from the node group. This will trigger the cloud provider to add replacement nodes for each. Transition the object to **ScalingUp**. If there are no more nodes to cycle then transition to **Successful**.
 
 5. In the **ScalingUp** phase, wait for the cloud provider to bring up the new nodes and then wait for the new nodes to be **Ready** in the Kubernetes API. Wait for the configured health checks on the node succeed. Transition the object to **CordoningNode**.
