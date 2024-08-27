@@ -535,7 +535,6 @@ func (t *CycleNodeRequestTransitioner) validateInstanceState(validNodeGroupInsta
 // namespace and deletes them.
 func (t *CycleNodeRequestTransitioner) deleteFailedSiblingCNRs() error {
 	ctx := context.TODO()
-	nodegroupList := t.cycleNodeRequest.GetNodeGroupNames()
 
 	var list v1.CycleNodeRequestList
 
@@ -549,7 +548,7 @@ func (t *CycleNodeRequestTransitioner) deleteFailedSiblingCNRs() error {
 
 	for _, cnr := range list.Items {
 		// Filter out CNRs generated for another Nodegroup
-		if !sameNodeGroups(nodegroupList, cnr.GetNodeGroupNames()) {
+		if !t.cycleNodeRequest.IsFromSameNodeGroup(cnr) {
 			continue
 		}
 
@@ -564,26 +563,4 @@ func (t *CycleNodeRequestTransitioner) deleteFailedSiblingCNRs() error {
 	}
 
 	return nil
-}
-
-// sameNodeGroups compares two lists of nodegroup names and check they are the
-// same. Ordering does not affect equality.
-func sameNodeGroups(groupA, groupB []string) bool {
-	if len(groupA) != len(groupB) {
-		return false
-	}
-
-	groupMap := make(map[string]struct{})
-
-	for _, group := range groupA {
-		groupMap[group] = struct{}{}
-	}
-
-	for _, group := range groupB {
-		if _, ok := groupMap[group]; !ok {
-			return false
-		}
-	}
-
-	return true
 }

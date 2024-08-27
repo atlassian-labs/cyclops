@@ -31,3 +31,23 @@ func buildNodeGroupNames(nodeGroupsList []string, nodeGroupName string) []string
 
 	return nodeGroups
 }
+
+// sameNodeGroups compares two lists of nodegroup names and check they are the
+// same. Ordering does not affect equality.
+func sameNodeGroups(groupA, groupB []string) bool {
+	if len(groupA) != len(groupB) {
+		return false
+	}
+
+	groupMap := make(map[string]struct{})
+	for _, group := range groupA {
+		groupMap[group] = struct{}{}
+	}
+
+	for _, group := range groupB {
+		if _, ok := groupMap[group]; !ok {
+			return false
+		}
+	}
+	return true
+}

@@ -384,47 +384,6 @@ func Test_dropInProgressNodeGroups(t *testing.T) {
 	}
 }
 
-func Test_sameNodeGroups(t *testing.T) {
-	tests := []struct {
-		name   string
-		groupA []string
-		groupB []string
-		expect bool
-	}{
-		{
-			"pass case with same order",
-			[]string{"ingress-us-west-2a", "ingress-us-west-2b", "ingress-us-west-2c"},
-			[]string{"ingress-us-west-2a", "ingress-us-west-2b", "ingress-us-west-2c"},
-			true,
-		},
-		{
-			"pass case with different order",
-			[]string{"ingress-us-west-2a", "ingress-us-west-2b", "ingress-us-west-2c"},
-			[]string{"ingress-us-west-2b", "ingress-us-west-2c", "ingress-us-west-2a"},
-			true,
-		},
-		{
-			"failure case with different length",
-			[]string{"ingress-us-west-2a", "ingress-us-west-2b", "ingress-us-west-2c"},
-			[]string{"ingress-us-west-2b", "ingress-us-west-2c"},
-			false,
-		},
-		{
-			"failure case with different items",
-			[]string{"ingress-us-west-2a", "ingress-us-west-2b", "ingress-us-west-2c"},
-			[]string{"ingress-us-west-2b", "ingress-us-west-2c", "system"},
-			false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := sameNodeGroups(tt.groupA, tt.groupB)
-			assert.Equal(t, tt.expect, got)
-		})
-	}
-}
-
 func NewFakeClientWithScheme(clientScheme *runtime.Scheme, initObjs ...runtime.Object) client.Client {
 	return fake.NewClientBuilder().WithScheme(clientScheme).WithRuntimeObjects(initObjs...).Build()
 }
