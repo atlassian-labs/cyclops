@@ -506,10 +506,17 @@ func (t *CycleNodeRequestTransitioner) logProblemNodes(nodesNotInCloudProviderNo
 		offendingNodesInfo += strings.Join(providerIDs, ",")
 	}
 
-	t.rm.LogEvent(t.cycleNodeRequest, "NodeStateInvalid",
-		"instances missing: %v, kube nodes missing: %v. %v",
-		len(nodesNotInCloudProviderNodegroup), len(instancesNotInKube), offendingNodesInfo,
+	message := fmt.Sprintf(
+		"instances missing from cloud provider nodegroup: %v, kube nodes missing: %v. %v",
+		len(nodesNotInCloudProviderNodegroup),
+		len(instancesNotInKube),
+		offendingNodesInfo,
 	)
+
+	// Send to both so because this is important info that needs to be found
+	// more easily
+	t.rm.Logger.Info(message)
+	t.rm.LogEvent(t.cycleNodeRequest, "NodeStateInvalid", message)
 }
 
 // validateInstanceState performs final validation on the nodegroup to ensure
