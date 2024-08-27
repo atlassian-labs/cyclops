@@ -506,8 +506,11 @@ func (t *CycleNodeRequestTransitioner) logProblemNodes(nodesNotInCloudProviderNo
 		offendingNodesInfo += strings.Join(providerIDs, ",")
 	}
 
-	message := fmt.Sprintf("instances missing: %v, kube nodes missing: %v. %v",
-		len(nodesNotInCloudProviderNodegroup), len(instancesNotInKube), offendingNodesInfo,
+	message := fmt.Sprintf(
+		"instances missing from cloud provider nodegroup: %v, kube nodes missing: %v. %v",
+		len(nodesNotInCloudProviderNodegroup),
+		len(instancesNotInKube),
+		offendingNodesInfo,
 	)
 
 	// Send to both so because this is important info that needs to be found
