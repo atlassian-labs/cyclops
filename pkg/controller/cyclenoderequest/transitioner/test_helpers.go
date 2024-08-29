@@ -26,7 +26,7 @@ func WithKubeNodes(nodes []*mock.Node) Option {
 
 func WithExtraKubeObject(extraKubeObject client.Object) Option {
 	return func(t *Transitioner) {
-		t.extrakubeObjects = append(t.extrakubeObjects, extraKubeObject)
+		t.extraKubeObjects = append(t.extraKubeObjects, extraKubeObject)
 	}
 }
 
@@ -45,7 +45,7 @@ type Transitioner struct {
 	CloudProviderInstances []*mock.Node
 	KubeNodes              []*mock.Node
 
-	extrakubeObjects []client.Object
+	extraKubeObjects []client.Object
 
 	transitionerOptions Options
 }
@@ -56,7 +56,7 @@ func NewFakeTransitioner(cnr *v1.CycleNodeRequest, opts ...Option) *Transitioner
 		// override these as needed
 		CloudProviderInstances: make([]*mock.Node, 0),
 		KubeNodes:              make([]*mock.Node, 0),
-		extrakubeObjects:       []client.Object{cnr},
+		extraKubeObjects:       []client.Object{cnr},
 		transitionerOptions:    Options{},
 	}
 
@@ -65,7 +65,7 @@ func NewFakeTransitioner(cnr *v1.CycleNodeRequest, opts ...Option) *Transitioner
 	}
 
 	t.Client = mock.NewClient(
-		t.KubeNodes, t.CloudProviderInstances, t.extrakubeObjects...,
+		t.KubeNodes, t.CloudProviderInstances, t.extraKubeObjects...,
 	)
 
 	rm := &controller.ResourceManager{

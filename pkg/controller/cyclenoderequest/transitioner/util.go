@@ -538,7 +538,7 @@ func (t *CycleNodeRequestTransitioner) validateInstanceState(validNodeGroupInsta
 }
 
 // deleteFailedSiblingCNRs finds the CNRs generated for the same nodegroup as
-// the one in the calling transitioner. It filters for deleted CNRs in the same
+// the one in the transitioner. It filters for deleted CNRs in the same
 // namespace and deletes them.
 func (t *CycleNodeRequestTransitioner) deleteFailedSiblingCNRs() error {
 	ctx := context.TODO()

@@ -261,7 +261,12 @@ func (c *controller) dropInProgressNodeGroups(nodeGroups v1.NodeGroupList, cnrs 
 		}
 
 		if dropNodeGroup {
-			klog.Warningf("nodegroup %q has an in progress CNR.. skipping this nodegroup", nodeGroup.Name)
+			if failedCNRsFound > nodeGroup.Spec.MaxFailedCycleNodeRequests {
+				klog.Warningf("nodegroup %q has too many failed CNRs.. skipping this nodegroup", nodeGroup.Name)
+			} else {
+				klog.Warningf("nodegroup %q has an in progress CNR.. skipping this nodegroup", nodeGroup.Name)
+			}
+
 			c.NodeGroupsLocked.WithLabelValues(nodeGroup.Name).Inc()
 			continue
 		}
