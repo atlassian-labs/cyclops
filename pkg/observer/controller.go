@@ -230,21 +230,47 @@ func (c *controller) inProgressCNRs() v1.CycleNodeRequestList {
 
 // dropInProgressNodeGroups matches nodeGroups to CNRs and filters out any that match
 func (c *controller) dropInProgressNodeGroups(nodeGroups v1.NodeGroupList, cnrs v1.CycleNodeRequestList) v1.NodeGroupList {
-	// filter out nodegroups that aren't current in progress with a cnr
+	// Filter out nodegroups that aren't currently in progress with a cnr. Count
+	// failed CNRs only if they don't outnumber the max threshold defined for
+	// the nodegroup
 	var restingNodeGroups v1.NodeGroupList
+
 	for i, nodeGroup := range nodeGroups.Items {
-		var found bool
+		var dropNodeGroup bool
+		var failedCNRsFound uint
+
 		for _, cnr := range cnrs.Items {
-			if sameNodeGroups(cnr.GetNodeGroupNames(), nodeGroup.GetNodeGroupNames()) {
-				found = true
-				break
+			// CNR doesn't match nodegroup, skip it
+			if !cnr.IsFromNodeGroup(nodeGroup) {
+				continue
+			}
+
+			// Count the Failed CNRs separately, they need to be counted before
+			// they can be considered to drop the nodegroup
+			if cnr.Status.Phase == v1.CycleNodeRequestFailed {
+				failedCNRsFound++
+			} else {
+				dropNodeGroup = true
+			}
+
+			// If the number of Failed CNRs exceeds the threshold in the
+			// nodegroup then drop it
+			if failedCNRsFound > nodeGroup.Spec.MaxFailedCycleNodeRequests {
+				dropNodeGroup = true
 			}
 		}
-		if found {
-			klog.Warningf("nodegroup %q has an in progress CNR.. skipping this nodegroup", nodeGroup.Name)
+
+		if dropNodeGroup {
+			if failedCNRsFound > nodeGroup.Spec.MaxFailedCycleNodeRequests {
+				klog.Warningf("nodegroup %q has too many failed CNRs.. skipping this nodegroup", nodeGroup.Name)
+			} else {
+				klog.Warningf("nodegroup %q has an in progress CNR.. skipping this nodegroup", nodeGroup.Name)
+			}
+
 			c.NodeGroupsLocked.WithLabelValues(nodeGroup.Name).Inc()
 			continue
 		}
+
 		restingNodeGroups.Items = append(restingNodeGroups.Items, nodeGroups.Items[i])
 	}
 
@@ -438,21 +464,4 @@ func (c *controller) RunForever() {
 			return
 		}
 	}
-}
-
-func sameNodeGroups(groupA, groupB []string) bool {
-	if len(groupA) != len(groupB) {
-		return false
-	}
-
-	groupMap := make(map[string]struct{})
-	for _, group := range groupA {
-		groupMap[group] = struct{}{}
-	}
-	for _, group := range groupB {
-		if _, ok := groupMap[group]; !ok {
-			return false
-		}
-	}
-	return true
 }

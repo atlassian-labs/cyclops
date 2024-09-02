@@ -19,6 +19,10 @@ type NodeGroupSpec struct {
 	// CycleSettings stores the settings to use for cycling the nodes.
 	CycleSettings CycleSettings `json:"cycleSettings"`
 
+	// MaxFailedCycleNodeRequests defines the maximum number of allowed failed CNRs for a nodegroup before the observer
+	// stops generating them.
+	MaxFailedCycleNodeRequests uint `json:"maxFailedCycleNodeRequests,omitempty"`
+
 	// ValidationOptions stores the settings to use for validating state of nodegroups
 	// in kube and the cloud provider for cycling the nodes.
 	ValidationOptions ValidationOptions `json:"validationOptions,omitempty"`

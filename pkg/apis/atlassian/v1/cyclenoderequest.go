@@ -15,3 +15,24 @@ func (in *CycleNodeRequest) NodeLabelSelector() (labels.Selector, error) {
 func (in *CycleNodeRequest) GetNodeGroupNames() []string {
 	return buildNodeGroupNames(in.Spec.NodeGroupsList, in.Spec.NodeGroupName)
 }
+
+// IsPartOfNodeGroup returns whether the CycleNodeRequest is part of the
+// provided NodeGroup by comparing the list of named cloud provider nodegroups
+// defined in each one. Ordering does not affect equality.
+func (in *CycleNodeRequest) IsFromNodeGroup(nodegroup NodeGroup) bool {
+	return sameNodeGroups(
+		buildNodeGroupNames(in.Spec.NodeGroupsList, in.Spec.NodeGroupName),
+		nodegroup.GetNodeGroupNames(),
+	)
+}
+
+// IsFromSameNodeGroup returns whether the CycleNodeRequest is part of the
+// same Nodegroup provided as the provided CycleNodeRequest by comparing the
+// list of named cloud provider nodegroups defined in each one. Ordering does
+// not affect equality.
+func (in *CycleNodeRequest) IsFromSameNodeGroup(cnr CycleNodeRequest) bool {
+	return sameNodeGroups(
+		buildNodeGroupNames(in.Spec.NodeGroupsList, in.Spec.NodeGroupName),
+		cnr.GetNodeGroupNames(),
+	)
+}

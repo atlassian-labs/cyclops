@@ -536,3 +536,45 @@ func (t *CycleNodeRequestTransitioner) validateInstanceState(validNodeGroupInsta
 
 	return false, nil
 }
+
+// deleteFailedSiblingCNRs finds the CNRs generated for the same nodegroup as
+// the one in the transitioner. It filters for deleted CNRs in the same
+// namespace and deletes them.
+func (t *CycleNodeRequestTransitioner) deleteFailedSiblingCNRs() error {
+	ctx := context.TODO()
+
+	var list v1.CycleNodeRequestList
+
+	err := t.rm.Client.List(ctx, &list, &client.ListOptions{
+		Namespace: t.cycleNodeRequest.Namespace,
+	})
+
+	if err != nil {
+		return err
+	}
+
+	for _, cnr := range list.Items {
+		// Filter out CNRs generated for another Nodegroup
+		if !t.cycleNodeRequest.IsFromSameNodeGroup(cnr) {
+			continue
+		}
+
+		// Filter out CNRs not in the Failed phase
+		if cnr.Status.Phase != v1.CycleNodeRequestFailed {
+			continue
+		}
+
+		// The Failed CNR should have been created prior to or at the same time
+		// as the CNR now in Successful otherwise new CNRs could fail and be
+		// cleaned up.
+		if t.cycleNodeRequest.CreationTimestamp.Before(&cnr.CreationTimestamp) {
+			continue
+		}
+
+		if err := t.rm.Client.Delete(ctx, &cnr); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}

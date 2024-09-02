@@ -6,6 +6,8 @@ import (
 	v1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
 	"github.com/atlassian-labs/cyclops/pkg/controller"
 	"github.com/atlassian-labs/cyclops/pkg/mock"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type Option func(t *Transitioner)
@@ -22,6 +24,18 @@ func WithKubeNodes(nodes []*mock.Node) Option {
 	}
 }
 
+func WithExtraKubeObject(extraKubeObject client.Object) Option {
+	return func(t *Transitioner) {
+		t.extraKubeObjects = append(t.extraKubeObjects, extraKubeObject)
+	}
+}
+
+func WithTransitionerOptions(options Options) Option {
+	return func(t *Transitioner) {
+		t.transitionerOptions = options
+	}
+}
+
 // ************************************************************************** //
 
 type Transitioner struct {
@@ -30,6 +44,10 @@ type Transitioner struct {
 
 	CloudProviderInstances []*mock.Node
 	KubeNodes              []*mock.Node
+
+	extraKubeObjects []client.Object
+
+	transitionerOptions Options
 }
 
 func NewFakeTransitioner(cnr *v1.CycleNodeRequest, opts ...Option) *Transitioner {
@@ -38,13 +56,17 @@ func NewFakeTransitioner(cnr *v1.CycleNodeRequest, opts ...Option) *Transitioner
 		// override these as needed
 		CloudProviderInstances: make([]*mock.Node, 0),
 		KubeNodes:              make([]*mock.Node, 0),
+		extraKubeObjects:       []client.Object{cnr},
+		transitionerOptions:    Options{},
 	}
 
 	for _, opt := range opts {
 		opt(t)
 	}
 
-	t.Client = mock.NewClient(t.KubeNodes, t.CloudProviderInstances, cnr)
+	t.Client = mock.NewClient(
+		t.KubeNodes, t.CloudProviderInstances, t.extraKubeObjects...,
+	)
 
 	rm := &controller.ResourceManager{
 		Client:        t.K8sClient,
@@ -54,7 +76,7 @@ func NewFakeTransitioner(cnr *v1.CycleNodeRequest, opts ...Option) *Transitioner
 	}
 
 	t.CycleNodeRequestTransitioner = NewCycleNodeRequestTransitioner(
-		cnr, rm, Options{},
+		cnr, rm, t.transitionerOptions,
 	)
 
 	return t
