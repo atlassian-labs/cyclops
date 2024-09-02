@@ -582,8 +582,16 @@ func (t *CycleNodeRequestTransitioner) transitionSuccessful() (reconcile.Result,
 	if err != nil {
 		return t.transitionToHealing(err)
 	}
+
 	if shouldRequeue {
 		return reconcile.Result{Requeue: true, RequeueAfter: transitionDuration}, nil
+	}
+
+	// Delete failed sibling CNRs regardless of whether the CNR for the
+	// transitioner should be deleted. If failed CNRs pile up that will prevent
+	// Cyclops observer from auto-generating new CNRs for a nodegroup.
+	if err := t.deleteFailedSiblingCNRs(); err != nil {
+		return t.transitionToHealing(err)
 	}
 
 	// If deleting CycleNodeRequests is not enabled, stop here
@@ -595,10 +603,11 @@ func (t *CycleNodeRequestTransitioner) transitionSuccessful() (reconcile.Result,
 	// than the time configured to keep them for.
 	if t.cycleNodeRequest.CreationTimestamp.Add(t.options.DeleteCNRExpiry).Before(time.Now()) {
 		t.rm.Logger.Info("Deleting CycleNodeRequest")
-		err := t.rm.Client.Delete(context.TODO(), t.cycleNodeRequest)
-		if err != nil {
+
+		if err := t.rm.Client.Delete(context.TODO(), t.cycleNodeRequest); err != nil {
 			t.rm.Logger.Error(err, "Unable to delete expired CycleNodeRequest")
 		}
+
 		return reconcile.Result{}, nil
 	}
 
