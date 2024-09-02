@@ -564,8 +564,9 @@ func (t *CycleNodeRequestTransitioner) deleteFailedSiblingCNRs() error {
 			continue
 		}
 
-		// The Failed CNR should have been created prior to the CNR now in
-		// Successful otherwise new CNRs could fail and be cleaned up.
+		// The Failed CNR should have been created prior to or at the same time
+		// as the CNR now in Successful otherwise new CNRs could fail and be
+		// cleaned up.
 		if t.cycleNodeRequest.CreationTimestamp.Before(&cnr.CreationTimestamp) {
 			continue
 		}
