@@ -133,10 +133,11 @@ func TestSuccessfulBeforeDeleteTime(t *testing.T) {
 }
 
 // Test that the Successful phase will delete sibling CNRs for the same
-// nodegroup that are in the failed phase. No other CNRs should be deleted.
+// nodegroup that are in the failed phase created at the same time or before the
+// Successful CNR execution. No other CNRs should be deleted.
 func TestSuccessfulDeleteFailedSiblingCNRs(t *testing.T) {
 	// CNR used for the execution
-	// Should not be deleted
+	// Should NOT be deleted
 	cnr1 := &v1.CycleNodeRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "cnr-1",
@@ -152,13 +153,47 @@ func TestSuccessfulDeleteFailedSiblingCNRs(t *testing.T) {
 		},
 	}
 
-	// Failed CNR for the same nodegroup
+	// Failed CNR for the same nodegroup created at the same time as cnr1
 	// Should be deleted
 	cnr2 := &v1.CycleNodeRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "cnr-2",
 			Namespace:         "kube-system",
-			CreationTimestamp: metav1.Now(),
+			CreationTimestamp: cnr1.CreationTimestamp,
+		},
+		Spec: v1.CycleNodeRequestSpec{
+			NodeGroupName: "ng-1",
+		},
+		Status: v1.CycleNodeRequestStatus{
+			Phase:   v1.CycleNodeRequestFailed,
+			Message: "",
+		},
+	}
+
+	// Failed CNR for the same nodegroup created before cnr1
+	// Should NOT be deleted
+	cnr3 := &v1.CycleNodeRequest{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "cnr-3",
+			Namespace:         "kube-system",
+			CreationTimestamp: metav1.NewTime(cnr1.CreationTimestamp.Add(-time.Second)),
+		},
+		Spec: v1.CycleNodeRequestSpec{
+			NodeGroupName: "ng-1",
+		},
+		Status: v1.CycleNodeRequestStatus{
+			Phase:   v1.CycleNodeRequestFailed,
+			Message: "",
+		},
+	}
+
+	// Failed CNR for the same nodegroup created after cnr1
+	// Should NOT be deleted
+	cnr4 := &v1.CycleNodeRequest{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "cnr-4",
+			Namespace:         "kube-system",
+			CreationTimestamp: metav1.NewTime(cnr1.CreationTimestamp.Add(time.Second)),
 		},
 		Spec: v1.CycleNodeRequestSpec{
 			NodeGroupName: "ng-1",
@@ -171,11 +206,11 @@ func TestSuccessfulDeleteFailedSiblingCNRs(t *testing.T) {
 
 	// Pending CNR for the same nodegroup
 	// Should NOT be deleted
-	cnr3 := &v1.CycleNodeRequest{
+	cnr5 := &v1.CycleNodeRequest{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:              "cnr-3",
+			Name:              "cnr-5",
 			Namespace:         "kube-system",
-			CreationTimestamp: metav1.Now(),
+			CreationTimestamp: metav1.NewTime(cnr1.CreationTimestamp.Add(-time.Second)),
 		},
 		Spec: v1.CycleNodeRequestSpec{
 			NodeGroupName: "ng-1",
@@ -188,11 +223,11 @@ func TestSuccessfulDeleteFailedSiblingCNRs(t *testing.T) {
 
 	// Failed CNR for a different nodegroup
 	// Should NOT be deleted
-	cnr4 := &v1.CycleNodeRequest{
+	cnr6 := &v1.CycleNodeRequest{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:              "cnr-4",
+			Name:              "cnr-6",
 			Namespace:         "kube-system",
-			CreationTimestamp: metav1.Now(),
+			CreationTimestamp: metav1.NewTime(cnr1.CreationTimestamp.Add(-time.Second)),
 		},
 		Spec: v1.CycleNodeRequestSpec{
 			NodeGroupName: "ng-2",
@@ -205,11 +240,11 @@ func TestSuccessfulDeleteFailedSiblingCNRs(t *testing.T) {
 
 	// Failed CNR for the same nodegroup in a different namespace
 	// Should NOT be deleted
-	cnr5 := &v1.CycleNodeRequest{
+	cnr7 := &v1.CycleNodeRequest{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:              "cnr-5",
+			Name:              "cnr-7",
 			Namespace:         "default",
-			CreationTimestamp: metav1.Now(),
+			CreationTimestamp: metav1.NewTime(cnr1.CreationTimestamp.Add(-time.Second)),
 		},
 		Spec: v1.CycleNodeRequestSpec{
 			NodeGroupName: "ng-1",
@@ -225,6 +260,8 @@ func TestSuccessfulDeleteFailedSiblingCNRs(t *testing.T) {
 		WithExtraKubeObject(cnr3),
 		WithExtraKubeObject(cnr4),
 		WithExtraKubeObject(cnr5),
+		WithExtraKubeObject(cnr6),
+		WithExtraKubeObject(cnr7),
 	)
 
 	var list v1.CycleNodeRequestList
@@ -233,7 +270,7 @@ func TestSuccessfulDeleteFailedSiblingCNRs(t *testing.T) {
 		fakeTransitioner.Client.K8sClient.List(context.TODO(), &list, &client.ListOptions{}),
 	)
 
-	assert.Len(t, list.Items, 5)
+	assert.Len(t, list.Items, 7)
 
 	// Execute the Successful phase
 	_, err := fakeTransitioner.Run()
@@ -243,7 +280,7 @@ func TestSuccessfulDeleteFailedSiblingCNRs(t *testing.T) {
 		fakeTransitioner.Client.K8sClient.List(context.TODO(), &list, &client.ListOptions{}),
 	)
 
-	assert.Len(t, list.Items, 4)
+	assert.Len(t, list.Items, 5)
 
 	var cnr v1.CycleNodeRequest
 
@@ -252,13 +289,14 @@ func TestSuccessfulDeleteFailedSiblingCNRs(t *testing.T) {
 		Namespace: cnr1.Namespace,
 	}, &cnr))
 
-	// CNR 2 is the only one that should be deleted
+	// CNR 2 should be deleted
 	assert.Error(t, fakeTransitioner.Client.K8sClient.Get(context.TODO(), types.NamespacedName{
 		Name:      cnr2.Name,
 		Namespace: cnr2.Namespace,
 	}, &cnr))
 
-	assert.NoError(t, fakeTransitioner.Client.K8sClient.Get(context.TODO(), types.NamespacedName{
+	// CNR 3 should be deleted
+	assert.Error(t, fakeTransitioner.Client.K8sClient.Get(context.TODO(), types.NamespacedName{
 		Name:      cnr3.Name,
 		Namespace: cnr3.Namespace,
 	}, &cnr))
@@ -271,5 +309,15 @@ func TestSuccessfulDeleteFailedSiblingCNRs(t *testing.T) {
 	assert.NoError(t, fakeTransitioner.Client.K8sClient.Get(context.TODO(), types.NamespacedName{
 		Name:      cnr5.Name,
 		Namespace: cnr5.Namespace,
+	}, &cnr))
+
+	assert.NoError(t, fakeTransitioner.Client.K8sClient.Get(context.TODO(), types.NamespacedName{
+		Name:      cnr6.Name,
+		Namespace: cnr6.Namespace,
+	}, &cnr))
+
+	assert.NoError(t, fakeTransitioner.Client.K8sClient.Get(context.TODO(), types.NamespacedName{
+		Name:      cnr7.Name,
+		Namespace: cnr7.Namespace,
 	}, &cnr))
 }
