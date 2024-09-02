@@ -3,8 +3,8 @@ package transitioner
 import (
 	"fmt"
 
-	corev1 "k8s.io/api/core/v1"
 	"github.com/atlassian-labs/cyclops/pkg/k8s"
+	corev1 "k8s.io/api/core/v1"
 )
 
 func (t *CycleNodeStatusTransitioner) removeLabelsFromPods() (finished bool, err error) {
@@ -53,14 +53,14 @@ func (t *CycleNodeStatusTransitioner) removeLabelsFromPods() (finished bool, err
 
 // podsFinished returns true if all relevant pods on the node are finished.
 func (t *CycleNodeStatusTransitioner) podsFinished() (bool, error) {
-	// Get drainable pods
-	drainablePods, err := t.rm.GetDrainablePodsOnNode(t.cycleNodeStatus.Status.CurrentNode.Name)
+	// Get undisruptable pods
+	undisruptablePods, err := t.rm.GetUndisruptablePods(t.cycleNodeStatus.Status.CurrentNode.Name)
 	if err != nil {
 		return false, err
 	}
 
 	waitingOnPods, err := getRunningPods(
-		drainablePods,
+		undisruptablePods,
 		t.cycleNodeStatus.Spec.CycleSettings.IgnoreNamespaces,
 		t.cycleNodeStatus.Spec.CycleSettings.IgnorePodsLabels,
 	)

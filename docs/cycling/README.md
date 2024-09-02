@@ -35,11 +35,11 @@ The CycleNodeRequest CRD handles a request to cycle nodes belonging to a specifi
 5. In the **ScalingUp** phase, wait for the cloud provider to bring up the new nodes and then wait for the new nodes to be **Ready** in the Kubernetes API. Wait for the configured health checks on the node succeed. Transition the object to **CordoningNode**.
 
 6. In the **CordoningNode** phase, cordon the selected nodes in the Kubernetes API then perform the pre-termination checks. Transition the object to **WaitingTermination**.
-    
+
 7. In the **WaitingTermination** phase, create a CycleNodeStatus CRD for every node that was cordoned. Each of these CycleNodeStatuses handles the termination of an individual node. The controller will wait for a number of them to enter the **Successful** or **Failed** phase before moving on.
-    
+
     If any of them have **Failed** then the CycleNodeRequest will move to **Failed** and will not add any more nodes for cycling. If they are all **Successful** then the CycleNodeRequest will move back to **Initialised** to cycle more nodes.
-    
+
 ### CycleNodeStatus
 
 The CycleNodeStatus CRD handles the draining of pods from, and termination of, an individual node. These should only be created by the controller.
@@ -51,7 +51,7 @@ The CycleNodeStatus CRD handles the draining of pods from, and termination of, a
 1. In the **Pending** phase, validate that the node still exists and store information about the node.
     Transition the object to **WaitingPods** if the Method is set to "Wait", otherwise transition to 
     **RemovingLabelsFromPods**.
-    
+
 1. In the **WaitingPods** phase, wait for all pods that are not ignored by the `waitRules` to be removed from the node. Will wait for a long time before finally giving up if pods still remain. Transition the object to **Failed** if it times out waiting, or to **RemovingLabelsFromPods** once there are no pods left. 
 
 1. In the **RemovingLabelsFromPods** phase, remove any labels that are defined in the `labelsToRemove` option from any pod that is running on the target node. This is useful when you want to "detach" a pod from a service before draining it from a node to prevent requests in progress to the pod from being interrupted. Transition the object to **DrainingPods**.
@@ -113,7 +113,8 @@ spec:
 
   cycleNodeSettings:
       # Method can be "Wait" or "Drain", defaults to "Drain" if not provided
-      # "Wait" will wait for pods on the node to complete, while "Drain" will forcefully drain them off the node
+      # "Wait" will wait for pods with the "cyclops.atlassian.com/do-not-disrupt=true"
+      # annotation on the node to complete, while "Drain" will forcefully drain them off the node
       method: "Wait|Drain"
 
       # Optional field - use this to scale up by `concurrency` nodes at a time. The default is the current number
@@ -128,18 +129,20 @@ spec:
       # if you want to remove them from existing services before draining the nodes
       labelsToRemove:
         - <labelKey>
-    
+
       # Optional field - only used if method=Wait
       # ignorePodsLabels is a map of label names to a list of label values, where any value for the given
       # label name will cause a pod to not be waited for
+      # Takes precendence over selecting pods with the "cyclops.atlassian.com/do-not-disrupt=true" annotation.
       ignorePodsLabels:
         # This example ignores all pods where labelName=value1 or labelName=value2
         labelName:
         - "value1"
         - "value2"
-  
+
       # Optional field - only used if method=Wait
       # ignoreNamespaces is a list of namespaces from which to ignore pods when waiting for pods on a node to finish
+      # Takes precendence over selecting pods with the "cyclops.atlassian.com/do-not-disrupt=true" annotation.
       ignoreNamespaces:
       - "kube-system"
 ```
