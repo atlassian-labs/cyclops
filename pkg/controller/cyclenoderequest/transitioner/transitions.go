@@ -48,7 +48,7 @@ func (t *CycleNodeRequestTransitioner) transitionUndefined() (reconcile.Result, 
 	validationErrors := validation.IsDNS1035Label(t.cycleNodeRequest.Name)
 
 	if len(validationErrors) > 0 {
-		return t.transitionToFailed(fmt.Errorf(strings.Join(validationErrors, ",")))
+		return t.transitionToFailed(fmt.Errorf("%s", strings.Join(validationErrors, ",")))
 	}
 
 	// Transition the object to pending

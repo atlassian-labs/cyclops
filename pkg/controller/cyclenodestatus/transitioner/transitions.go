@@ -153,7 +153,7 @@ func (t *CycleNodeStatusTransitioner) transitionDraining() (reconcile.Result, er
 	// Fail with all of the combined encountered errors if we got any. If we failed inside the loop we would
 	// potentially miss some important information in the logs.
 	if len(unexpectedErrors) > 0 {
-		return t.transitionToFailed(fmt.Errorf(strings.Join(unexpectedErrors, "\n")))
+		return t.transitionToFailed(fmt.Errorf("%s", strings.Join(unexpectedErrors, "\n")))
 	}
 	// No serious errors were encountered. If we're done, move on.
 	if finished {
