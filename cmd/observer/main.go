@@ -37,7 +37,6 @@ type app struct {
 	cloudProviderName        *string
 	namespace                *string
 	addr                     *string
-	prometheusAddress        *string
 	dryMode                  *bool
 	runImmediately           *bool
 	runOnce                  *bool
@@ -50,18 +49,16 @@ type app struct {
 // newApp creates a new app and sets up the cobra flags
 func newApp(rootCmd *cobra.Command) *app {
 	return &app{
-		addr:                     rootCmd.PersistentFlags().String("addr", ":8080", "Address to listen on for /metrics"),
-		cloudProviderName:        rootCmd.PersistentFlags().String("cloud-provider", "aws", "Which cloud provider to use, options: [aws]"),
-		namespaces:               rootCmd.PersistentFlags().StringSlice("namespaces", []string{"kube-system"}, "Namespaces to watch for cycle request objects"),
-		namespace:                rootCmd.PersistentFlags().String("namespace", "kube-system", "Namespaces to watch and create cnrs"),
-		dryMode:                  rootCmd.PersistentFlags().Bool("dry", false, "api-server drymode for applying CNRs"),
-		waitInterval:             rootCmd.PersistentFlags().Duration("wait-interval", 2*time.Minute, "duration to wait after detecting changes before creating CNR objects. The window for letting changes on nodegroups settle before starting rotation"),
-		checkInterval:            rootCmd.PersistentFlags().Duration("check-interval", 5*time.Minute, `duration interval to check for changes. e.g. run the loop every 5 minutes"`),
-		nodeStartupTime:          rootCmd.PersistentFlags().Duration("node-startup-time", 2*time.Minute, "duration to wait after a cluster-autoscaler scaleUp event is detected"),
-		runImmediately:           rootCmd.PersistentFlags().Bool("now", false, "makes the check loop run straight away on program start rather than wait for the check interval to elapse"),
-		runOnce:                  rootCmd.PersistentFlags().Bool("once", false, "run the check loop once then exit. also works with --now"),
-		prometheusAddress:        rootCmd.PersistentFlags().String("prometheus-address", "prometheus", "Prometheus service address used to query cluster-autoscaler metrics"),
-		prometheusScrapeInterval: rootCmd.PersistentFlags().Duration("prometheus-scrape-interval", 40*time.Second, "Prometheus scrape interval used to detect change of value from prometheus query, needed to detect scaleUp event"),
+		addr:              rootCmd.PersistentFlags().String("addr", ":8080", "Address to listen on for /metrics"),
+		cloudProviderName: rootCmd.PersistentFlags().String("cloud-provider", "aws", "Which cloud provider to use, options: [aws]"),
+		namespaces:        rootCmd.PersistentFlags().StringSlice("namespaces", []string{"kube-system"}, "Namespaces to watch for cycle request objects"),
+		namespace:         rootCmd.PersistentFlags().String("namespace", "kube-system", "Namespaces to watch and create cnrs"),
+		dryMode:           rootCmd.PersistentFlags().Bool("dry", false, "api-server drymode for applying CNRs"),
+		waitInterval:      rootCmd.PersistentFlags().Duration("wait-interval", 2*time.Minute, "duration to wait after detecting changes before creating CNR objects. The window for letting changes on nodegroups settle before starting rotation"),
+		checkInterval:     rootCmd.PersistentFlags().Duration("check-interval", 5*time.Minute, `duration interval to check for changes. e.g. run the loop every 5 minutes"`),
+		nodeStartupTime:   rootCmd.PersistentFlags().Duration("node-startup-time", 2*time.Minute, "duration to wait after a cluster-autoscaler scaleUp event is detected"),
+		runImmediately:    rootCmd.PersistentFlags().Bool("now", false, "makes the check loop run straight away on program start rather than wait for the check interval to elapse"),
+		runOnce:           rootCmd.PersistentFlags().Bool("once", false, "run the check loop once then exit. also works with --now"),
 	}
 }
 
@@ -126,7 +123,6 @@ func (a *app) run() {
 		RunOnce:                  *a.runOnce,
 		WaitInterval:             *a.waitInterval,
 		NodeStartupTime:          *a.nodeStartupTime,
-		PrometheusAddress:        *a.prometheusAddress,
 		PrometheusScrapeInterval: *a.prometheusScrapeInterval,
 	}
 

@@ -21,10 +21,9 @@ type Controller interface {
 
 // Options contains the options config for a controller
 type Options struct {
-	CNRPrefix         string
-	Namespace         string
-	CheckSchedule     string
-	PrometheusAddress string
+	CNRPrefix     string
+	Namespace     string
+	CheckSchedule string
 
 	DryMode        bool
 	RunImmediately bool
