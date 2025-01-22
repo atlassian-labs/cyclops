@@ -220,8 +220,6 @@ Flags:
       --node-startup-time duration            duration to wait after a cluster-autoscaler scaleUp event is detected (default 2m0s)
       --now                                   makes the check loop run straight away on program start rather than wait for the check interval to elapse
       --once                                  run the check loop once then exit. also works with --now
-      --prometheus-address string             Prometheus service address used to query cluster-autoscaler metrics (default "prometheus")
-      --prometheus-scrape-interval duration   Prometheus scrape interval used to detect change of value from prometheus query, needed to detect scaleUp event (default 40s)
       --skip_headers                          If true, avoid header prefixes in the log messages
       --skip_log_headers                      If true, avoid headers when opening log files
       --stderrthreshold severity              logs at or above this threshold go to stderr
