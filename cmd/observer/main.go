@@ -33,17 +33,16 @@ var (
 
 // app type holds options for the application from cobra
 type app struct {
-	namespaces               *[]string
-	cloudProviderName        *string
-	namespace                *string
-	addr                     *string
-	dryMode                  *bool
-	runImmediately           *bool
-	runOnce                  *bool
-	checkInterval            *time.Duration
-	waitInterval             *time.Duration
-	nodeStartupTime          *time.Duration
-	prometheusScrapeInterval *time.Duration
+	namespaces        *[]string
+	cloudProviderName *string
+	namespace         *string
+	addr              *string
+	dryMode           *bool
+	runImmediately    *bool
+	runOnce           *bool
+	checkInterval     *time.Duration
+	waitInterval      *time.Duration
+	nodeStartupTime   *time.Duration
 }
 
 // newApp creates a new app and sets up the cobra flags
@@ -115,15 +114,14 @@ func (a *app) run() {
 	}
 
 	options := observer.Options{
-		CNRPrefix:                "observer",
-		Namespace:                *a.namespace,
-		CheckInterval:            *a.checkInterval,
-		DryMode:                  *a.dryMode,
-		RunImmediately:           *a.runImmediately,
-		RunOnce:                  *a.runOnce,
-		WaitInterval:             *a.waitInterval,
-		NodeStartupTime:          *a.nodeStartupTime,
-		PrometheusScrapeInterval: *a.prometheusScrapeInterval,
+		CNRPrefix:       "observer",
+		Namespace:       *a.namespace,
+		CheckInterval:   *a.checkInterval,
+		DryMode:         *a.dryMode,
+		RunImmediately:  *a.runImmediately,
+		RunOnce:         *a.runOnce,
+		WaitInterval:    *a.waitInterval,
+		NodeStartupTime: *a.nodeStartupTime,
 	}
 
 	go awaitStopSignal(stopCh)

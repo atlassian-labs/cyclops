@@ -29,10 +29,9 @@ type Options struct {
 	RunImmediately bool
 	RunOnce        bool
 
-	CheckInterval            time.Duration
-	WaitInterval             time.Duration
-	NodeStartupTime          time.Duration
-	PrometheusScrapeInterval time.Duration
+	CheckInterval   time.Duration
+	WaitInterval    time.Duration
+	NodeStartupTime time.Duration
 }
 
 // ListedNodeGroups defines a type that contains a NodeGroup, a List of Nodes for that NodeGroup, and an optional Reason for why they are there
