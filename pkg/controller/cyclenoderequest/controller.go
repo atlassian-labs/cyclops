@@ -80,11 +80,8 @@ func NewReconciler(
 	}
 
 	// Initialise the controller's required watches
-	err = cnrController.Watch(
-		source.Kind(mgr.GetCache(), &v1.CycleNodeRequest{}),
-		&handler.EnqueueRequestForObject{},
-		cyclecontroller.NewNamespacePredicate(namespace),
-	)
+	src := source.Kind(mgr.GetCache(), &v1.CycleNodeRequest{}, &handler.TypedEnqueueRequestForObject[*v1.CycleNodeRequest]{}, cyclecontroller.NewNamespacePredicate[*v1.CycleNodeRequest](namespace))
+	err = cnrController.Watch(src)
 	if err != nil {
 		log.Error(err, "Unable to watch CycleNodeRequest objects")
 		return nil, err

@@ -35,7 +35,10 @@ func NewNotifier() (notifications.Notifier, error) {
 	}
 
 	// Check that the Slack app has been added to the channel in the workspace
-	if _, err := n.client.GetConversationInfo(channelID, false); err != nil {
+	if _, err := n.client.GetConversationInfo(&slackapi.GetConversationInfoInput{
+		ChannelID:     channelID,
+		IncludeLocale: false,
+	}); err != nil {
 		return nil, err
 	}
 
