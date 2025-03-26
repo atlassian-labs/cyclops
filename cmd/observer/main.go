@@ -14,7 +14,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
-	"k8s.io/klog/v2/klogr"
+	"k8s.io/klog/v2/textlogger"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/atlassian-labs/cyclops/pkg/apis"
@@ -28,7 +28,7 @@ import (
 var (
 	// replaced by ldflags at buildtime
 	version = "undefined" //nolint:golint,varcheck,deadcode,unused
-	klogger = klogr.New()
+	klogger = textlogger.NewLogger(&textlogger.Config{})
 )
 
 // app type holds options for the application from cobra

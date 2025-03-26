@@ -6,6 +6,7 @@ import (
 	"os"
 	"runtime"
 
+	"github.com/alecthomas/kingpin/v2"
 	"github.com/atlassian-labs/cyclops/pkg/apis"
 	"github.com/atlassian-labs/cyclops/pkg/cloudprovider/builder"
 	"github.com/atlassian-labs/cyclops/pkg/controller/cyclenoderequest"
@@ -16,13 +17,13 @@ import (
 	"github.com/atlassian-labs/cyclops/pkg/notifications"
 	"github.com/atlassian-labs/cyclops/pkg/notifications/notifierbuilder"
 	"github.com/operator-framework/operator-lib/leader"
-	"gopkg.in/alecthomas/kingpin.v2"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 )
 
 var (
@@ -74,9 +75,9 @@ func main() {
 
 	// Create a new Cmd to provide shared dependencies and start components
 	mgr, err := manager.New(cfg, manager.Options{
-		// Watch all namespaces, so we can see pods in namespaces other than the current
-		Namespace:          "",
-		MetricsBindAddress: *addr,
+		Metrics: metricsserver.Options{
+			BindAddress: *addr,
+		},
 	})
 	if err != nil {
 		log.Error(err, "Unable to create a new manager")

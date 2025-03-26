@@ -72,11 +72,8 @@ func NewReconciler(
 	}
 
 	// Initialise the controller's required watches
-	err = cnsController.Watch(
-		source.Kind(mgr.GetCache(), &v1.CycleNodeStatus{}),
-		&handler.EnqueueRequestForObject{},
-		cyclecontroller.NewNamespacePredicate(namespace),
-	)
+	src := source.Kind(mgr.GetCache(), &v1.CycleNodeStatus{}, &handler.TypedEnqueueRequestForObject[*v1.CycleNodeStatus]{}, cyclecontroller.NewNamespacePredicate[*v1.CycleNodeStatus](namespace))
+	err = cnsController.Watch(src)
 	if err != nil {
 		return nil, err
 	}

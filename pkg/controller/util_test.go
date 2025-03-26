@@ -13,13 +13,13 @@ func TestNamespacePredicate(t *testing.T) {
 	tests := []struct {
 		name      string
 		namespace string
-		event     interface{}
+		event     any
 		allowed   bool
 	}{
 		{
 			"test create allowed",
 			"kube-system",
-			event.CreateEvent{
+			event.TypedCreateEvent[*coreV1.Event]{
 				Object: &coreV1.Event{
 					ObjectMeta: v1.ObjectMeta{
 						Namespace: "kube-system",
@@ -31,7 +31,7 @@ func TestNamespacePredicate(t *testing.T) {
 		{
 			"test create denied",
 			"kube-system",
-			event.CreateEvent{
+			event.TypedCreateEvent[*coreV1.Event]{
 				Object: &coreV1.Event{
 					ObjectMeta: v1.ObjectMeta{
 						Namespace: "default",
@@ -43,7 +43,7 @@ func TestNamespacePredicate(t *testing.T) {
 		{
 			"test delete allowed",
 			"kube-system",
-			event.DeleteEvent{
+			event.TypedDeleteEvent[*coreV1.Event]{
 				Object: &coreV1.Event{
 					ObjectMeta: v1.ObjectMeta{
 						Namespace: "kube-system",
@@ -55,7 +55,7 @@ func TestNamespacePredicate(t *testing.T) {
 		{
 			"test delete denied",
 			"kube-system",
-			event.DeleteEvent{
+			event.TypedDeleteEvent[*coreV1.Event]{
 				Object: &coreV1.Event{
 					ObjectMeta: v1.ObjectMeta{
 						Namespace: "default",
@@ -67,7 +67,7 @@ func TestNamespacePredicate(t *testing.T) {
 		{
 			"test update allowed",
 			"kube-system",
-			event.UpdateEvent{
+			event.TypedUpdateEvent[*coreV1.Event]{
 				ObjectNew: &coreV1.Event{
 					ObjectMeta: v1.ObjectMeta{
 						Namespace: "kube-system",
@@ -79,7 +79,7 @@ func TestNamespacePredicate(t *testing.T) {
 		{
 			"test update denied",
 			"kube-system",
-			event.UpdateEvent{
+			event.TypedUpdateEvent[*coreV1.Event]{
 				ObjectNew: &coreV1.Event{
 					ObjectMeta: v1.ObjectMeta{
 						Namespace: "default",
@@ -91,7 +91,7 @@ func TestNamespacePredicate(t *testing.T) {
 		{
 			"test generic allowed",
 			"kube-system",
-			event.GenericEvent{
+			event.TypedGenericEvent[*coreV1.Event]{
 				Object: &coreV1.Event{
 					ObjectMeta: v1.ObjectMeta{
 						Namespace: "kube-system",
@@ -103,7 +103,7 @@ func TestNamespacePredicate(t *testing.T) {
 		{
 			"test generic denied",
 			"kube-system",
-			event.GenericEvent{
+			event.TypedGenericEvent[*coreV1.Event]{
 				Object: &coreV1.Event{
 					ObjectMeta: v1.ObjectMeta{
 						Namespace: "default",
@@ -116,17 +116,17 @@ func TestNamespacePredicate(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			p := NewNamespacePredicate(tc.namespace)
+			p := NewNamespacePredicate[*coreV1.Event](tc.namespace)
 
 			var res bool
 			switch e := tc.event.(type) {
-			case event.CreateEvent:
+			case event.TypedCreateEvent[*coreV1.Event]:
 				res = p.Create(e)
-			case event.DeleteEvent:
+			case event.TypedDeleteEvent[*coreV1.Event]:
 				res = p.Delete(e)
-			case event.UpdateEvent:
+			case event.TypedUpdateEvent[*coreV1.Event]:
 				res = p.Update(e)
-			case event.GenericEvent:
+			case event.TypedGenericEvent[*coreV1.Event]:
 				res = p.Generic(e)
 			}
 
