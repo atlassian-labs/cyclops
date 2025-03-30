@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/spf13/cobra"
 
 	"k8s.io/client-go/kubernetes"
@@ -28,7 +29,7 @@ import (
 var (
 	// replaced by ldflags at buildtime
 	version = "undefined" //nolint:golint,varcheck,deadcode,unused
-	klogger = textlogger.NewLogger(&textlogger.Config{})
+	klogger logr.Logger
 )
 
 // app type holds options for the application from cobra
@@ -189,6 +190,9 @@ func main() {
 		Long:  "detects changes on nodegroups for both cloud instances out of date with ASGs and OnDelete pods of DaemonSets. Will create CNRs to automatically cycle affected nodes",
 
 		Run: func(*cobra.Command, []string) {
+			loggerConfig := textlogger.NewConfig()
+			klogger = textlogger.NewLogger(loggerConfig)
+
 			a.run()
 		},
 	}
