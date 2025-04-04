@@ -1,3 +1,5 @@
+<img src="assets/logo.svg" alt="Cyclops Logo" width="200" height="200" />
+
 # Cyclops
 
 [![Godoc](https://godoc.org/github.com/atlassian-labs/cyclops?status.svg)](https://godoc.org/github.com/atlassian-labs/cyclops)

@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="100" cy="100" r="90" fill="#0052CC" />
+  
+  <!-- Cyclops eye -->
+  <circle cx="100" cy="100" r="40" fill="#FFFFFF" />
+  <circle cx="100" cy="100" r="25" fill="#172B4D" />
+  <circle cx="110" cy="90" r="8" fill="#FFFFFF" opacity="0.7" />
+  
+  <!-- Rotating arrows -->
+  <g transform="translate(100,100)" fill="none" stroke="#FFFFFF" stroke-width="8">
+    <path d="M-60,0 A60,60 0 1,1 60,0" stroke-linecap="round"/>
+    <path d="M60,0 L45,-15 M60,0 L45,15" stroke-linecap="round"/>
+  </g>
+  
+  <!-- Kubernetes-style gear segments -->
+  <g transform="translate(100,100)">
+    <g fill="#FFFFFF" transform="rotate(0)">
+      <rect x="-5" y="-85" width="10" height="25" rx="2"/>
+    </g>
+    <g fill="#FFFFFF" transform="rotate(45)">
+      <rect x="-5" y="-85" width="10" height="25" rx="2"/>
+    </g>
+    <g fill="#FFFFFF" transform="rotate(90)">
+      <rect x="-5" y="-85" width="10" height="25" rx="2"/>
+    </g>
+    <g fill="#FFFFFF" transform="rotate(135)">
+      <rect x="-5" y="-85" width="10" height="25" rx="2"/>
+    </g>
+    <g fill="#FFFFFF" transform="rotate(180)">
+      <rect x="-5" y="-85" width="10" height="25" rx="2"/>
+    </g>
+    <g fill="#FFFFFF" transform="rotate(225)">
+      <rect x="-5" y="-85" width="10" height="25" rx="2"/>
+    </g>
+    <g fill="#FFFFFF" transform="rotate(270)">
+      <rect x="-5" y="-85" width="10" height="25" rx="2"/>
+    </g>
+    <g fill="#FFFFFF" transform="rotate(315)">
+      <rect x="-5" y="-85" width="10" height="25" rx="2"/>
+    </g>
+  </g>
+</svg>
