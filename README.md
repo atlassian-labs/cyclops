@@ -1,9 +1,20 @@
 # Cyclops
 
+<div align="center">
+  <img src="docs/assets/logos/cyclops-logo-color.svg" width="120" height="120" alt="Cyclops Logo"/>
+</div>
+
 [![Godoc](https://godoc.org/github.com/atlassian-labs/cyclops?status.svg)](https://godoc.org/github.com/atlassian-labs/cyclops)
 [![Build](https://github.com/atlassian-labs/cyclops/workflows/Build/badge.svg)](https://github.com/cyclops-labs/workflows/actions)
 [![Go Report Card](https://goreportcard.com/badge/github.com/atlassian-labs/cyclops)](https://goreportcard.com/report/github.com/atlassian-labs/cyclops)
 [![license](https://img.shields.io/github/license/atlassian-labs/cyclops.svg)](LICENSE)
+
+## Logo Usage
+
+The Cyclops logo is available in three variations:
+- [Full Color](docs/assets/logos/cyclops-logo-color.svg) - Primary logo for light backgrounds
+- [Monochrome](docs/assets/logos/cyclops-logo-mono.svg) - Black version for light backgrounds
+- [White](docs/assets/logos/cyclops-logo-white.svg) - White version for dark backgrounds
 
 Cyclops is a Kubernetes Operator that is able to terminate and create replacement nodes for a set of nodes in a cloud provider node group, e.g. AWS's Auto Scaling Group.
 
