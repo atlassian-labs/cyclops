@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="300" height="100" viewBox="0 0 300 100" version="1.1" xmlns="http://www.w3.org/2000/svg">
+    <style>
+        .text { font-family: Arial, sans-serif; font-weight: bold; }
+    </style>
+    <!-- Kubernetes-inspired wheel -->
+    <circle cx="50" cy="50" r="45" fill="none" stroke="#0052CC" stroke-width="3"/>
+    <circle cx="50" cy="50" r="35" fill="none" stroke="#0052CC" stroke-width="2"/>
+    
+    <!-- Eye element -->
+    <circle cx="50" cy="50" r="20" fill="#0052CC"/>
+    <circle cx="50" cy="50" r="10" fill="white"/>
+    <circle cx="47" cy="47" r="4" fill="white" opacity="0.7"/>
+    
+    <!-- Kubernetes-inspired spokes -->
+    <g stroke="#0052CC" stroke-width="2">
+        <line x1="50" y1="5" x2="50" y2="95"/>
+        <line x1="5" y1="50" x2="95" y2="50"/>
+        <line x1="15" y1="15" x2="85" y2="85"/>
+        <line x1="15" y1="85" x2="85" y2="15"/>
+    </g>
+    
+    <!-- Text -->
+    <text x="120" y="60" class="text" font-size="36" fill="#0052CC">CYCLOPS</text>
+</svg>
