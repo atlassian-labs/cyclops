@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Monochrome version for dark backgrounds -->
+  <circle cx="100" cy="100" r="90" fill="white" opacity="0.1"/>
+  <circle cx="100" cy="100" r="70" fill="white" opacity="0.2"/>
+  <circle cx="100" cy="100" r="50" fill="white"/>
+  <circle cx="100" cy="100" r="25" fill="#172B4D"/>
+  <circle cx="85" cy="85" r="10" fill="#172B4D" opacity="0.5"/>
+</svg>

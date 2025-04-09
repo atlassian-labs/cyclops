@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="400" height="200" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Full logo with text -->
+  <circle cx="100" cy="100" r="90" fill="#0052CC" opacity="0.1"/>
+  <circle cx="100" cy="100" r="70" fill="#0052CC" opacity="0.2"/>
+  <circle cx="100" cy="100" r="50" fill="#0052CC"/>
+  <circle cx="100" cy="100" r="25" fill="white"/>
+  <circle cx="85" cy="85" r="10" fill="white" opacity="0.5"/>
+  
+  <!-- Text -->
+  <text x="200" y="115" font-family="Arial, sans-serif" font-size="48" font-weight="bold" fill="#0052CC">CYCLOPS</text>
+</svg>
