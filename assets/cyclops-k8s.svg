@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="200" height="200" viewBox="0 0 200 200" version="1.1" xmlns="http://www.w3.org/2000/svg">
+    <!-- Kubernetes-style wheel -->
+    <path d="M100,10 L190,60 L190,140 L100,190 L10,140 L10,60 Z" fill="#E9E9E9" stroke="#2684FF" stroke-width="4"/>
+    
+    <!-- Cyclops Eye -->
+    <circle cx="100" cy="100" r="60" fill="#FFFFFF" stroke="#2684FF" stroke-width="4"/>
+    <circle cx="100" cy="100" r="30" fill="#2684FF"/>
+    <circle cx="115" cy="90" r="10" fill="#FFFFFF"/>
+    
+    <!-- Kubernetes-style spokes -->
+    <path d="M100,10 L100,190 M10,60 L190,140 M10,140 L190,60" stroke="#2684FF" stroke-width="2" fill="none"/>
+</svg>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="500" height="200" viewBox="0 0 500 200" version="1.1" xmlns="http://www.w3.org/2000/svg">
+    <!-- Cyclops Eye -->
+    <circle cx="100" cy="100" r="90" fill="#E9E9E9" stroke="#2684FF" stroke-width="6"/>
+    <circle cx="100" cy="100" r="45" fill="#2684FF"/>
+    <circle cx="120" cy="85" r="15" fill="#FFFFFF"/>
+    
+    <!-- CYCLOPS Text -->
+    <text x="220" y="120" font-family="Arial, sans-serif" font-size="72" font-weight="bold" fill="#2684FF">CYCLOPS</text>
+</svg>
