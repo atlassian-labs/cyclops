@@ -431,6 +431,36 @@ func TestInstance_OutOfDate(t *testing.T) {
 			buildLTInstance(&instanceID, &configV2),
 			true,
 		},
+		{
+			"test asg mixed set to latest should match if instance is latest",
+			&autoscaling.Group{
+				Instances: []*autoscaling.Instance{buildLTInstance(&instanceID, &configV3)},
+				MixedInstancesPolicy: &autoscaling.MixedInstancesPolicy{
+					LaunchTemplate: &autoscaling.LaunchTemplate{
+						LaunchTemplateSpecification: &autoscaling.LaunchTemplateSpecification{
+					                Version: aws.String(launchTemplateLatestVersion),
+						},
+					},
+				},
+			},
+			buildLTInstance(&instanceID, &configV3),
+			false,
+		},
+		{
+			"test asg mixed set to latest should not match if instance not latest",
+			&autoscaling.Group{
+				Instances: []*autoscaling.Instance{buildLTInstance(&instanceID, &configV2)},
+				MixedInstancesPolicy: &autoscaling.MixedInstancesPolicy{
+					LaunchTemplate: &autoscaling.LaunchTemplate{
+						LaunchTemplateSpecification: &autoscaling.LaunchTemplateSpecification{
+					                Version: aws.String(launchTemplateLatestVersion),
+						},
+					},
+				},
+			},
+			buildLTInstance(&instanceID, &configV2),
+			true,
+		},
 	}
 
 	for _, tt := range tests {

@@ -337,10 +337,21 @@ func (a *autoscalingGroups) instanceOutOfDate(instance *autoscaling.Instance) bo
 				return false
 			}
 		}
-
 	case group.MixedInstancesPolicy != nil:
-		if policy := group.MixedInstancesPolicy; policy.LaunchTemplate != nil && policy.LaunchTemplate.LaunchTemplateSpecification != nil {
+		policy := group.MixedInstancesPolicy
+		if policy.LaunchTemplate != nil && policy.LaunchTemplate.LaunchTemplateSpecification != nil {
 			groupVersion = aws.StringValue(policy.LaunchTemplate.LaunchTemplateSpecification.Version)
+			if groupVersion == launchTemplateLatestVersion {
+				launchTemplateSpec := policy.LaunchTemplate.LaunchTemplateSpecification
+				groupVersion, err = a.getLaunchTemplateLatestVersion(aws.StringValue(launchTemplateSpec.LaunchTemplateId))
+				if err != nil {
+					a.logger.WithValues(
+						"lt-id", aws.StringValue(launchTemplateSpec.LaunchTemplateId),
+						"lt-name", aws.StringValue(launchTemplateSpec.LaunchTemplateName),
+					).Error(err, "[ASG] failed to get latest asg version for mixedInstancesPolicy")
+					return false
+				}
+			}
 		}
 	}
 
