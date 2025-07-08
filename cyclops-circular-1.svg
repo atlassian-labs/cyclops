@@ -1,0 +1,16 @@
+<svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <!-- Outer rotating ring representing the cycling process -->
+  <circle cx="60" cy="60" r="50" fill="none" stroke="#2684FF" stroke-width="8" stroke-dasharray="20 10" opacity="0.8"/>
+  
+  <!-- Inner core representing the stable operator -->
+  <circle cx="60" cy="60" r="25" fill="#0052CC" opacity="0.9"/>
+  
+  <!-- Three nodes being cycled - positioned around the circle -->
+  <circle cx="60" cy="20" r="6" fill="#FF5630"/>
+  <circle cx="95" cy="75" r="6" fill="#FF5630"/>
+  <circle cx="25" cy="75" r="6" fill="#FF5630"/>
+  
+  <!-- Rotation indicators -->
+  <path d="M 85 35 Q 90 30 95 35" fill="none" stroke="#2684FF" stroke-width="3" stroke-linecap="round"/>
+  <polygon points="95,35 98,32 98,38" fill="#2684FF"/>
+</svg>

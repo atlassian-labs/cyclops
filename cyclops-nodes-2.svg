@@ -1,0 +1,28 @@
+<svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background grid representing the node group -->
+  <defs>
+    <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+      <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#E3E8F0" stroke-width="1" opacity="0.3"/>
+    </pattern>
+  </defs>
+  <rect width="120" height="120" fill="url(#grid)"/>
+  
+  <!-- Central operator hub -->
+  <rect x="45" y="45" width="30" height="30" rx="8" fill="#0052CC"/>
+  
+  <!-- Active nodes (being managed) -->
+  <rect x="20" y="20" width="15" height="15" rx="3" fill="#36B37E"/>
+  <rect x="85" y="20" width="15" height="15" rx="3" fill="#36B37E"/>
+  <rect x="20" y="85" width="15" height="15" rx="3" fill="#36B37E"/>
+  <rect x="85" y="85" width="15" height="15" rx="3" fill="#36B37E"/>
+  
+  <!-- Node being cycled (highlighted) -->
+  <rect x="52.5" y="15" width="15" height="15" rx="3" fill="#FF5630"/>
+  
+  <!-- Connection lines showing management -->
+  <line x1="60" y1="45" x2="27.5" y2="35" stroke="#2684FF" stroke-width="2" opacity="0.6"/>
+  <line x1="60" y1="45" x2="92.5" y2="35" stroke="#2684FF" stroke-width="2" opacity="0.6"/>
+  <line x1="60" y1="75" x2="27.5" y2="85" stroke="#2684FF" stroke-width="2" opacity="0.6"/>
+  <line x1="60" y1="75" x2="92.5" y2="85" stroke="#2684FF" stroke-width="2" opacity="0.6"/>
+  <line x1="60" y1="45" x2="60" y2="30" stroke="#FF5630" stroke-width="3"/>
+</svg>

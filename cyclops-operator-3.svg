@@ -1,0 +1,33 @@
+<svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <!-- Kubernetes-inspired hexagonal pattern -->
+  <defs>
+    <clipPath id="hexClip">
+      <polygon points="60,15 90,35 90,65 60,85 30,65 30,35" />
+    </clipPath>
+  </defs>
+  
+  <!-- Outer hexagon representing the operator boundary -->
+  <polygon points="60,15 90,35 90,65 60,85 30,65 30,35" fill="none" stroke="#2684FF" stroke-width="4"/>
+  
+  <!-- Inner rotating element representing automation -->
+  <g clip-path="url(#hexClip)">
+    <!-- Central automation core -->
+    <circle cx="60" cy="50" r="18" fill="#0052CC"/>
+    
+    <!-- Rotating segments showing continuous operation -->
+    <path d="M 60 32 A 18 18 0 0 1 78 50 L 60 50 Z" fill="#FF5630" opacity="0.8"/>
+    <path d="M 60 68 A 18 18 0 0 1 42 50 L 60 50 Z" fill="#36B37E" opacity="0.8"/>
+  </g>
+  
+  <!-- Corner elements representing managed nodes -->
+  <circle cx="75" cy="25" r="4" fill="#FFAB00"/>
+  <circle cx="75" cy="75" r="4" fill="#FFAB00"/>
+  <circle cx="45" cy="75" r="4" fill="#FFAB00"/>
+  <circle cx="45" cy="25" r="4" fill="#FFAB00"/>
+  
+  <!-- Subtle connection lines -->
+  <line x1="71" y1="29" x2="66" y2="38" stroke="#2684FF" stroke-width="1.5" opacity="0.4"/>
+  <line x1="71" y1="71" x2="66" y2="62" stroke="#2684FF" stroke-width="1.5" opacity="0.4"/>
+  <line x1="49" y1="71" x2="54" y2="62" stroke="#2684FF" stroke-width="1.5" opacity="0.4"/>
+  <line x1="49" y1="29" x2="54" y2="38" stroke="#2684FF" stroke-width="1.5" opacity="0.4"/>
+</svg>
