@@ -1,0 +1,25 @@
+<svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle for containment -->
+  <circle cx="60" cy="60" r="55" fill="none" stroke="#F4F5F7" stroke-width="2"/>
+  
+  <!-- Old nodes (being cycled out) -->
+  <rect x="25" y="35" width="12" height="12" rx="2" fill="#FFAB00" opacity="0.6"/>
+  <rect x="45" y="25" width="12" height="12" rx="2" fill="#FFAB00" opacity="0.6"/>
+  <rect x="65" y="35" width="12" height="12" rx="2" fill="#FFAB00" opacity="0.6"/>
+  
+  <!-- Refresh arrows -->
+  <path d="M 35 55 Q 60 45 85 55" fill="none" stroke="#2684FF" stroke-width="3" stroke-linecap="round"/>
+  <path d="M 80 50 L 85 55 L 80 60" fill="none" stroke="#2684FF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  
+  <path d="M 85 65 Q 60 75 35 65" fill="none" stroke="#2684FF" stroke-width="3" stroke-linecap="round"/>
+  <path d="M 40 70 L 35 65 L 40 60" fill="none" stroke="#2684FF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  
+  <!-- New nodes (fresh/cycled) -->
+  <rect x="25" y="75" width="12" height="12" rx="2" fill="#36B37E"/>
+  <rect x="45" y="85" width="12" height="12" rx="2" fill="#36B37E"/>
+  <rect x="65" y="75" width="12" height="12" rx="2" fill="#36B37E"/>
+  
+  <!-- Central orchestrator -->
+  <circle cx="60" cy="60" r="8" fill="#253858"/>
+  <circle cx="60" cy="60" r="4" fill="#2684FF"/>
+</svg>

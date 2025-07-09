@@ -1,0 +1,19 @@
+<svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <!-- Outer ring representing the cycling process -->
+  <circle cx="60" cy="60" r="50" fill="none" stroke="#2684FF" stroke-width="3" opacity="0.3"/>
+  
+  <!-- Main circular arrow showing cycling direction -->
+  <path d="M 60 15 A 45 45 0 1 1 59.9 15" fill="none" stroke="#2684FF" stroke-width="4" stroke-linecap="round"/>
+  
+  <!-- Arrow head -->
+  <path d="M 55 20 L 65 15 L 55 10" fill="none" stroke="#2684FF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  
+  <!-- Inner nodes (representing infrastructure) -->
+  <circle cx="60" cy="40" r="4" fill="#36B37E"/>
+  <circle cx="75" cy="60" r="4" fill="#36B37E"/>
+  <circle cx="60" cy="80" r="4" fill="#36B37E"/>
+  <circle cx="45" cy="60" r="4" fill="#36B37E"/>
+  
+  <!-- Central hub -->
+  <circle cx="60" cy="60" r="6" fill="#253858"/>
+</svg>

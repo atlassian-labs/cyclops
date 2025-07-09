@@ -1,0 +1,24 @@
+<svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <!-- Orbital paths -->
+  <ellipse cx="60" cy="60" rx="45" ry="20" fill="none" stroke="#2684FF" stroke-width="2" opacity="0.4" transform="rotate(0 60 60)"/>
+  <ellipse cx="60" cy="60" rx="45" ry="20" fill="none" stroke="#2684FF" stroke-width="2" opacity="0.4" transform="rotate(60 60 60)"/>
+  <ellipse cx="60" cy="60" rx="45" ry="20" fill="none" stroke="#2684FF" stroke-width="2" opacity="0.4" transform="rotate(120 60 60)"/>
+  
+  <!-- Nodes in orbit (representing cycling infrastructure) -->
+  <circle cx="105" cy="60" r="5" fill="#36B37E"/>
+  <circle cx="82" cy="95" r="5" fill="#36B37E"/>
+  <circle cx="38" cy="95" r="5" fill="#36B37E"/>
+  <circle cx="15" cy="60" r="5" fill="#36B37E"/>
+  <circle cx="38" cy="25" r="5" fill="#36B37E"/>
+  <circle cx="82" cy="25" r="5" fill="#36B37E"/>
+  
+  <!-- Motion indicators -->
+  <path d="M 100 65 Q 95 70 90 65" fill="none" stroke="#FFAB00" stroke-width="2" stroke-linecap="round"/>
+  <path d="M 77 90 Q 72 95 67 90" fill="none" stroke="#FFAB00" stroke-width="2" stroke-linecap="round"/>
+  <path d="M 43 90 Q 38 95 33 90" fill="none" stroke="#FFAB00" stroke-width="2" stroke-linecap="round"/>
+  
+  <!-- Central control hub -->
+  <circle cx="60" cy="60" r="12" fill="#253858"/>
+  <circle cx="60" cy="60" r="6" fill="#2684FF"/>
+  <circle cx="60" cy="60" r="2" fill="#36B37E"/>
+</svg>
