@@ -1,0 +1,20 @@
+<svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <!-- Outer orbital ring -->
+  <circle cx="60" cy="60" r="45" fill="none" stroke="#2684FF" stroke-width="2" stroke-dasharray="8,4" opacity="0.4"/>
+  
+  <!-- Middle orbital ring -->
+  <circle cx="60" cy="60" r="30" fill="none" stroke="#36B37E" stroke-width="2" stroke-dasharray="6,3" opacity="0.6"/>
+  
+  <!-- Inner core -->
+  <circle cx="60" cy="60" r="12" fill="#253858"/>
+  
+  <!-- Orbiting nodes -->
+  <circle cx="105" cy="60" r="5" fill="#FFAB00"/>
+  <circle cx="90" cy="60" r="4" fill="#36B37E"/>
+  <circle cx="72" cy="60" r="3" fill="#2684FF"/>
+  
+  <!-- Motion trails -->
+  <path d="M 105 60 A 45 45 0 0 1 102 70" fill="none" stroke="#FFAB00" stroke-width="1.5" opacity="0.5"/>
+  <path d="M 90 60 A 30 30 0 0 1 88 67" fill="none" stroke="#36B37E" stroke-width="1.5" opacity="0.5"/>
+  <path d="M 72 60 A 12 12 0 0 1 71 64" fill="none" stroke="#2684FF" stroke-width="1.5" opacity="0.5"/>
+</svg>

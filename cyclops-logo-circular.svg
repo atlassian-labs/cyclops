@@ -1,0 +1,19 @@
+<svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <!-- Outer ring representing the cycling process -->
+  <circle cx="60" cy="60" r="50" fill="none" stroke="#2684FF" stroke-width="3" opacity="0.3"/>
+  
+  <!-- Inner rotating elements representing nodes -->
+  <circle cx="60" cy="25" r="6" fill="#36B37E"/>
+  <circle cx="85" cy="45" r="6" fill="#36B37E"/>
+  <circle cx="85" cy="75" r="6" fill="#FFAB00"/>
+  <circle cx="60" cy="95" r="6" fill="#FFAB00"/>
+  <circle cx="35" cy="75" r="6" fill="#2684FF"/>
+  <circle cx="35" cy="45" r="6" fill="#2684FF"/>
+  
+  <!-- Central hub -->
+  <circle cx="60" cy="60" r="8" fill="#253858"/>
+  
+  <!-- Subtle rotation indicator -->
+  <path d="M 75 35 A 20 20 0 0 1 85 55" fill="none" stroke="#36B37E" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+  <polygon points="87,53 83,57 79,51" fill="#36B37E"/>
+</svg>

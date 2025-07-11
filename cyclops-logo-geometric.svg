@@ -1,0 +1,24 @@
+<svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="60" cy="60" r="50" fill="#F4F5F7" opacity="0.3"/>
+  
+  <!-- Hexagonal node pattern -->
+  <polygon points="60,20 80,35 80,55 60,70 40,55 40,35" fill="none" stroke="#2684FF" stroke-width="2"/>
+  
+  <!-- Central rotating element -->
+  <circle cx="60" cy="45" r="8" fill="#36B37E"/>
+  
+  <!-- Cycling arrow -->
+  <path d="M 45 30 A 15 15 0 1 1 75 30" fill="none" stroke="#FFAB00" stroke-width="3" stroke-linecap="round"/>
+  <polygon points="77,28 73,32 69,26" fill="#FFAB00"/>
+  
+  <!-- Node indicators -->
+  <rect x="35" y="40" width="6" height="6" rx="1" fill="#253858"/>
+  <rect x="79" y="40" width="6" height="6" rx="1" fill="#253858"/>
+  <rect x="57" y="75" width="6" height="6" rx="1" fill="#253858"/>
+  
+  <!-- Connection lines -->
+  <line x1="41" y1="43" x2="54" y2="45" stroke="#DFE1E6" stroke-width="1"/>
+  <line x1="66" y1="45" x2="79" y2="43" stroke="#DFE1E6" stroke-width="1"/>
+  <line x1="60" y1="53" x2="60" y2="75" stroke="#DFE1E6" stroke-width="1"/>
+</svg>
