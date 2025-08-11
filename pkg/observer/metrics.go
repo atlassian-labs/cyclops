@@ -16,6 +16,11 @@ type metrics struct {
 	CNRsCreated         *prometheus.CounterVec
 	NodeGroupsLocked    *prometheus.CounterVec
 	ObserverRunTimes    *prometheus.GaugeVec
+
+    // Priority/flow visibility
+    NodeGroupsDetectedChanges *prometheus.GaugeVec
+    NodeGroupsApplying        *prometheus.GaugeVec
+    NodeGroupsBlocked         *prometheus.GaugeVec
 }
 
 // newMetrics creates the new controller metrics struct
@@ -53,6 +58,32 @@ func newMetrics() *metrics {
 			},
 			[]string{"observer"},
 		),
+
+        // Visibility metrics for priority flow
+        NodeGroupsDetectedChanges: prometheus.NewGaugeVec(
+            prometheus.GaugeOpts{
+                Name:      "nodegroups_detected_changes",
+                Namespace: metricsNamespace,
+                Help:      "gauge of total nodegroups with detected changes in a run",
+            },
+            []string{},
+        ),
+        NodeGroupsApplying: prometheus.NewGaugeVec(
+            prometheus.GaugeOpts{
+                Name:      "nodegroups_applying",
+                Namespace: metricsNamespace,
+                Help:      "gauge of nodegroups currently being applied in this run (lowest priority batch)",
+            },
+            []string{},
+        ),
+        NodeGroupsBlocked: prometheus.NewGaugeVec(
+            prometheus.GaugeOpts{
+                Name:      "nodegroups_blocked_by_higher_priority",
+                Namespace: metricsNamespace,
+                Help:      "gauge of nodegroups blocked due to higher priority work in progress",
+            },
+            []string{},
+        ),
 	}
 }
 
