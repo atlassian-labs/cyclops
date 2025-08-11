@@ -97,8 +97,8 @@ func GenerateCNR(nodeGroup atlassianv1.NodeGroup, nodes []string, name, namespac
 		}
 	}
 
-    // Default/normalize priority for backward compatibility
-    priority := max(nodeGroup.Spec.Priority, 0)
+    // Default/normalize priority for backward compatibility (not stored on CNR anymore)
+    _ = max(nodeGroup.Spec.Priority, 0)
 
     return atlassianv1.CycleNodeRequest{
 		ObjectMeta: metav1.ObjectMeta{
@@ -114,8 +114,7 @@ func GenerateCNR(nodeGroup atlassianv1.NodeGroup, nodes []string, name, namespac
 			HealthChecks:             nodeGroup.Spec.HealthChecks,
 			PreTerminationChecks:     nodeGroup.Spec.PreTerminationChecks,
 			SkipInitialHealthChecks:  nodeGroup.Spec.SkipInitialHealthChecks,
-			SkipPreTerminationChecks: nodeGroup.Spec.SkipPreTerminationChecks,
-            Priority:                 priority,
+            SkipPreTerminationChecks: nodeGroup.Spec.SkipPreTerminationChecks,
 			ValidationOptions:        nodeGroup.Spec.ValidationOptions,
 		},
 	}
