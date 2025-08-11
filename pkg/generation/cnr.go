@@ -97,7 +97,10 @@ func GenerateCNR(nodeGroup atlassianv1.NodeGroup, nodes []string, name, namespac
 		}
 	}
 
-	return atlassianv1.CycleNodeRequest{
+    // Default/normalize priority for backward compatibility
+    priority := max(nodeGroup.Spec.Priority, 0)
+
+    return atlassianv1.CycleNodeRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      finalName,
 			Namespace: namespace,
@@ -112,7 +115,7 @@ func GenerateCNR(nodeGroup atlassianv1.NodeGroup, nodes []string, name, namespac
 			PreTerminationChecks:     nodeGroup.Spec.PreTerminationChecks,
 			SkipInitialHealthChecks:  nodeGroup.Spec.SkipInitialHealthChecks,
 			SkipPreTerminationChecks: nodeGroup.Spec.SkipPreTerminationChecks,
-			Priority:                 nodeGroup.Spec.Priority,
+            Priority:                 priority,
 			ValidationOptions:        nodeGroup.Spec.ValidationOptions,
 		},
 	}

@@ -278,7 +278,14 @@ func (c *controller) createCNRs(changedNodeGroups []*ListedNodeGroups) {
     }
 
     // Determine the lowest priority present among the changed nodegroups
-    getPriority := func(ng *v1.NodeGroup) int32 { return ng.Spec.Priority }
+    // Backward compatibility: if priority is missing (zero-value) or negative, treat as 0
+    getPriority := func(ng *v1.NodeGroup) int32 {
+        p := ng.Spec.Priority
+        if p < 0 {
+            return 0
+        }
+        return p
+    }
 
     minPriority := getPriority(changedNodeGroups[0].NodeGroup)
     for i := 1; i < len(changedNodeGroups); i++ {
