@@ -273,35 +273,8 @@ func (c *controller) dropInProgressNodeGroups(nodeGroups v1.NodeGroupList, cnrs 
 
 // createCNRs generates and applies CNRs from the changedNodeGroups
 func (c *controller) createCNRs(changedNodeGroups []*ListedNodeGroups) {
-    if len(changedNodeGroups) == 0 {
-        return
-    }
-
-    // Determine the lowest priority present among the changed nodegroups
-    // Backward compatibility: if priority is missing (zero-value) or negative, treat as 0
-    getPriority := func(ng *v1.NodeGroup) int32 {
-        p := ng.Spec.Priority
-        if p < 0 {
-            return 0
-        }
-        return p
-    }
-
-    minPriority := getPriority(changedNodeGroups[0].NodeGroup)
-    for i := 1; i < len(changedNodeGroups); i++ {
-        p := getPriority(changedNodeGroups[i].NodeGroup)
-        if p < minPriority {
-            minPriority = p
-        }
-    }
-
-    // Only create CNRs for the lowest priority in this run; higher priorities will be handled in future runs
-    klog.V(3).Infof("applying CNRs for priority %d only", minPriority)
+    klog.V(3).Infoln("applying")
     for _, nodeGroup := range changedNodeGroups {
-        if getPriority(nodeGroup.NodeGroup) != minPriority {
-            continue
-        }
-
         nodeNames := make([]string, 0, len(nodeGroup.List))
         for _, node := range nodeGroup.List {
             nodeNames = append(nodeNames, node.Name)
@@ -321,10 +294,65 @@ func (c *controller) createCNRs(changedNodeGroups []*ListedNodeGroups) {
             if c.DryMode {
                 drymodeStr = "[drymode] "
             }
-            klog.V(2).Infof("%ssuccessfully applied cnr %q for nodegroup %q (priority %d)", drymodeStr, name, nodeGroup.NodeGroup.Name, minPriority)
+            klog.V(2).Infof("%ssuccessfully applied cnr %q for nodegroup %q", drymodeStr, name, nodeGroup.NodeGroup.Name)
             c.CNRsCreated.WithLabelValues(nodeGroup.NodeGroup.Name).Inc()
         }
     }
+}
+
+// filterNodeGroupsByPriority returns only the node groups at the lowest priority value
+// Backward compatibility: negative or missing priorities are treated as 0
+func (c *controller) filterNodeGroupsByPriority(changedNodeGroups []*ListedNodeGroups) []*ListedNodeGroups {
+    if len(changedNodeGroups) == 0 {
+        return nil
+    }
+    getPriority := func(ng *v1.NodeGroup) int32 {
+        p := ng.Spec.Priority
+        if p < 0 {
+            return 0
+        }
+        return p
+    }
+    minPriority := getPriority(changedNodeGroups[0].NodeGroup)
+    for i := 1; i < len(changedNodeGroups); i++ {
+        p := getPriority(changedNodeGroups[i].NodeGroup)
+        if p < minPriority {
+            minPriority = p
+        }
+    }
+    var filtered []*ListedNodeGroups
+    for _, g := range changedNodeGroups {
+        if getPriority(g.NodeGroup) == minPriority {
+            filtered = append(filtered, g)
+        }
+    }
+    return filtered
+}
+
+// lowerPriorityInProgress returns true if any in-progress CNR belongs to a NodeGroup with
+// a priority lower than the provided minPriority (i.e., must finish before creating higher priorities)
+func (c *controller) lowerPriorityInProgress(minPriority int32, inProg v1.CycleNodeRequestList) bool {
+    if len(inProg.Items) == 0 {
+        return false
+    }
+    // Build a list of valid nodegroups to map CNRs to priorities
+    allNG := c.validNodeGroups()
+    for _, cnr := range inProg.Items {
+        for i := range allNG.Items {
+            ng := allNG.Items[i]
+            if cnr.IsFromNodeGroup(ng) {
+                p := ng.Spec.Priority
+                if p < 0 {
+                    p = 0
+                }
+                if p < minPriority {
+                    return true
+                }
+                break
+            }
+        }
+    }
+    return false
 }
 
 // nextRunTime returns the next time the controller loop will run from now in UTC
@@ -346,8 +374,9 @@ func (c *controller) Run() {
 		nodeGroups = c.dropInProgressNodeGroups(nodeGroups, inProgressCNRs)
 	}
 
-	// observer the changes using the remaining nodegroups. This is stateless and will pickup changes again if restarted
-	changedNodeGroups := c.observeChanges(nodeGroups)
+    // observe the changes using the remaining nodegroups. This is stateless and will pickup changes again if restarted
+    changedNodeGroups := c.observeChanges(nodeGroups)
+    c.NodeGroupsDetectedChanges.WithLabelValues().Set(float64(len(changedNodeGroups)))
 	if len(changedNodeGroups) == 0 {
 		klog.V(2).Infoln("all nodegroups up to date. next check in", c.CheckInterval)
 		return
@@ -361,12 +390,34 @@ func (c *controller) Run() {
 		}
 	}
 
-	// wait for the desired amount to allow any in progress changes to batch up
+    // Filter to only the lowest priority nodegroups
+    filtered := c.filterNodeGroupsByPriority(changedNodeGroups)
+    if len(filtered) == 0 {
+        klog.V(2).Infoln("no nodegroups to apply after priority filter")
+        return
+    }
+
+    // Guard: if any lower priority CNRs are still in progress, skip this run
+    minP := filtered[0].NodeGroup.Spec.Priority
+    if minP < 0 {
+        minP = 0
+    }
+    if c.lowerPriorityInProgress(minP, inProgressCNRs) {
+        c.NodeGroupsBlocked.WithLabelValues().Set(float64(len(filtered)))
+        klog.V(2).Infof("lower priority CNRs still in progress for priority < %d; skipping creation", minP)
+        return
+    }
+    // Not blocked
+    c.NodeGroupsBlocked.WithLabelValues().Set(0)
+
+    // wait for the desired amount to allow any in progress changes to batch up
 	klog.V(3).Infof("waiting for %v to allow changes to settle", c.WaitInterval)
 	select {
 	case <-time.After(c.WaitInterval):
-		klog.V(3).Infof("applying %d CNRs", len(changedNodeGroups))
-		c.createCNRs(changedNodeGroups)
+        klog.V(3).Infof("applying %d CNRs (lowest priority batch)", len(filtered))
+        c.NodeGroupsApplying.WithLabelValues().Set(float64(len(filtered)))
+        c.createCNRs(filtered)
+        c.NodeGroupsApplying.WithLabelValues().Set(0)
 		if c.RunOnce {
 			klog.V(3).Infoln("done creating CNRs after runOnce. exiting")
 		} else {
