@@ -578,3 +578,14 @@ func (t *CycleNodeRequestTransitioner) deleteFailedSiblingCNRs() error {
 
 	return nil
 }
+
+// countNodesCreatedAfter returns the number of nodes in the given map that are created after the specified time
+func countNodesCreatedAfter(nodes map[string]corev1.Node, cutoffTime time.Time) int {
+	count := 0
+	for _, node := range nodes {
+		if node.CreationTimestamp.Time.After(cutoffTime) {
+			count++
+		}
+	}
+	return count
+}

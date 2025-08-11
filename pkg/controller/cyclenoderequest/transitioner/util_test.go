@@ -3,10 +3,12 @@ package transitioner
 import (
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/atlassian-labs/cyclops/pkg/cloudprovider"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type dummyInstance struct {
@@ -142,8 +144,72 @@ func TestFindOffendingNodes(t *testing.T) {
 	}
 }
 
+func TestCountNodesCreatedAfter(t *testing.T) {
+	baseTime := time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		name          string
+		nodes         map[string]corev1.Node
+		cutoffTime    time.Time
+		expectedCount int
+	}{
+		{
+			name:          "empty nodes map",
+			nodes:         map[string]corev1.Node{},
+			cutoffTime:    baseTime,
+			expectedCount: 0,
+		},
+		{
+			name: "all nodes created after cutoff",
+			nodes: map[string]corev1.Node{
+				"node1": buildNodeWithTimestamp("node1", baseTime.Add(1*time.Hour)),
+				"node2": buildNodeWithTimestamp("node2", baseTime.Add(1*time.Hour)),
+				"node3": buildNodeWithTimestamp("node3", baseTime.Add(1*time.Hour)),
+			},
+			cutoffTime:    baseTime,
+			expectedCount: 3,
+		},
+		{
+			name: "all nodes created before cutoff",
+			nodes: map[string]corev1.Node{
+				"node1": buildNodeWithTimestamp("node1", baseTime.Add(-1*time.Hour)),
+				"node2": buildNodeWithTimestamp("node2", baseTime.Add(-1*time.Hour)),
+				"node3": buildNodeWithTimestamp("node3", baseTime.Add(-1*time.Hour)),
+			},
+			cutoffTime:    baseTime,
+			expectedCount: 0,
+		},
+		{
+			name: "mixed nodes before and after cutoff",
+			nodes: map[string]corev1.Node{
+				"node1": buildNodeWithTimestamp("node1", baseTime.Add(-1*time.Hour)),
+				"node2": buildNodeWithTimestamp("node2", baseTime.Add(1*time.Hour)),
+				"node3": buildNodeWithTimestamp("node3", baseTime.Add(1*time.Hour)),
+			},
+			cutoffTime:    baseTime,
+			expectedCount: 2,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := countNodesCreatedAfter(test.nodes, test.cutoffTime)
+			assert.Equal(t, test.expectedCount, result)
+		})
+	}
+}
+
 func buildNode(n dummyInstance) corev1.Node {
 	return corev1.Node{
 		Spec: corev1.NodeSpec{ProviderID: n.providerID},
+	}
+}
+
+func buildNodeWithTimestamp(name string, timestamp time.Time) corev1.Node {
+	return corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              name,
+			CreationTimestamp: metav1.NewTime(timestamp),
+		},
 	}
 }
