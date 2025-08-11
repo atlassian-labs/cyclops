@@ -42,6 +42,10 @@ type CycleNodeRequestSpec struct {
 
 	// SkipPreTerminationChecks is an optional flag to skip pre-termination checks during cycling
 	SkipPreTerminationChecks bool `json:"skipPreTerminationChecks,omitempty"`
+
+    // Priority mirrors the NodeGroup priority to indicate ordering of work
+    // Lower values are higher priority. 0 runs first, then 1, 2, ...
+    Priority int32 `json:"priority,omitempty"`
 }
 
 // CycleNodeRequestStatus defines the observed state of CycleNodeRequest

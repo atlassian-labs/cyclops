@@ -39,6 +39,10 @@ type NodeGroupSpec struct {
 
 	// SkipPreTerminationChecks is an optional flag to skip pre-termination checks during cycling
 	SkipPreTerminationChecks bool `json:"skipPreTerminationChecks,omitempty"`
+
+    // Priority controls the ordering of CNR creation for this NodeGroup.
+    // Lower values are higher priority. 0 runs first, then 1, 2, ...
+    Priority int32 `json:"priority,omitempty"`
 }
 
 // NodeGroupStatus defines the observed state of NodeGroup

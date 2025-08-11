@@ -273,31 +273,51 @@ func (c *controller) dropInProgressNodeGroups(nodeGroups v1.NodeGroupList, cnrs 
 
 // createCNRs generates and applies CNRs from the changedNodeGroups
 func (c *controller) createCNRs(changedNodeGroups []*ListedNodeGroups) {
-	klog.V(3).Infoln("applying")
-	for _, nodeGroup := range changedNodeGroups {
-		nodeNames := make([]string, 0, len(nodeGroup.List))
-		for _, node := range nodeGroup.List {
-			nodeNames = append(nodeNames, node.Name)
-		}
-		// generate cnr with prefix and use generate name method
-		cnr := generation.GenerateCNR(*nodeGroup.NodeGroup, nodeNames, c.CNRPrefix, c.Namespace)
-		generation.UseGenerateNameCNR(&cnr)
-		generation.GiveReason(&cnr, nodeGroup.Reason)
-		generation.SetAPIVersion(&cnr, apiVersion)
+    if len(changedNodeGroups) == 0 {
+        return
+    }
 
-		name := generation.GetName(cnr.ObjectMeta)
+    // Determine the lowest priority present among the changed nodegroups
+    getPriority := func(ng *v1.NodeGroup) int32 { return ng.Spec.Priority }
 
-		if err := generation.ApplyCNR(c.client, c.DryMode, cnr); err != nil {
-			klog.Errorf("failed to apply cnr %q for nodegroup %q: %s", name, nodeGroup.NodeGroup.Name, err)
-		} else {
-			var drymodeStr string
-			if c.DryMode {
-				drymodeStr = "[drymode] "
-			}
-			klog.V(2).Infof("%ssuccessfully applied cnr %q for nodegroup %q", drymodeStr, name, nodeGroup.NodeGroup.Name)
-			c.CNRsCreated.WithLabelValues(nodeGroup.NodeGroup.Name).Inc()
-		}
-	}
+    minPriority := getPriority(changedNodeGroups[0].NodeGroup)
+    for i := 1; i < len(changedNodeGroups); i++ {
+        p := getPriority(changedNodeGroups[i].NodeGroup)
+        if p < minPriority {
+            minPriority = p
+        }
+    }
+
+    // Only create CNRs for the lowest priority in this run; higher priorities will be handled in future runs
+    klog.V(3).Infof("applying CNRs for priority %d only", minPriority)
+    for _, nodeGroup := range changedNodeGroups {
+        if getPriority(nodeGroup.NodeGroup) != minPriority {
+            continue
+        }
+
+        nodeNames := make([]string, 0, len(nodeGroup.List))
+        for _, node := range nodeGroup.List {
+            nodeNames = append(nodeNames, node.Name)
+        }
+        // generate cnr with prefix and use generate name method
+        cnr := generation.GenerateCNR(*nodeGroup.NodeGroup, nodeNames, c.CNRPrefix, c.Namespace)
+        generation.UseGenerateNameCNR(&cnr)
+        generation.GiveReason(&cnr, nodeGroup.Reason)
+        generation.SetAPIVersion(&cnr, apiVersion)
+
+        name := generation.GetName(cnr.ObjectMeta)
+
+        if err := generation.ApplyCNR(c.client, c.DryMode, cnr); err != nil {
+            klog.Errorf("failed to apply cnr %q for nodegroup %q: %s", name, nodeGroup.NodeGroup.Name, err)
+        } else {
+            var drymodeStr string
+            if c.DryMode {
+                drymodeStr = "[drymode] "
+            }
+            klog.V(2).Infof("%ssuccessfully applied cnr %q for nodegroup %q (priority %d)", drymodeStr, name, nodeGroup.NodeGroup.Name, minPriority)
+            c.CNRsCreated.WithLabelValues(nodeGroup.NodeGroup.Name).Inc()
+        }
+    }
 }
 
 // nextRunTime returns the next time the controller loop will run from now in UTC
