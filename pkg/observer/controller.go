@@ -397,11 +397,8 @@ func (c *controller) Run() {
         return
     }
 
-    // Guard: if any lower priority CNRs are still in progress, skip this run
-    minP := filtered[0].NodeGroup.Spec.Priority
-    if minP < 0 {
-        minP = 0
-    }
+    // If any lower priority CNRs are still in progress, skip this run
+    minP := max(filtered[0].NodeGroup.Spec.Priority, 0)
     if c.lowerPriorityInProgress(minP, inProgressCNRs) {
         c.NodeGroupsBlocked.WithLabelValues().Set(float64(len(filtered)))
         klog.V(2).Infof("lower priority CNRs still in progress for priority < %d; skipping creation", minP)
