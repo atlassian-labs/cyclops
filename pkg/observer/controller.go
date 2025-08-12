@@ -329,9 +329,9 @@ func (c *controller) filterNodeGroupsByPriority(changedNodeGroups []*ListedNodeG
     return filtered
 }
 
-// lowerPriorityInProgress returns true if any in-progress CNR belongs to a NodeGroup with
+// isLowerPriorityInProgress returns true if any in-progress CNR belongs to a NodeGroup with
 // a priority lower than the provided minPriority (i.e., must finish before creating higher priorities)
-func (c *controller) lowerPriorityInProgress(minPriority int32, inProg v1.CycleNodeRequestList) bool {
+func (c *controller) isLowerPriorityInProgress(minPriority int32, inProg v1.CycleNodeRequestList) bool {
     if len(inProg.Items) == 0 {
         return false
     }
@@ -399,7 +399,7 @@ func (c *controller) Run() {
 
     // If any lower priority CNRs are still in progress, skip this run
     minP := max(filtered[0].NodeGroup.Spec.Priority, 0)
-    if c.lowerPriorityInProgress(minP, inProgressCNRs) {
+    if c.isLowerPriorityInProgress(minP, inProgressCNRs) {
         c.NodeGroupsBlocked.WithLabelValues().Set(float64(len(filtered)))
         klog.V(2).Infof("lower priority CNRs still in progress for priority < %d; skipping creation", minP)
         return
