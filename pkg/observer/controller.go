@@ -323,19 +323,18 @@ func (c *controller) selectLowestPriorityNodeGroups(changedNodeGroups []*ListedN
 }
 
 // hasLowerPriorityCNRsInProgress returns true if any in-progress CNR belongs to a NodeGroup with
-// a priority lower than the provided minPriority (i.e., must finish before creating higher priorities)
-func (c *controller) hasLowerPriorityCNRsInProgress(minPriority int32, inProg v1.CycleNodeRequestList) bool {
-    if len(inProg.Items) == 0 {
+// a priority lower than the provided batchPriority (i.e., must finish before creating higher priorities)
+func (c *controller) hasLowerPriorityCNRsInProgress(batchPriority int32, inProgressCNRs v1.CycleNodeRequestList) bool {
+    if len(inProgressCNRs.Items) == 0 {
         return false
     }
     // Build a list of valid nodegroups to map CNRs to priorities
-    allNG := c.validNodeGroups()
-    for _, cnr := range inProg.Items {
-        for i := range allNG.Items {
-            ng := allNG.Items[i]
+    allNodeGroups := c.validNodeGroups()
+    for _, cnr := range inProgressCNRs.Items {
+        for _, ng := range allNodeGroups.Items {
             if cnr.IsFromNodeGroup(ng) {
                 p := max(ng.Spec.Priority, 0)
-                if p < minPriority {
+                if p < batchPriority {
                     return true
                 }
                 break
@@ -366,7 +365,9 @@ func (c *controller) Run() {
 
     // observe the changes using the remaining nodegroups. This is stateless and will pickup changes again if restarted
     changedNodeGroups := c.observeChanges(nodeGroups)
-    c.ChangedNodeGroups.WithLabelValues().Set(float64(len(changedNodeGroups)))
+    if n := len(changedNodeGroups); n > 0 {
+        c.ChangedNodeGroups.WithLabelValues().Add(float64(n))
+    }
 	if len(changedNodeGroups) == 0 {
 		klog.V(2).Infoln("all nodegroups up to date. next check in", c.CheckInterval)
 		return
@@ -391,21 +392,21 @@ func (c *controller) Run() {
     // This is a failsafe, the CRD validation will ensure the values are a minimum of 0 at creation time
     batchPriority := max(lowestPriorityBatch[0].NodeGroup.Spec.Priority, 0)
     if c.hasLowerPriorityCNRsInProgress(batchPriority, inProgressCNRs) {
-        c.BlockedNodeGroups.WithLabelValues().Set(float64(len(lowestPriorityBatch)))
+        c.BlockedNodeGroups.WithLabelValues().Add(float64(len(lowestPriorityBatch)))
         klog.V(2).Infof("lower priority CNRs still in progress for priority < %d; skipping creation", batchPriority)
         return
     }
-    // Not blocked
-    c.BlockedNodeGroups.WithLabelValues().Set(0)
+    // Not blocked: counters don't need clearing
 
     // wait for the desired amount to allow any in progress changes to batch up
 	klog.V(3).Infof("waiting for %v to allow changes to settle", c.WaitInterval)
 	select {
     case <-time.After(c.WaitInterval):
         klog.V(3).Infof("applying %d CNRs (lowest priority batch)", len(lowestPriorityBatch))
-        c.ApplyingNodeGroups.WithLabelValues().Set(float64(len(lowestPriorityBatch)))
+        if n := len(lowestPriorityBatch); n > 0 {
+            c.ApplyingNodeGroups.WithLabelValues().Add(float64(n))
+        }
         c.createCNRs(lowestPriorityBatch)
-        c.ApplyingNodeGroups.WithLabelValues().Set(0)
 		if c.RunOnce {
 			klog.V(3).Infoln("done creating CNRs after runOnce. exiting")
 		} else {
