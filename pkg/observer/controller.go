@@ -322,7 +322,7 @@ func (c *controller) selectLowestPriorityNodeGroups(changedNodeGroups []*ListedN
     return filtered
 }
 
-// isLowerPriorityInProgress returns true if any in-progress CNR belongs to a NodeGroup with
+// hasLowerPriorityCNRsInProgress returns true if any in-progress CNR belongs to a NodeGroup with
 // a priority lower than the provided minPriority (i.e., must finish before creating higher priorities)
 func (c *controller) hasLowerPriorityCNRsInProgress(minPriority int32, inProg v1.CycleNodeRequestList) bool {
     if len(inProg.Items) == 0 {
@@ -388,6 +388,7 @@ func (c *controller) Run() {
     }
 
     // If any lower priority CNRs are still in progress, skip this run
+    // This is a failsafe, the CRD validation will ensure the values are a minimum of 0 at creation time
     batchPriority := max(lowestPriorityBatch[0].NodeGroup.Spec.Priority, 0)
     if c.hasLowerPriorityCNRsInProgress(batchPriority, inProgressCNRs) {
         c.BlockedNodeGroups.WithLabelValues().Set(float64(len(lowestPriorityBatch)))
