@@ -111,7 +111,7 @@ func GenerateCNR(nodeGroup atlassianv1.NodeGroup, nodes []string, name, namespac
 			HealthChecks:             nodeGroup.Spec.HealthChecks,
 			PreTerminationChecks:     nodeGroup.Spec.PreTerminationChecks,
 			SkipInitialHealthChecks:  nodeGroup.Spec.SkipInitialHealthChecks,
-            SkipPreTerminationChecks: nodeGroup.Spec.SkipPreTerminationChecks,
+			SkipPreTerminationChecks: nodeGroup.Spec.SkipPreTerminationChecks,
 			ValidationOptions:        nodeGroup.Spec.ValidationOptions,
 		},
 	}
