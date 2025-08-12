@@ -588,6 +588,117 @@ func TestPriority_ThreeLevels_Sequential(t *testing.T) {
     assert.Equal(t, 3, len(lst.Items))
 }
 
+func TestPriority_OngoingLowerPriorityDefersHigher(t *testing.T) {
+    scenario := test.BuildTestScenario(test.ScenarioOpts{Keys: []string{"a", "b", "c"}, NodeCount: 1, PodCount: 1}).Flatten()
+    a := scenario.Nodegroups[0]
+    b := scenario.Nodegroups[1]
+    c := scenario.Nodegroups[2]
+    a.Spec.CycleSettings.Concurrency = 1
+    b.Spec.CycleSettings.Concurrency = 1
+    c.Spec.CycleSettings.Concurrency = 1
+    a.Spec.Priority = 0
+    b.Spec.Priority = 10
+    c.Spec.Priority = 20
+
+    var objects []runtime.Object
+    objects = append(objects, a, b, c)
+
+    // Start with A changed only
+    obs := testObserver{changed: map[string]*ListedNodeGroups{
+        a.Name: buildListed(a, scenario.Nodes[0].Name),
+    }}
+    ctrl := newPriorityControllerForTest(t, objects, scenario.Nodes, obs)
+
+    // 1) A is created
+    ctrl.observers["test"] = obs
+    ctrl.Run()
+    lst, _ := generation.ListCNRs(ctrl.client, &client.ListOptions{Namespace: ctrl.Namespace})
+    assert.Equal(t, 1, len(lst.Items))
+    assert.True(t, lst.Items[0].IsFromNodeGroup(*a))
+
+    // 2) A succeeds
+    var cnrA1 atlassianv1.CycleNodeRequest
+    _ = ctrl.client.Get(context.TODO(), client.ObjectKey{Namespace: ctrl.Namespace, Name: lst.Items[0].Name}, &cnrA1)
+    cnrA1.Status.Phase = atlassianv1.CycleNodeRequestSuccessful
+    _ = ctrl.client.Update(context.TODO(), &cnrA1)
+
+    // 3) B is created (set B as changed)
+    ctrl.observers["test"] = testObserver{changed: map[string]*ListedNodeGroups{
+        b.Name: buildListed(b, scenario.Nodes[0].Name),
+    }}
+    ctrl.Run()
+    lst, _ = generation.ListCNRs(ctrl.client, &client.ListOptions{Namespace: ctrl.Namespace})
+    assert.Equal(t, 2, len(lst.Items))
+    // find the newly created (non-successful)
+    var cnrB atlassianv1.CycleNodeRequest
+    for i := range lst.Items {
+        if lst.Items[i].Status.Phase != atlassianv1.CycleNodeRequestSuccessful {
+            _ = ctrl.client.Get(context.TODO(), client.ObjectKey{Namespace: ctrl.Namespace, Name: lst.Items[i].Name}, &cnrB)
+            assert.True(t, cnrB.IsFromNodeGroup(*b))
+            break
+        }
+    }
+
+    // 4) New changes come in for A (add A back)
+    ctrl.observers["test"] = testObserver{changed: map[string]*ListedNodeGroups{
+        a.Name: buildListed(a, scenario.Nodes[0].Name),
+    }}
+
+    // 5) A is created again (while B is still in progress)
+    ctrl.Run()
+    lst, _ = generation.ListCNRs(ctrl.client, &client.ListOptions{Namespace: ctrl.Namespace})
+    assert.Equal(t, 3, len(lst.Items))
+    // ensure latest created belongs to A (find a pending belonging to A other than B's)
+    var foundA bool
+    for i := range lst.Items {
+        if lst.Items[i].IsFromNodeGroup(*a) && lst.Items[i].Status.Phase != atlassianv1.CycleNodeRequestSuccessful {
+            foundA = true
+            break
+        }
+    }
+    assert.True(t, foundA)
+
+    // 6) B succeeds
+    cnrB.Status.Phase = atlassianv1.CycleNodeRequestSuccessful
+    _ = ctrl.client.Update(context.TODO(), &cnrB)
+
+    // 7) Set C as changed, but C should NOT be created yet because A is in progress
+    ctrl.observers["test"] = testObserver{changed: map[string]*ListedNodeGroups{
+        c.Name: buildListed(c, scenario.Nodes[0].Name),
+    }}
+    ctrl.Run()
+    lst, _ = generation.ListCNRs(ctrl.client, &client.ListOptions{Namespace: ctrl.Namespace})
+    assert.Equal(t, 3, len(lst.Items))
+
+    // 8) Complete A
+    // find pending A and mark successful
+    for i := range lst.Items {
+        if lst.Items[i].IsFromNodeGroup(*a) && lst.Items[i].Status.Phase != atlassianv1.CycleNodeRequestSuccessful {
+            var cnr atlassianv1.CycleNodeRequest
+            _ = ctrl.client.Get(context.TODO(), client.ObjectKey{Namespace: ctrl.Namespace, Name: lst.Items[i].Name}, &cnr)
+            cnr.Status.Phase = atlassianv1.CycleNodeRequestSuccessful
+            _ = ctrl.client.Update(context.TODO(), &cnr)
+        }
+    }
+
+    // 9) Now C is created
+    ctrl.Run()
+    lst, _ = generation.ListCNRs(ctrl.client, &client.ListOptions{Namespace: ctrl.Namespace})
+    assert.Equal(t, 4, len(lst.Items))
+    var cnrC atlassianv1.CycleNodeRequest
+    for i := range lst.Items {
+        if lst.Items[i].IsFromNodeGroup(*c) && lst.Items[i].Status.Phase != atlassianv1.CycleNodeRequestSuccessful {
+            _ = ctrl.client.Get(context.TODO(), client.ObjectKey{Namespace: ctrl.Namespace, Name: lst.Items[i].Name}, &cnrC)
+            break
+        }
+    }
+    assert.True(t, cnrC.IsFromNodeGroup(*c))
+
+    // 10) C succeeds
+    cnrC.Status.Phase = atlassianv1.CycleNodeRequestSuccessful
+    _ = ctrl.client.Update(context.TODO(), &cnrC)
+}
+
 func TestPriority_GlobalGuard_BlocksOnExternalLowerPriority(t *testing.T) {
     // Changed contains only B (p1). Seed an external lower-priority NG X (p0) with an in-progress CNR
     scenario := test.BuildTestScenario(test.ScenarioOpts{Keys: []string{"b", "x"}, NodeCount: 1, PodCount: 1}).Flatten()
