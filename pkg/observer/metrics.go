@@ -18,9 +18,9 @@ type metrics struct {
 	ObserverRunTimes    *prometheus.GaugeVec
 
     // Priority/flow visibility
-    NodeGroupsDetectedChanges *prometheus.GaugeVec
-    NodeGroupsApplying        *prometheus.GaugeVec
-    NodeGroupsBlocked         *prometheus.GaugeVec
+    ChangedNodeGroups 		  *prometheus.GaugeVec
+    ApplyingNodeGroups        *prometheus.GaugeVec
+    BlockedNodeGroups         *prometheus.GaugeVec
 }
 
 // newMetrics creates the new controller metrics struct
@@ -60,25 +60,25 @@ func newMetrics() *metrics {
 		),
 
         // Visibility metrics for priority flow
-        NodeGroupsDetectedChanges: prometheus.NewGaugeVec(
+        ChangedNodeGroups: prometheus.NewGaugeVec(
             prometheus.GaugeOpts{
-                Name:      "nodegroups_detected_changes",
+                Name:      "changed_nodegroups",
                 Namespace: metricsNamespace,
                 Help:      "gauge of total nodegroups with detected changes in a run",
             },
             []string{},
         ),
-        NodeGroupsApplying: prometheus.NewGaugeVec(
+        ApplyingNodeGroups: prometheus.NewGaugeVec(
             prometheus.GaugeOpts{
-                Name:      "nodegroups_applying",
+                Name:      "applying_nodegroups",
                 Namespace: metricsNamespace,
                 Help:      "gauge of nodegroups currently being applied in this run (lowest priority batch)",
             },
             []string{},
         ),
-        NodeGroupsBlocked: prometheus.NewGaugeVec(
+        BlockedNodeGroups: prometheus.NewGaugeVec(
             prometheus.GaugeOpts{
-                Name:      "nodegroups_blocked_by_higher_priority",
+                Name:      "blocked_nodegroups_by_higher_priority",
                 Namespace: metricsNamespace,
                 Help:      "gauge of nodegroups blocked due to higher priority work in progress",
             },
