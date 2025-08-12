@@ -306,13 +306,7 @@ func (c *controller) filterNodeGroupsByPriority(changedNodeGroups []*ListedNodeG
     if len(changedNodeGroups) == 0 {
         return nil
     }
-    getPriority := func(ng *v1.NodeGroup) int32 {
-        p := ng.Spec.Priority
-        if p < 0 {
-            return 0
-        }
-        return p
-    }
+    getPriority := func(ng *v1.NodeGroup) int32 { return max(ng.Spec.Priority, 0) }
     minPriority := getPriority(changedNodeGroups[0].NodeGroup)
     for i := 1; i < len(changedNodeGroups); i++ {
         p := getPriority(changedNodeGroups[i].NodeGroup)
@@ -341,10 +335,7 @@ func (c *controller) isLowerPriorityInProgress(minPriority int32, inProg v1.Cycl
         for i := range allNG.Items {
             ng := allNG.Items[i]
             if cnr.IsFromNodeGroup(ng) {
-                p := ng.Spec.Priority
-                if p < 0 {
-                    p = 0
-                }
+                p := max(ng.Spec.Priority, 0)
                 if p < minPriority {
                     return true
                 }
