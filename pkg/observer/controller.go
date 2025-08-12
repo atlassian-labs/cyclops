@@ -300,9 +300,9 @@ func (c *controller) createCNRs(changedNodeGroups []*ListedNodeGroups) {
     }
 }
 
-// filterNodeGroupsByPriority returns only the node groups at the lowest priority value
+// selectLowestPriorityNodeGroups returns only the node groups at the lowest priority value
 // Backward compatibility: negative or missing priorities are treated as 0
-func (c *controller) filterNodeGroupsByPriority(changedNodeGroups []*ListedNodeGroups) []*ListedNodeGroups {
+func (c *controller) selectLowestPriorityNodeGroups(changedNodeGroups []*ListedNodeGroups) []*ListedNodeGroups {
     if len(changedNodeGroups) == 0 {
         return nil
     }
@@ -325,7 +325,7 @@ func (c *controller) filterNodeGroupsByPriority(changedNodeGroups []*ListedNodeG
 
 // isLowerPriorityInProgress returns true if any in-progress CNR belongs to a NodeGroup with
 // a priority lower than the provided minPriority (i.e., must finish before creating higher priorities)
-func (c *controller) isLowerPriorityInProgress(minPriority int32, inProg v1.CycleNodeRequestList) bool {
+func (c *controller) hasLowerPriorityCNRsInProgress(minPriority int32, inProg v1.CycleNodeRequestList) bool {
     if len(inProg.Items) == 0 {
         return false
     }
@@ -382,16 +382,16 @@ func (c *controller) Run() {
 	}
 
     // Filter to only the lowest priority nodegroups
-    filtered := c.filterNodeGroupsByPriority(changedNodeGroups)
-    if len(filtered) == 0 {
+    lowestPriorityBatch := c.selectLowestPriorityNodeGroups(changedNodeGroups)
+    if len(lowestPriorityBatch) == 0 {
         klog.V(2).Infoln("no nodegroups to apply after priority filter")
         return
     }
 
     // If any lower priority CNRs are still in progress, skip this run
-    batchPriority := max(filtered[0].NodeGroup.Spec.Priority, 0)
-    if c.isLowerPriorityInProgress(batchPriority, inProgressCNRs) {
-        c.NodeGroupsBlocked.WithLabelValues().Set(float64(len(filtered)))
+    batchPriority := max(lowestPriorityBatch[0].NodeGroup.Spec.Priority, 0)
+    if c.hasLowerPriorityCNRsInProgress(batchPriority, inProgressCNRs) {
+        c.NodeGroupsBlocked.WithLabelValues().Set(float64(len(lowestPriorityBatch)))
         klog.V(2).Infof("lower priority CNRs still in progress for priority < %d; skipping creation", batchPriority)
         return
     }
@@ -401,10 +401,10 @@ func (c *controller) Run() {
     // wait for the desired amount to allow any in progress changes to batch up
 	klog.V(3).Infof("waiting for %v to allow changes to settle", c.WaitInterval)
 	select {
-	case <-time.After(c.WaitInterval):
-        klog.V(3).Infof("applying %d CNRs (lowest priority batch)", len(filtered))
-        c.NodeGroupsApplying.WithLabelValues().Set(float64(len(filtered)))
-        c.createCNRs(filtered)
+    case <-time.After(c.WaitInterval):
+        klog.V(3).Infof("applying %d CNRs (lowest priority batch)", len(lowestPriorityBatch))
+        c.NodeGroupsApplying.WithLabelValues().Set(float64(len(lowestPriorityBatch)))
+        c.createCNRs(lowestPriorityBatch)
         c.NodeGroupsApplying.WithLabelValues().Set(0)
 		if c.RunOnce {
 			klog.V(3).Infoln("done creating CNRs after runOnce. exiting")

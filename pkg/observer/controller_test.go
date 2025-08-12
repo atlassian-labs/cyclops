@@ -662,13 +662,13 @@ func TestPriority_DropInProgress_OnSameNodeGroup_NoCreate(t *testing.T) {
 
 // ---- Unit tests for helpers ----
 
-func Test_filterNodeGroupsByPriority_Empty(t *testing.T) {
+func Test_selectLowestPriorityNodeGroups_Empty(t *testing.T) {
     ctrl := &controller{metrics: newMetrics()}
-    got := ctrl.filterNodeGroupsByPriority(nil)
+    got := ctrl.selectLowestPriorityNodeGroups(nil)
     assert.Nil(t, got)
 }
 
-func Test_filterNodeGroupsByPriority_PicksLowest(t *testing.T) {
+func Test_selectLowestPriorityNodeGroups_PicksLowest(t *testing.T) {
     // Build three NodeGroups with priorities 0,1,2
     ng0 := &atlassianv1.NodeGroup{ObjectMeta: v1.ObjectMeta{Name: "ng0"}}
     ng1 := &atlassianv1.NodeGroup{ObjectMeta: v1.ObjectMeta{Name: "ng1"}}
@@ -683,12 +683,12 @@ func Test_filterNodeGroupsByPriority_PicksLowest(t *testing.T) {
         buildListed(ng2, "n2"),
     }
     ctrl := &controller{metrics: newMetrics()}
-    filtered := ctrl.filterNodeGroupsByPriority(changed)
+    filtered := ctrl.selectLowestPriorityNodeGroups(changed)
     assert.Equal(t, 1, len(filtered))
     assert.Equal(t, "ng0", filtered[0].NodeGroup.Name)
 }
 
-func Test_filterNodeGroupsByPriority_NegativeDefaultsToZero(t *testing.T) {
+func Test_selectLowestPriorityNodeGroups_NegativeDefaultsToZero(t *testing.T) {
     ngNeg := &atlassianv1.NodeGroup{ObjectMeta: v1.ObjectMeta{Name: "neg"}}
     ngPos := &atlassianv1.NodeGroup{ObjectMeta: v1.ObjectMeta{Name: "pos"}}
     ngNeg.Spec.Priority = -10
@@ -696,7 +696,7 @@ func Test_filterNodeGroupsByPriority_NegativeDefaultsToZero(t *testing.T) {
 
     changed := []*ListedNodeGroups{buildListed(ngNeg, "n0"), buildListed(ngPos, "n1")}
     ctrl := &controller{metrics: newMetrics()}
-    filtered := ctrl.filterNodeGroupsByPriority(changed)
+    filtered := ctrl.selectLowestPriorityNodeGroups(changed)
     assert.Equal(t, 1, len(filtered))
     assert.Equal(t, "neg", filtered[0].NodeGroup.Name)
 }
@@ -744,23 +744,23 @@ func Test_isLowerPriorityInProgress_Various(t *testing.T) {
     }
 
     // No in progress
-    assert.False(t, ctrl.isLowerPriorityInProgress(1, atlassianv1.CycleNodeRequestList{}))
+    assert.False(t, ctrl.hasLowerPriorityCNRsInProgress(1, atlassianv1.CycleNodeRequestList{}))
 
     // Lower exists -> true
     inProg := atlassianv1.CycleNodeRequestList{Items: []atlassianv1.CycleNodeRequest{mkCNR(low, atlassianv1.CycleNodeRequestPending)}}
-    assert.True(t, ctrl.isLowerPriorityInProgress(1, inProg))
+    assert.True(t, ctrl.hasLowerPriorityCNRsInProgress(1, inProg))
 
     // Equal priority -> false
     inProgEq := atlassianv1.CycleNodeRequestList{Items: []atlassianv1.CycleNodeRequest{mkCNR(low, atlassianv1.CycleNodeRequestPending)}}
-    assert.False(t, ctrl.isLowerPriorityInProgress(0, inProgEq))
+    assert.False(t, ctrl.hasLowerPriorityCNRsInProgress(0, inProgEq))
 
     // Higher only -> false
     inProgHigh := atlassianv1.CycleNodeRequestList{Items: []atlassianv1.CycleNodeRequest{mkCNR(high, atlassianv1.CycleNodeRequestPending)}}
-    assert.False(t, ctrl.isLowerPriorityInProgress(1, inProgHigh))
+    assert.False(t, ctrl.hasLowerPriorityCNRsInProgress(1, inProgHigh))
 
     // Negative priority on lower treated as 0: with min=1 -> true, with min=0 -> false
     low.Spec.Priority = -3
     _ = c.Update(context.TODO(), low)
-    assert.True(t, ctrl.isLowerPriorityInProgress(1, inProg))
-    assert.False(t, ctrl.isLowerPriorityInProgress(0, inProg))
+    assert.True(t, ctrl.hasLowerPriorityCNRsInProgress(1, inProg))
+    assert.False(t, ctrl.hasLowerPriorityCNRsInProgress(0, inProg))
 }
