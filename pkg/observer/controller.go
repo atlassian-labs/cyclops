@@ -301,7 +301,6 @@ func (c *controller) createCNRs(changedNodeGroups []*ListedNodeGroups) {
 }
 
 // selectLowestPriorityNodeGroups returns only the node groups at the lowest priority value
-// Backward compatibility: negative or missing priorities are treated as 0
 func (c *controller) selectLowestPriorityNodeGroups(changedNodeGroups []*ListedNodeGroups) []*ListedNodeGroups {
     if len(changedNodeGroups) == 0 {
         return nil
@@ -314,10 +313,10 @@ func (c *controller) selectLowestPriorityNodeGroups(changedNodeGroups []*ListedN
             minPriority = p
         }
     }
-    var filtered []*ListedNodeGroups
-    for _, g := range changedNodeGroups {
-        if getPriority(g.NodeGroup) == minPriority {
-            filtered = append(filtered, g)
+    filtered := make([]*ListedNodeGroups, 0, len(changedNodeGroups))
+    for _, changeNodeGroup := range changedNodeGroups {
+        if getPriority(changeNodeGroup.NodeGroup) == minPriority {
+            filtered = append(filtered, changeNodeGroup)
         }
     }
     return filtered
