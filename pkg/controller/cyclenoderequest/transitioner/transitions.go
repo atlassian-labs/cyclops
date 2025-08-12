@@ -351,6 +351,7 @@ func (t *CycleNodeRequestTransitioner) transitionScalingUp() (reconcile.Result, 
 	requiredNumNodes := len(nodeGroups.Instances()) + len(t.cycleNodeRequest.Status.CurrentNodes)
 	allInstancesReady := len(nodeGroups.ReadyInstances()) >= len(nodeGroups.Instances())
 	allKubernetesNodesReady := numKubeNodesReady >= requiredNumNodes
+	numNodesCreatedAfterScaleUpStarted := countNodesCreatedAfter(kubeNodes, scaleUpStarted.Time)
 
 	// If something scales down/up right at this moment then the overall maths still works, because the
 	// instances we're working on are detached from the node group.
@@ -362,7 +363,8 @@ func (t *CycleNodeRequestTransitioner) transitionScalingUp() (reconcile.Result, 
 		"scalingUpBy", len(t.cycleNodeRequest.Status.CurrentNodes))
 
 	// If either check isn't ready, requeue to check again later
-	if !(allInstancesReady && allKubernetesNodesReady) {
+	// also check if at least one Ready node was created after the scaleUpStarted time
+	if !(allInstancesReady && allKubernetesNodesReady && numNodesCreatedAfterScaleUpStarted > 0) {
 		t.rm.LogEvent(t.cycleNodeRequest, "ScalingUpWaiting", "Waiting for new nodes to be ready")
 		return reconcile.Result{Requeue: true, RequeueAfter: requeueDuration}, nil
 	}
