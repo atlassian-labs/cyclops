@@ -305,7 +305,7 @@ func (c *controller) selectLowestPriorityNodeGroups(changedNodeGroups []*ListedN
     if len(changedNodeGroups) == 0 {
         return nil
     }
-    getPriority := func(ng *v1.NodeGroup) int32 { return max(ng.Spec.Priority, 0) }
+    getPriority := func(ng *v1.NodeGroup) int32 { return ng.Spec.Priority }
     minPriority := getPriority(changedNodeGroups[0].NodeGroup)
     for i := 1; i < len(changedNodeGroups); i++ {
         p := getPriority(changedNodeGroups[i].NodeGroup)
@@ -333,7 +333,7 @@ func (c *controller) hasLowerPriorityCNRsInProgress(batchPriority int32, inProgr
     for _, cnr := range inProgressCNRs.Items {
         for _, ng := range allNodeGroups.Items {
             if cnr.IsFromNodeGroup(ng) {
-                p := max(ng.Spec.Priority, 0)
+                p := ng.Spec.Priority
                 if p < batchPriority {
                     return true
                 }
@@ -389,8 +389,7 @@ func (c *controller) Run() {
     }
 
     // If any lower priority CNRs are still in progress, skip this run
-    // This is a failsafe, the CRD validation will ensure the values are a minimum of 0 at creation time
-    batchPriority := max(lowestPriorityBatch[0].NodeGroup.Spec.Priority, 0)
+    batchPriority := lowestPriorityBatch[0].NodeGroup.Spec.Priority
     if c.hasLowerPriorityCNRsInProgress(batchPriority, inProgressCNRs) {
         c.BlockedNodeGroups.WithLabelValues().Add(float64(len(lowestPriorityBatch)))
         klog.V(2).Infof("lower priority CNRs still in progress for priority < %d; skipping creation", batchPriority)
