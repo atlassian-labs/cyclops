@@ -97,7 +97,7 @@ func GenerateCNR(nodeGroup atlassianv1.NodeGroup, nodes []string, name, namespac
 		}
 	}
 
-    return atlassianv1.CycleNodeRequest{
+	return atlassianv1.CycleNodeRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      finalName,
 			Namespace: namespace,
