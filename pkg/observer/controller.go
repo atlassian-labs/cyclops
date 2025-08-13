@@ -305,17 +305,16 @@ func (c *controller) selectLowestPriorityNodeGroups(changedNodeGroups []*ListedN
     if len(changedNodeGroups) == 0 {
         return nil
     }
-    getPriority := func(ng *v1.NodeGroup) int32 { return ng.Spec.Priority }
-    minPriority := getPriority(changedNodeGroups[0].NodeGroup)
+    minPriority := changedNodeGroups[0].NodeGroup.Spec.Priority
     for i := 1; i < len(changedNodeGroups); i++ {
-        p := getPriority(changedNodeGroups[i].NodeGroup)
+        p := changedNodeGroups[i].NodeGroup.Spec.Priority
         if p < minPriority {
             minPriority = p
         }
     }
     filtered := make([]*ListedNodeGroups, 0, len(changedNodeGroups))
     for _, changeNodeGroup := range changedNodeGroups {
-        if getPriority(changeNodeGroup.NodeGroup) == minPriority {
+        if changeNodeGroup.NodeGroup.Spec.Priority == minPriority {
             filtered = append(filtered, changeNodeGroup)
         }
     }
