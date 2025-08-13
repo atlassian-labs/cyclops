@@ -382,10 +382,6 @@ func (c *controller) Run() {
 
     // Filter to only the lowest priority nodegroups
     lowestPriorityBatch := c.selectLowestPriorityNodeGroups(changedNodeGroups)
-    if len(lowestPriorityBatch) == 0 {
-        klog.V(2).Infoln("no nodegroups to apply after priority filter")
-        return
-    }
 
     // If any lower priority CNRs are still in progress, skip this run
     batchPriority := lowestPriorityBatch[0].NodeGroup.Spec.Priority
