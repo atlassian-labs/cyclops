@@ -302,7 +302,9 @@ func (c *controller) createCNRs(changedNodeGroups []*ListedNodeGroups) {
 
 // selectLowestPriorityNodeGroups returns only the node groups at the lowest priority value
 func (c *controller) selectLowestPriorityNodeGroups(changedNodeGroups []*ListedNodeGroups) []*ListedNodeGroups {
+    klog.V(3).Infof("received %d changed nodegroups", len(changedNodeGroups))
     if len(changedNodeGroups) == 0 {
+        klog.V(3).Infoln("no nodegroups to select")
         return nil
     }
     minPriority := changedNodeGroups[0].NodeGroup.Spec.Priority
@@ -312,19 +314,27 @@ func (c *controller) selectLowestPriorityNodeGroups(changedNodeGroups []*ListedN
             minPriority = p
         }
     }
+    klog.V(3).Infof("computed minimum priority %d", minPriority)
     filtered := make([]*ListedNodeGroups, 0, len(changedNodeGroups))
     for _, changeNodeGroup := range changedNodeGroups {
         if changeNodeGroup.NodeGroup.Spec.Priority == minPriority {
             filtered = append(filtered, changeNodeGroup)
         }
     }
+    selectedNames := make([]string, 0, len(filtered))
+    for _, ng := range filtered {
+        selectedNames = append(selectedNames, ng.NodeGroup.Name)
+    }
+    klog.V(3).Infof("selected %d nodegroups at priority %d: %v", len(filtered), minPriority, selectedNames)
     return filtered
 }
 
 // hasLowerPriorityCNRsInProgress returns true if any in-progress CNR belongs to a NodeGroup with
 // a priority lower than the provided batchPriority (i.e., must finish before creating higher priorities)
 func (c *controller) hasLowerPriorityCNRsInProgress(batchPriority int32, inProgressCNRs v1.CycleNodeRequestList) bool {
+    klog.V(3).Infof("batchPriority=%d, inProgressCNRs=%d", batchPriority, len(inProgressCNRs.Items))
     if len(inProgressCNRs.Items) == 0 {
+        klog.V(3).Infoln("no in-progress CNRs found")
         return false
     }
     // Build a list of valid nodegroups to map CNRs to priorities
@@ -334,12 +344,14 @@ func (c *controller) hasLowerPriorityCNRsInProgress(batchPriority int32, inProgr
             if cnr.IsFromNodeGroup(ng) {
                 p := ng.Spec.Priority
                 if p < batchPriority {
+                    klog.V(3).Infof("blocking due to CNR %q from nodegroup %q with priority %d < %d", cnr.Name, ng.Name, p, batchPriority)
                     return true
                 }
                 break
             }
         }
     }
+    klog.V(3).Infoln("no lower-priority in-progress CNRs found")
     return false
 }
 
