@@ -741,6 +741,41 @@ func TestPriority_BlocksOnExternalLowerPriority(t *testing.T) {
     assert.Equal(t, "cnr-x", lst.Items[0].Name)
 }
 
+func Test_FiltersZeroConcurrency(t *testing.T) {
+	// Create two simple node groups
+	nodegroupZero := &atlassianv1.NodeGroup{
+		ObjectMeta: v1.ObjectMeta{Name: "zero"},
+		Spec: atlassianv1.NodeGroupSpec{
+			CycleSettings: atlassianv1.CycleSettings{Concurrency: 0},
+		},
+	}
+	nodegroupOne := &atlassianv1.NodeGroup{
+		ObjectMeta: v1.ObjectMeta{Name: "one"},
+		Spec: atlassianv1.NodeGroupSpec{
+			CycleSettings: atlassianv1.CycleSettings{Concurrency: 1},
+		},
+	}
+
+	// Mock observer that returns changes for both
+	obs := testObserver{changed: map[string]*ListedNodeGroups{
+		"zero": {NodeGroup: nodegroupZero, List: []*corev1.Node{}, Reason: "test"},
+		"one":  {NodeGroup: nodegroupOne, List: []*corev1.Node{}, Reason: "test"},
+	}}
+
+	ctrl := &controller{
+		observers:      map[string]Observer{"test": obs},
+		optimisedOrder: []timedKey{{key: "test"}},
+		metrics:        newMetrics(),
+	}
+
+	// Test: only the non-zero concurrency nodegroup should remain
+	input := atlassianv1.NodeGroupList{Items: []atlassianv1.NodeGroup{*nodegroupZero, *nodegroupOne}}
+	result := ctrl.observeChanges(input)
+
+	assert.Len(t, result, 1)
+	assert.Equal(t, "one", result[0].NodeGroup.Name)
+}
+
 func TestPriority_DropInProgress_OnSameNodeGroup_NoCreate(t *testing.T) {
     scenario := test.BuildTestScenario(test.ScenarioOpts{Keys: []string{"a"}, NodeCount: 1, PodCount: 1}).Flatten()
     a := scenario.Nodegroups[0]

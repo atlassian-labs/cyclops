@@ -113,6 +113,17 @@ func (c *controller) observeChanges(validNodeGroups v1.NodeGroupList) []*ListedN
 		klog.V(2).Infoln("no valid no groups to check for changes")
 	}
 
+	// Drop nodegroups that have Concurrency set to 0
+	var filteredNodeGroups v1.NodeGroupList
+	for i, nodeGroup := range validNodeGroups.Items {
+		if nodeGroup.Spec.CycleSettings.Concurrency == 0 {
+			klog.Warningf("nodegroup %q has concurrency set to 0.. removing this nodegroup from the list", nodeGroup.Name)
+			continue
+		}
+		filteredNodeGroups.Items = append(filteredNodeGroups.Items, validNodeGroups.Items[i])
+	}
+	validNodeGroups = filteredNodeGroups
+
 	// record latest run times to optimise
 	var runTimes []timedKey
 	// poll observers to get changed status and collect on nodegroup so we don't have duplicates across observers
