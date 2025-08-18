@@ -16,10 +16,6 @@ type metrics struct {
 	CNRsCreated         *prometheus.CounterVec
 	NodeGroupsLocked    *prometheus.CounterVec
 	ObserverRunTimes    *prometheus.GaugeVec
-	
-    ChangedNodeGroups         *prometheus.CounterVec
-    ApplyingNodeGroups        *prometheus.CounterVec
-    BlockedNodeGroups         *prometheus.CounterVec
 }
 
 // newMetrics creates the new controller metrics struct
@@ -58,31 +54,7 @@ func newMetrics() *metrics {
 			[]string{"observer"},
 		),
 
-        // Visibility metrics for priority flow
-        ChangedNodeGroups: prometheus.NewCounterVec(
-            prometheus.CounterOpts{
-                Name:      "changed_nodegroups",
-                Namespace: metricsNamespace,
-                Help:      "counter of nodegroups detected as changed per run",
-            },
-            []string{},
-        ),
-        ApplyingNodeGroups: prometheus.NewCounterVec(
-            prometheus.CounterOpts{
-                Name:      "applying_nodegroups",
-                Namespace: metricsNamespace,
-                Help:      "counter of nodegroups applied per run (lowest priority batch)",
-            },
-            []string{},
-        ),
-        BlockedNodeGroups: prometheus.NewCounterVec(
-            prometheus.CounterOpts{
-                Name:      "blocked_nodegroups_by_higher_priority",
-                Namespace: metricsNamespace,
-                Help:      "counter of nodegroups blocked due to higher priority work in progress",
-            },
-            []string{},
-        ),
+
 	}
 }
 
