@@ -773,7 +773,8 @@ func Test_FiltersZeroConcurrency(t *testing.T) {
 	result := ctrl.observeChanges(input)
 
 	assert.Len(t, result, 1)
-	assert.Equal(t, "one", result[0].NodeGroup.Name)
+	assert.Contains(t, result, "one")
+	assert.Equal(t, "one", result["one"].NodeGroup.Name)
 }
 
 func TestPriority_DropInProgress_OnSameNodeGroup_NoCreate(t *testing.T) {
