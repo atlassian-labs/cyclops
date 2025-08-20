@@ -108,7 +108,7 @@ func unionNodes(aa []*corev1.Node, bb []*corev1.Node) []*corev1.Node {
 // observeChanges iterates all observers in the controller and returns a combined list of changed node groups
 // nodegroups that have changes in one observer will be skipped by the subsequent observers in order to reduce unnecessary api calls
 // the order of observers is optimised each run by their runtime. This makes heavier unnecessary api calls less likely
-func (c *controller) observeChanges(validNodeGroups v1.NodeGroupList) []*ListedNodeGroups {
+func (c *controller) observeChanges(validNodeGroups v1.NodeGroupList) map[string]*ListedNodeGroups {
 	if len(validNodeGroups.Items) == 0 {
 		klog.V(2).Infoln("no valid no groups to check for changes")
 	}
@@ -184,12 +184,7 @@ func (c *controller) observeChanges(validNodeGroups v1.NodeGroupList) []*ListedN
 		return nil
 	}
 
-	// convert map back into list
-	changedList := make([]*ListedNodeGroups, 0, len(changedMap))
-	for name := range changedMap {
-		changedList = append(changedList, changedMap[name])
-	}
-	return changedList
+	return changedMap
 }
 
 // validNodeGroups lists all the nodegroups in the cluster and filters out non valid ones
@@ -366,6 +361,19 @@ func (c *controller) hasLowerPriorityCNRsInProgress(batchPriority int32, inProgr
     return false
 }
 
+func (c *controller) updateNodeGroupChangeStatusMetrics(validNodeGroups v1.NodeGroupList, changedMap map[string]*ListedNodeGroups) {
+    for _, nodeGroup := range validNodeGroups.Items {
+        // Check if this nodegroup is in the changed map (out of date)
+        isOutOfDate := 0
+        if _, exists := changedMap[nodeGroup.Name]; exists {
+            isOutOfDate = 1
+        }
+        
+        // Set the metric with only nodegroup name as label
+        c.NodeGroupChangeStatus.WithLabelValues(nodeGroup.Name).Set(float64(isOutOfDate))
+    }
+}
+
 // nextRunTime returns the next time the controller loop will run from now in UTC
 func (c *controller) nextRunTime() time.Time {
 	return time.Now().UTC().Add(c.CheckInterval)
@@ -386,22 +394,29 @@ func (c *controller) Run() {
 	}
 
     // observe the changes using the remaining nodegroups. This is stateless and will pickup changes again if restarted
-    changedNodeGroups := c.observeChanges(nodeGroups)
-	if len(changedNodeGroups) == 0 {
+    changedNodeGroupsMap := c.observeChanges(nodeGroups)
+	if len(changedNodeGroupsMap) == 0 {
 		klog.V(2).Infoln("all nodegroups up to date. next check in", c.CheckInterval)
 		return
 	}
 
-	klog.V(3).Infof("listing all %d nodegroups and nodes changed this run", len(changedNodeGroups))
-	for _, nodeGroup := range changedNodeGroups {
+    changedNodeGroupsList := make([]*ListedNodeGroups, 0, len(changedNodeGroupsMap))
+    for name := range changedNodeGroupsMap {
+        changedNodeGroupsList = append(changedNodeGroupsList, changedNodeGroupsMap[name])
+    }
+
+	klog.V(3).Infof("listing all %d nodegroups and nodes changed this run", len(changedNodeGroupsList))
+	for _, nodeGroup := range changedNodeGroupsList {
 		klog.V(2).Infof("nodegroup %q out of date", nodeGroup.NodeGroup.Name)
 		for _, node := range nodeGroup.List {
 			klog.V(2).Infof("for node %q", node.Name)
 		}
 	}
 
+	c.updateNodeGroupChangeStatusMetrics(nodeGroups, changedNodeGroupsMap)
+
     // Filter to only the lowest priority nodegroups
-    lowestPriorityBatch := c.selectLowestPriorityNodeGroups(changedNodeGroups)
+    lowestPriorityBatch := c.selectLowestPriorityNodeGroups(changedNodeGroupsList)
 
     // If any lower priority CNRs are still in progress, skip this run
     batchPriority := lowestPriorityBatch[0].NodeGroup.Spec.Priority
