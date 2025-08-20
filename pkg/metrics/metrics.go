@@ -3,6 +3,7 @@ package metrics
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	v1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
@@ -41,6 +42,24 @@ var (
 		fmt.Sprintf("%v_cycle_node_status_by_phase", namespace),
 		"Number of CycleNodeStatuses in the cluster by phase",
 		[]string{"phase"},
+		nil,
+	)
+	// NodeGroupInfo provides static information about nodegroups
+	NodeGroupInfo = prometheus.NewDesc(
+		fmt.Sprintf("%v_node_group_info", namespace),
+		"Static information about nodegroups in the cluster",
+		[]string{
+			"nodegroup_name",
+			"nodegroups_list",
+			"node_selector",           
+			"concurrency",
+			"method",
+			"max_failed_cnrs",
+			"skip_missing_named_nodes",
+			"skip_initial_health_checks",
+			"skip_pre_termination_checks",
+			"priority",
+		},
 		nil,
 	)
 )
@@ -105,6 +124,7 @@ func (c cyclopsCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- CycleNodeRequestsByPhase
 	ch <- CycleNodeStatuses
 	ch <- CycleNodeStatusesByPhase
+	ch <- NodeGroupInfo
 }
 
 func (c cyclopsCollector) Collect(ch chan<- prometheus.Metric) {
@@ -172,4 +192,22 @@ func (c cyclopsCollector) Collect(ch chan<- prometheus.Metric) {
 		prometheus.GaugeValue,
 		float64(len(c.cycleNodeStatusList.Items)),
 	)
+
+    for _, nodegroup := range c.nodeGroupList.Items {
+        ch <- prometheus.MustNewConstMetric(
+            NodeGroupInfo,
+            prometheus.GaugeValue,
+            1.0,
+			nodegroup.Spec.NodeGroupName,
+			strings.Join(nodegroup.Spec.NodeGroupsList, ","),
+			nodegroup.Spec.NodeSelector.String(),
+			fmt.Sprintf("%d", nodegroup.Spec.CycleSettings.Concurrency),
+			string(nodegroup.Spec.CycleSettings.Method),
+			fmt.Sprintf("%d", nodegroup.Spec.MaxFailedCycleNodeRequests),
+			fmt.Sprintf("%t", nodegroup.Spec.ValidationOptions.SkipMissingNamedNodes),
+			fmt.Sprintf("%t", nodegroup.Spec.SkipInitialHealthChecks),
+			fmt.Sprintf("%t", nodegroup.Spec.SkipPreTerminationChecks),
+			fmt.Sprintf("%d", nodegroup.Spec.Priority),
+        )
+    }
 }
