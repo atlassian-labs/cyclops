@@ -61,7 +61,7 @@ func newMetrics() *metrics {
                 Namespace: metricsNamespace,
                 Help:      "current change status of nodegroups (0=up to date, 1=out of date)",
             },
-            []string{"nodegroup"},
+            []string{"nodegroup_name"},
         ),
 
 	}
