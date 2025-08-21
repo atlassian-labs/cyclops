@@ -395,6 +395,7 @@ func (c *controller) Run() {
 
     // observe the changes using the remaining nodegroups. This is stateless and will pickup changes again if restarted
     changedNodeGroupsMap := c.observeChanges(nodeGroups)
+	c.updateNodeGroupChangeStatusMetrics(nodeGroups, changedNodeGroupsMap)
 	if len(changedNodeGroupsMap) == 0 {
 		klog.V(2).Infoln("all nodegroups up to date. next check in", c.CheckInterval)
 		return
@@ -412,8 +413,6 @@ func (c *controller) Run() {
 			klog.V(2).Infof("for node %q", node.Name)
 		}
 	}
-
-	c.updateNodeGroupChangeStatusMetrics(nodeGroups, changedNodeGroupsMap)
 
     // Filter to only the lowest priority nodegroups
     lowestPriorityBatch := c.selectLowestPriorityNodeGroups(changedNodeGroupsList)
