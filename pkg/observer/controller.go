@@ -309,10 +309,6 @@ func (c *controller) createCNRs(changedNodeGroups []*ListedNodeGroups) {
 // selectLowestPriorityNodeGroups returns only the node groups at the lowest priority value
 func (c *controller) selectLowestPriorityNodeGroups(changedNodeGroups []*ListedNodeGroups) []*ListedNodeGroups {
     klog.V(3).Infof("received %d changed nodegroups", len(changedNodeGroups))
-    if len(changedNodeGroups) == 0 {
-        klog.V(3).Infoln("no nodegroups to select")
-        return nil
-    }
     minPriority := changedNodeGroups[0].NodeGroup.Spec.Priority
     for i := 1; i < len(changedNodeGroups); i++ {
         p := changedNodeGroups[i].NodeGroup.Spec.Priority
