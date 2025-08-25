@@ -35,8 +35,8 @@ See [Docs](docs/README.md)
 
 ## Requirements
 
-- [Kubernetes](https://kubernetes.io/) version 1.13+. Cyclops has been tested and deployed on 1.13+ and newer. Older versions of Kubernetes may have bugs or issues that will prevent it from functioning properly.
-- [Go](https://golang.org/) version 1.13+. Newer versions of Go are highly recommended.
+- [Kubernetes](https://kubernetes.io/) version 1.32+. Cyclops has been tested and deployed on 1.32+ and newer. Older versions of Kubernetes may have bugs or issues that will prevent it from functioning properly.
+- [Go](https://golang.org/) version 1.23+. Newer versions of Go are highly recommended.
 - Dependencies and their locked versions can be found in `go.mod` and `go.sum`.
 
 ## Building

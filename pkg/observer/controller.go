@@ -108,10 +108,21 @@ func unionNodes(aa []*corev1.Node, bb []*corev1.Node) []*corev1.Node {
 // observeChanges iterates all observers in the controller and returns a combined list of changed node groups
 // nodegroups that have changes in one observer will be skipped by the subsequent observers in order to reduce unnecessary api calls
 // the order of observers is optimised each run by their runtime. This makes heavier unnecessary api calls less likely
-func (c *controller) observeChanges(validNodeGroups v1.NodeGroupList) []*ListedNodeGroups {
+func (c *controller) observeChanges(validNodeGroups v1.NodeGroupList) map[string]*ListedNodeGroups {
 	if len(validNodeGroups.Items) == 0 {
 		klog.V(2).Infoln("no valid no groups to check for changes")
 	}
+
+	// Drop nodegroups that have Concurrency set to 0
+	var filteredNodeGroups v1.NodeGroupList
+	for i, nodeGroup := range validNodeGroups.Items {
+		if nodeGroup.Spec.CycleSettings.Concurrency == 0 {
+			klog.Warningf("nodegroup %q has concurrency set to 0.. removing this nodegroup from the list", nodeGroup.Name)
+			continue
+		}
+		filteredNodeGroups.Items = append(filteredNodeGroups.Items, validNodeGroups.Items[i])
+	}
+	validNodeGroups = filteredNodeGroups
 
 	// record latest run times to optimise
 	var runTimes []timedKey
@@ -173,12 +184,7 @@ func (c *controller) observeChanges(validNodeGroups v1.NodeGroupList) []*ListedN
 		return nil
 	}
 
-	// convert map back into list
-	changedList := make([]*ListedNodeGroups, 0, len(changedMap))
-	for name := range changedMap {
-		changedList = append(changedList, changedMap[name])
-	}
-	return changedList
+	return changedMap
 }
 
 // validNodeGroups lists all the nodegroups in the cluster and filters out non valid ones
@@ -273,31 +279,95 @@ func (c *controller) dropInProgressNodeGroups(nodeGroups v1.NodeGroupList, cnrs 
 
 // createCNRs generates and applies CNRs from the changedNodeGroups
 func (c *controller) createCNRs(changedNodeGroups []*ListedNodeGroups) {
-	klog.V(3).Infoln("applying")
-	for _, nodeGroup := range changedNodeGroups {
-		nodeNames := make([]string, 0, len(nodeGroup.List))
-		for _, node := range nodeGroup.List {
-			nodeNames = append(nodeNames, node.Name)
-		}
-		// generate cnr with prefix and use generate name method
-		cnr := generation.GenerateCNR(*nodeGroup.NodeGroup, nodeNames, c.CNRPrefix, c.Namespace)
-		generation.UseGenerateNameCNR(&cnr)
-		generation.GiveReason(&cnr, nodeGroup.Reason)
-		generation.SetAPIVersion(&cnr, apiVersion)
+    klog.V(3).Infoln("applying")
+    for _, nodeGroup := range changedNodeGroups {
+        nodeNames := make([]string, 0, len(nodeGroup.List))
+        for _, node := range nodeGroup.List {
+            nodeNames = append(nodeNames, node.Name)
+        }
+        // generate cnr with prefix and use generate name method
+        cnr := generation.GenerateCNR(*nodeGroup.NodeGroup, nodeNames, c.CNRPrefix, c.Namespace)
+        generation.UseGenerateNameCNR(&cnr)
+        generation.GiveReason(&cnr, nodeGroup.Reason)
+        generation.SetAPIVersion(&cnr, apiVersion)
 
-		name := generation.GetName(cnr.ObjectMeta)
+        name := generation.GetName(cnr.ObjectMeta)
 
-		if err := generation.ApplyCNR(c.client, c.DryMode, cnr); err != nil {
-			klog.Errorf("failed to apply cnr %q for nodegroup %q: %s", name, nodeGroup.NodeGroup.Name, err)
-		} else {
-			var drymodeStr string
-			if c.DryMode {
-				drymodeStr = "[drymode] "
-			}
-			klog.V(2).Infof("%ssuccessfully applied cnr %q for nodegroup %q", drymodeStr, name, nodeGroup.NodeGroup.Name)
-			c.CNRsCreated.WithLabelValues(nodeGroup.NodeGroup.Name).Inc()
-		}
-	}
+        if err := generation.ApplyCNR(c.client, c.DryMode, cnr); err != nil {
+            klog.Errorf("failed to apply cnr %q for nodegroup %q: %s", name, nodeGroup.NodeGroup.Name, err)
+        } else {
+            var drymodeStr string
+            if c.DryMode {
+                drymodeStr = "[drymode] "
+            }
+            klog.V(2).Infof("%ssuccessfully applied cnr %q for nodegroup %q", drymodeStr, name, nodeGroup.NodeGroup.Name)
+            c.CNRsCreated.WithLabelValues(nodeGroup.NodeGroup.Name).Inc()
+        }
+    }
+}
+
+// selectLowestPriorityNodeGroups returns only the node groups at the lowest priority value
+func (c *controller) selectLowestPriorityNodeGroups(changedNodeGroups []*ListedNodeGroups) []*ListedNodeGroups {
+    klog.V(3).Infof("received %d changed nodegroups", len(changedNodeGroups))
+    minPriority := changedNodeGroups[0].NodeGroup.Spec.Priority
+    for i := 1; i < len(changedNodeGroups); i++ {
+        p := changedNodeGroups[i].NodeGroup.Spec.Priority
+        if p < minPriority {
+            minPriority = p
+        }
+    }
+    klog.V(3).Infof("computed minimum priority %d", minPriority)
+    filtered := make([]*ListedNodeGroups, 0, len(changedNodeGroups))
+    for _, changeNodeGroup := range changedNodeGroups {
+        if changeNodeGroup.NodeGroup.Spec.Priority == minPriority {
+            filtered = append(filtered, changeNodeGroup)
+        }
+    }
+    selectedNames := make([]string, 0, len(filtered))
+    for _, ng := range filtered {
+        selectedNames = append(selectedNames, ng.NodeGroup.Name)
+    }
+    klog.V(3).Infof("selected %d nodegroups at priority %d: %v", len(filtered), minPriority, selectedNames)
+    return filtered
+}
+
+// hasLowerPriorityCNRsInProgress returns true if any in-progress CNR belongs to a NodeGroup with
+// a priority lower than the provided batchPriority (i.e., must finish before creating higher priorities)
+func (c *controller) hasLowerPriorityCNRsInProgress(batchPriority int32, inProgressCNRs v1.CycleNodeRequestList) bool {
+    klog.V(3).Infof("batchPriority=%d, inProgressCNRs=%d", batchPriority, len(inProgressCNRs.Items))
+    if len(inProgressCNRs.Items) == 0 {
+        klog.V(3).Infoln("no in-progress CNRs found")
+        return false
+    }
+    // Build a list of valid nodegroups to map CNRs to priorities
+    allNodeGroups := c.validNodeGroups()
+    for _, cnr := range inProgressCNRs.Items {
+        for _, ng := range allNodeGroups.Items {
+            if cnr.IsFromNodeGroup(ng) {
+                p := ng.Spec.Priority
+                if p < batchPriority {
+                    klog.V(3).Infof("blocking due to CNR %q from nodegroup %q with priority %d < %d", cnr.Name, ng.Name, p, batchPriority)
+                    return true
+                }
+                break
+            }
+        }
+    }
+    klog.V(3).Infoln("no lower-priority in-progress CNRs found")
+    return false
+}
+
+func (c *controller) updateNodeGroupChangeStatusMetrics(validNodeGroups v1.NodeGroupList, changedMap map[string]*ListedNodeGroups) {
+    for _, nodeGroup := range validNodeGroups.Items {
+        // Check if this nodegroup is in the changed map (out of date)
+        isOutOfDate := 0
+        if _, exists := changedMap[nodeGroup.Name]; exists {
+            isOutOfDate = 1
+        }
+        
+        // Set the metric with only nodegroup name as label
+        c.NodeGroupChangeStatus.WithLabelValues(nodeGroup.Name).Set(float64(isOutOfDate))
+    }
 }
 
 // nextRunTime returns the next time the controller loop will run from now in UTC
@@ -319,27 +389,43 @@ func (c *controller) Run() {
 		nodeGroups = c.dropInProgressNodeGroups(nodeGroups, inProgressCNRs)
 	}
 
-	// observer the changes using the remaining nodegroups. This is stateless and will pickup changes again if restarted
-	changedNodeGroups := c.observeChanges(nodeGroups)
-	if len(changedNodeGroups) == 0 {
+    // observe the changes using the remaining nodegroups. This is stateless and will pickup changes again if restarted
+    changedNodeGroupsMap := c.observeChanges(nodeGroups)
+	c.updateNodeGroupChangeStatusMetrics(nodeGroups, changedNodeGroupsMap)
+	if len(changedNodeGroupsMap) == 0 {
 		klog.V(2).Infoln("all nodegroups up to date. next check in", c.CheckInterval)
 		return
 	}
 
-	klog.V(3).Infof("listing all %d nodegroups and nodes changed this run", len(changedNodeGroups))
-	for _, nodeGroup := range changedNodeGroups {
+    changedNodeGroupsList := make([]*ListedNodeGroups, 0, len(changedNodeGroupsMap))
+    for name := range changedNodeGroupsMap {
+        changedNodeGroupsList = append(changedNodeGroupsList, changedNodeGroupsMap[name])
+    }
+
+	klog.V(3).Infof("listing all %d nodegroups and nodes changed this run", len(changedNodeGroupsList))
+	for _, nodeGroup := range changedNodeGroupsList {
 		klog.V(2).Infof("nodegroup %q out of date", nodeGroup.NodeGroup.Name)
 		for _, node := range nodeGroup.List {
 			klog.V(2).Infof("for node %q", node.Name)
 		}
 	}
 
-	// wait for the desired amount to allow any in progress changes to batch up
+    // Filter to only the lowest priority nodegroups
+    lowestPriorityBatch := c.selectLowestPriorityNodeGroups(changedNodeGroupsList)
+
+    // If any lower priority CNRs are still in progress, skip this run
+    batchPriority := lowestPriorityBatch[0].NodeGroup.Spec.Priority
+    if c.hasLowerPriorityCNRsInProgress(batchPriority, inProgressCNRs) {
+        klog.V(2).Infof("lower priority CNRs still in progress for priority < %d; skipping creation", batchPriority)
+        return
+    }
+
+    // wait for the desired amount to allow any in progress changes to batch up
 	klog.V(3).Infof("waiting for %v to allow changes to settle", c.WaitInterval)
 	select {
-	case <-time.After(c.WaitInterval):
-		klog.V(3).Infof("applying %d CNRs", len(changedNodeGroups))
-		c.createCNRs(changedNodeGroups)
+    case <-time.After(c.WaitInterval):
+        klog.V(3).Infof("applying %d CNRs (lowest priority batch)", len(lowestPriorityBatch))
+        c.createCNRs(lowestPriorityBatch)
 		if c.RunOnce {
 			klog.V(3).Infoln("done creating CNRs after runOnce. exiting")
 		} else {

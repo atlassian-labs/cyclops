@@ -306,6 +306,12 @@ spec:
                   - triggerEndpoint
                   type: object
                 type: array
+              priority:
+                description: Priority controls the ordering of CNR creation for this
+                  NodeGroup. Lower values are higher priority. -10 runs before 0;
+                  then 10, 20, ...  Value range is from -2,147,483,648 to 2,147,483,647.
+                format: int32
+                type: integer
               skipInitialHealthChecks:
                 description: SkipInitialHealthChecks is an optional flag to skip the
                   initial set of node health checks before cycling begins This does

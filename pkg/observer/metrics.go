@@ -16,6 +16,7 @@ type metrics struct {
 	CNRsCreated         *prometheus.CounterVec
 	NodeGroupsLocked    *prometheus.CounterVec
 	ObserverRunTimes    *prometheus.GaugeVec
+	NodeGroupChangeStatus *prometheus.GaugeVec
 }
 
 // newMetrics creates the new controller metrics struct
@@ -53,6 +54,16 @@ func newMetrics() *metrics {
 			},
 			[]string{"observer"},
 		),
+
+		NodeGroupChangeStatus: prometheus.NewGaugeVec(
+            prometheus.GaugeOpts{
+                Name:      "node_group_change_status",
+                Namespace: metricsNamespace,
+                Help:      "current change status of nodegroups (0=up to date, 1=out of date)",
+            },
+            []string{"nodegroup_name"},
+        ),
+
 	}
 }
 
