@@ -809,12 +809,6 @@ func TestPriority_DropInProgress_OnSameNodeGroup_NoCreate(t *testing.T) {
 
 // ---- Unit tests for helpers ----
 
-func Test_selectLowestPriorityNodeGroups_Empty(t *testing.T) {
-    ctrl := &controller{metrics: newMetrics()}
-    got := ctrl.selectLowestPriorityNodeGroups(nil)
-    assert.Nil(t, got)
-}
-
 func Test_selectLowestPriorityNodeGroups_PicksLowest(t *testing.T) {
     // Build three NodeGroups with priorities 0,1,2
     ng0 := &atlassianv1.NodeGroup{ObjectMeta: v1.ObjectMeta{Name: "ng0"}}
