@@ -1,0 +1,30 @@
+<svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="60" cy="60" r="55" fill="none" stroke="#e5e7eb" stroke-width="2"/>
+  
+  <!-- Node positions around circle -->
+  <!-- Active nodes -->
+  <circle cx="60" cy="15" r="8" fill="#10b981"/>
+  <circle cx="95" cy="35" r="8" fill="#10b981"/>
+  <circle cx="95" cy="85" r="8" fill="#10b981"/>
+  <circle cx="25" cy="85" r="8" fill="#10b981"/>
+  <circle cx="25" cy="35" r="8" fill="#10b981"/>
+  
+  <!-- Node being cycled (transitioning) -->
+  <circle cx="60" cy="105" r="8" fill="#f97316" opacity="0.7"/>
+  
+  <!-- Cycling arrow path -->
+  <path d="M 60 105 Q 110 60 60 15" fill="none" stroke="#2563eb" stroke-width="3" stroke-dasharray="5 3" opacity="0.8"/>
+  
+  <!-- Arrow head -->
+  <polygon points="55,20 65,20 60,10" fill="#2563eb" opacity="0.8"/>
+  
+  <!-- Connection lines between active nodes -->
+  <g stroke="#6b7280" stroke-width="1.5" opacity="0.3">
+    <line x1="60" y1="15" x2="95" y2="35"/>
+    <line x1="95" y1="35" x2="95" y2="85"/>
+    <line x1="95" y1="85" x2="25" y2="85"/>
+    <line x1="25" y1="85" x2="25" y2="35"/>
+    <line x1="25" y1="35" x2="60" y2="15"/>
+  </g>
+</svg>

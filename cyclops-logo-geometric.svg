@@ -1,0 +1,27 @@
+<svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <!-- Outer hexagon representing infrastructure -->
+  <polygon points="60,10 90,30 90,70 60,90 30,70 30,30" fill="none" stroke="#2563eb" stroke-width="4" opacity="0.8"/>
+  
+  <!-- Inner rotating triangle -->
+  <g transform="translate(60,60)">
+    <polygon points="0,-20 17,10 -17,10" fill="#1e40af" opacity="0.9"/>
+  </g>
+  
+  <!-- Cycling elements - three curved segments -->
+  <g fill="none" stroke="#f97316" stroke-width="6" stroke-linecap="round">
+    <!-- Segment 1 -->
+    <path d="M 85 45 A 25 25 0 0 1 75 75" opacity="0.9"/>
+    <!-- Segment 2 -->
+    <path d="M 45 85 A 25 25 0 0 1 15 75" opacity="0.7"/>
+    <!-- Segment 3 -->
+    <path d="M 15 45 A 25 25 0 0 1 25 15" opacity="0.5"/>
+  </g>
+  
+  <!-- Central core -->
+  <circle cx="60" cy="60" r="6" fill="#ffffff"/>
+  
+  <!-- Small indicator dots -->
+  <circle cx="60" cy="25" r="3" fill="#10b981"/>
+  <circle cx="82" cy="60" r="3" fill="#10b981"/>
+  <circle cx="38" cy="60" r="3" fill="#10b981"/>
+</svg>
