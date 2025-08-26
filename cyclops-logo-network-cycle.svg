@@ -1,0 +1,57 @@
+<svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <!-- Network cycle representing node group management -->
+  <defs>
+    <radialGradient id="nodeGradient" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1d4ed8;stop-opacity:1" />
+    </radialGradient>
+    <radialGradient id="activeNodeGradient" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#f59e0b;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#d97706;stop-opacity:1" />
+    </radialGradient>
+  </defs>
+  
+  <g transform="translate(60,60)">
+    <!-- Connection lines forming cycle -->
+    <g stroke="#cbd5e1" stroke-width="2" fill="none" opacity="0.6">
+      <line x1="0" y1="-40" x2="34.64" y2="-20"/>
+      <line x1="34.64" y1="-20" x2="34.64" y2="20"/>
+      <line x1="34.64" y1="20" x2="0" y2="40"/>
+      <line x1="0" y1="40" x2="-34.64" y2="20"/>
+      <line x1="-34.64" y1="20" x2="-34.64" y2="-20"/>
+      <line x1="-34.64" y1="-20" x2="0" y2="-40"/>
+    </g>
+    
+    <!-- Active connection showing cycling -->
+    <g stroke="#f97316" stroke-width="3" fill="none">
+      <line x1="0" y1="-40" x2="34.64" y2="-20"/>
+      <line x1="34.64" y1="-20" x2="34.64" y2="20"/>
+    </g>
+    
+    <!-- Node group arranged in hexagon -->
+    <!-- Top node (being cycled) -->
+    <circle cx="0" cy="-40" r="7" fill="url(#activeNodeGradient)"/>
+    
+    <!-- Top right node (being cycled) -->
+    <circle cx="34.64" cy="-20" r="7" fill="url(#activeNodeGradient)"/>
+    
+    <!-- Bottom right node (active) -->
+    <circle cx="34.64" cy="20" r="6" fill="url(#nodeGradient)"/>
+    
+    <!-- Bottom node (stable) -->
+    <circle cx="0" cy="40" r="6" fill="url(#nodeGradient)"/>
+    
+    <!-- Bottom left node (stable) -->
+    <circle cx="-34.64" cy="20" r="6" fill="url(#nodeGradient)"/>
+    
+    <!-- Top left node (stable) -->
+    <circle cx="-34.64" cy="-20" r="6" fill="url(#nodeGradient)"/>
+    
+    <!-- Central control node -->
+    <circle r="5" fill="#1e40af"/>
+    <circle r="2" fill="#ffffff"/>
+  </g>
+  
+  <!-- Subtle outer ring -->
+  <circle cx="60" cy="60" r="52" fill="none" stroke="#e2e8f0" stroke-width="1" opacity="0.5"/>
+</svg>

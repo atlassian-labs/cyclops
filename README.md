@@ -1,5 +1,9 @@
 # Cyclops
 
+<img src="cyclops-logo-circular-flow.svg" alt="Cyclops Logo - Circular Flow" width="80" height="80" style="margin-right: 20px;">
+<img src="cyclops-logo-geometric-rotation.svg" alt="Cyclops Logo - Geometric Rotation" width="80" height="80" style="margin-right: 20px;">
+<img src="cyclops-logo-network-cycle.svg" alt="Cyclops Logo - Network Cycle" width="80" height="80">
+
 [![Godoc](https://godoc.org/github.com/atlassian-labs/cyclops?status.svg)](https://godoc.org/github.com/atlassian-labs/cyclops)
 [![Build](https://github.com/atlassian-labs/cyclops/workflows/Build/badge.svg)](https://github.com/cyclops-labs/workflows/actions)
 [![Go Report Card](https://goreportcard.com/badge/github.com/atlassian-labs/cyclops)](https://goreportcard.com/report/github.com/atlassian-labs/cyclops)

@@ -1,0 +1,34 @@
+<svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <!-- Circular flow representing node cycling -->
+  <defs>
+    <linearGradient id="flowGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2563eb;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1e40af;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Outer rotation ring -->
+  <circle cx="60" cy="60" r="45" fill="none" stroke="#2563eb" stroke-width="3" opacity="0.3"/>
+  
+  <!-- Main circular flow with nodes -->
+  <g transform="translate(60,60)">
+    <!-- Circular arrow path -->
+    <path d="M 0,-35 A 35,35 0 1,1 -24.75,24.75" fill="none" stroke="url(#flowGradient)" stroke-width="4" stroke-linecap="round"/>
+    
+    <!-- Arrow head -->
+    <polygon points="-24.75,24.75 -30,18 -18,30" fill="#2563eb"/>
+    
+    <!-- Active nodes (being cycled) -->
+    <circle cx="0" cy="-35" r="6" fill="#f97316"/>
+    <circle cx="30.31" cy="-17.5" r="6" fill="#f97316"/>
+    <circle cx="30.31" cy="17.5" r="6" fill="#2563eb"/>
+    
+    <!-- Inactive/stable nodes -->
+    <circle cx="0" cy="35" r="4" fill="#64748b" opacity="0.6"/>
+    <circle cx="-30.31" cy="17.5" r="4" fill="#64748b" opacity="0.6"/>
+    <circle cx="-30.31" cy="-17.5" r="4" fill="#64748b" opacity="0.6"/>
+  </g>
+  
+  <!-- Center control point -->
+  <circle cx="60" cy="60" r="3" fill="#1e40af"/>
+</svg>
