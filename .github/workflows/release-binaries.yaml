@@ -2,6 +2,8 @@ name: Release Binaries
 
 on:
   push:
+    branches:
+      - master
     tags:
       - 'v*'
   workflow_dispatch:
@@ -23,10 +25,6 @@ jobs:
         with:
           go-version: '1.22'
 
-      - name: Get version from tag
-        id: get_version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
-
       - name: Build for Linux (amd64)
         run: |
           GOOS=linux GOARCH=amd64 go build -o ${{ env.PLUGIN_NAME }}-linux-amd64 ./cmd/cli/main.go
@@ -35,33 +33,45 @@ jobs:
         run: |
           GOOS=linux GOARCH=arm64 go build -o ${{ env.PLUGIN_NAME }}-linux-arm64 ./cmd/cli/main.go
 
-      - name: Create GitHub Release
+      - name: Create GitHub Release (for tags)
+        if: startsWith(github.ref, 'refs/tags/')
         id: create_release
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ env.VERSION }}
-          release_name: Release ${{ env.VERSION }}
+          tag_name: ${{ github.ref_name }}
+          release_name: Release ${{ github.ref_name }}
           draft: false
           prerelease: false
 
-      - name: Upload amd64 Binary to Release
+      - name: Upload Release Asset (amd64, for tags)
+        if: startsWith(github.ref, 'refs/tags/')
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ./${{ env.PLUGIN_NAME }}-linux-amd64
-          asset_name: ${{ env.PLUGIN_NAME }}-${{ env.VERSION }}-linux-amd64
+          asset_name: ${{ env.PLUGIN_NAME }}-${{ github.ref_name }}-linux-amd64
           asset_content_type: application/octet-stream
 
-      - name: Upload arm64 Binary to Release
+      - name: Upload Release Asset (arm64, for tags)
+        if: startsWith(github.ref, 'refs/tags/')
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ./${{ env.PLUGIN_NAME }}-linux-arm64
-          asset_name: ${{ env.PLUGIN_NAME }}-${{ env.VERSION }}-linux-arm64
+          asset_name: ${{ env.PLUGIN_NAME }}-${{ github.ref_name }}-linux-arm64
           asset_content_type: application/octet-stream
+
+      - name: Upload Artifacts (for master branch)
+        if: github.ref == 'refs/heads/master'
+        uses: actions/upload-artifact@v3
+        with:
+          name: kubectl-cycle-binaries-master
+          path: |
+            ${{ env.PLUGIN_NAME }}-linux-amd64
+            ${{ env.PLUGIN_NAME }}-linux-arm64
