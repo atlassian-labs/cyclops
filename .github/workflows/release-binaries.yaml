@@ -1,0 +1,55 @@
+name: Release Binaries
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+env:
+  PLUGIN_NAME: kubectl-cycle
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # This is crucial for creating releases
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Build for Linux (amd64)
+        run: |
+          GOOS=linux GOARCH=amd64 go build -o ${{ env.PLUGIN_NAME }}-linux-amd64 ./cmd/cli/main.go
+
+      - name: Build for Linux (arm64)
+        run: |
+          GOOS=linux GOARCH=arm64 go build -o ${{ env.PLUGIN_NAME }}-linux-arm64 ./cmd/cli/main.go
+
+      - name: Create/Update GitHub Release (for tags)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          files: |
+            ${{ env.PLUGIN_NAME }}-linux-amd64
+            ${{ env.PLUGIN_NAME }}-linux-arm64
+
+      - name: Upload Artifacts (for master branch)
+        if: github.ref == 'refs/heads/master'
+        uses: actions/upload-artifact@v4
+        with:
+          name: kubectl-cycle-binaries-master
+          path: |
+            ${{ env.PLUGIN_NAME }}-linux-amd64
+            ${{ env.PLUGIN_NAME }}-linux-arm64
