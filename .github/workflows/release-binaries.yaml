@@ -15,7 +15,7 @@ jobs:
   build-and-release:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write # This is crucial for creating releases
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
