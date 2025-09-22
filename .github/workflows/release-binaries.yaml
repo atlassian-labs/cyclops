@@ -1,0 +1,67 @@
+name: Release Binaries
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+env:
+  PLUGIN_NAME: kubectl-cycle
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.22'
+
+      - name: Get version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+
+      - name: Build for Linux (amd64)
+        run: |
+          GOOS=linux GOARCH=amd64 go build -o ${{ env.PLUGIN_NAME }}-linux-amd64 ./cmd/kubectl-cycle
+
+      - name: Build for Linux (arm64)
+        run: |
+          GOOS=linux GOARCH=arm64 go build -o ${{ env.PLUGIN_NAME }}-linux-arm64 ./cmd/kubectl-cycle
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ env.VERSION }}
+          release_name: Release ${{ env.VERSION }}
+          draft: false
+          prerelease: false
+
+      - name: Upload amd64 Binary to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./${{ env.PLUGIN_NAME }}-linux-amd64
+          asset_name: ${{ env.PLUGIN_NAME }}-${{ env.VERSION }}-linux-amd64
+          asset_content_type: application/octet-stream
+
+      - name: Upload arm64 Binary to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./${{ env.PLUGIN_NAME }}-linux-arm64
+          asset_name: ${{ env.PLUGIN_NAME }}-${{ env.VERSION }}-linux-arm64
+          asset_content_type: application/octet-stream
