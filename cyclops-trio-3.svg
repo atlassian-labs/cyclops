@@ -1,0 +1,10 @@
+<svg width="256" height="256" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Cyclops trio orbit logo">
+  <!-- Outer ring with gaps to suggest motion -->
+  <circle cx="64" cy="64" r="44" fill="none" stroke="#2684FF" stroke-width="10" stroke-linecap="round" stroke-dasharray="200 40"/>
+  <!-- Three orbiting nodes -->
+  <circle cx="108" cy="64" r="5" fill="#2684FF"/>
+  <circle cx="42" cy="102.1" r="5" fill="#2684FF"/>
+  <circle cx="42" cy="25.9" r="5" fill="#2684FF"/>
+  <!-- Central eye/pupil -->
+  <circle cx="64" cy="64" r="10" fill="#0052CC"/>
+</svg>

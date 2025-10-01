@@ -1,3 +1,9 @@
+<p align="center">
+  <img src="./cyclops-orbit-1.svg" alt="Cyclops orbit logo" width="140" />
+  <img src="./cyclops-hex-2.svg" alt="Cyclops hex logo" width="140" />
+  <img src="./cyclops-trio-3.svg" alt="Cyclops trio logo" width="140" />
+</p>
+
 # Cyclops
 
 [![Godoc](https://godoc.org/github.com/atlassian-labs/cyclops?status.svg)](https://godoc.org/github.com/atlassian-labs/cyclops)

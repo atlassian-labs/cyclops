@@ -1,0 +1,10 @@
+<svg width="256" height="256" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Cyclops orbit logo">
+  <!-- Outer orbit (almost full circle) suggesting continuous cycling -->
+  <g transform="rotate(-18 64 64)">
+    <circle cx="64" cy="64" r="46" stroke="#2684FF" stroke-width="14" stroke-linecap="round" stroke-dasharray="270 50"/>
+    <!-- Arrowhead at the leading end of the orbit -->
+    <polygon points="109,41 121,45 112,54" fill="#2684FF"/>
+  </g>
+  <!-- Central eye/pupil -->
+  <circle cx="64" cy="64" r="12" fill="#0052CC"/>
+</svg>
