@@ -1,0 +1,23 @@
+<svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="60" cy="60" r="55" fill="none" stroke="#2684FF" stroke-width="3"/>
+  
+  <!-- Three rotating nodes -->
+  <circle cx="60" cy="20" r="8" fill="#36B37E">
+    <animateTransform attributeName="transform" type="rotate" values="0 60 60;360 60 60" dur="8s" repeatCount="indefinite"/>
+  </circle>
+  
+  <circle cx="95.98" cy="80" r="8" fill="#36B37E">
+    <animateTransform attributeName="transform" type="rotate" values="120 60 60;480 60 60" dur="8s" repeatCount="indefinite"/>
+  </circle>
+  
+  <circle cx="24.02" cy="80" r="8" fill="#36B37E">
+    <animateTransform attributeName="transform" type="rotate" values="240 60 60;600 60 60" dur="8s" repeatCount="indefinite"/>
+  </circle>
+  
+  <!-- Center hub -->
+  <circle cx="60" cy="60" r="12" fill="#0052CC"/>
+  
+  <!-- Orbital paths (subtle) -->
+  <circle cx="60" cy="60" r="40" fill="none" stroke="#DFE1E6" stroke-width="1" stroke-dasharray="2,3" opacity="0.5"/>
+</svg>

@@ -1,0 +1,19 @@
+<svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <!-- Simple cyclical arrow design -->
+  <g transform="translate(60,60)">
+    <!-- Circular arrow path -->
+    <path d="M 0 -40 A 40 40 0 1 1 -2 -40" fill="none" stroke="#2684FF" stroke-width="6" stroke-linecap="round"/>
+    
+    <!-- Arrow head -->
+    <polygon points="2,-40 12,-35 8,-45" fill="#2684FF"/>
+    
+    <!-- Three dots representing nodes -->
+    <circle cx="0" cy="-28" r="4" fill="#36B37E"/>
+    <circle cx="24" cy="14" r="4" fill="#36B37E"/>
+    <circle cx="-24" cy="14" r="4" fill="#36B37E"/>
+    
+    <!-- Central kubernetes-style icon -->
+    <circle cx="0" cy="0" r="8" fill="none" stroke="#0052CC" stroke-width="3"/>
+    <circle cx="0" cy="0" r="2" fill="#0052CC"/>
+  </g>
+</svg>
