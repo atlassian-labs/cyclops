@@ -127,7 +127,7 @@ func healthCheckPassed(healthCheck v1.HealthCheck, statusCode uint, body []byte)
 }
 
 // makeRequest makes the health check request to the endpoint specified, reads the body and returns
-// the status code/body to determinate weather it passed
+// the status code/body to determinate whether it passed
 func (t *CycleNodeRequestTransitioner) makeRequest(httpMethod string, httpClient *http.Client, endpoint string) (uint, []byte, error) {
 	httpReq, err := http.NewRequest(httpMethod, endpoint, nil)
 	if err != nil {
@@ -220,7 +220,7 @@ func (t *CycleNodeRequestTransitioner) performInitialHealthChecks(kubeNodes map[
 	for _, node := range t.cycleNodeRequest.Status.NodesToTerminate {
 		nodeHash := getNodeHash(node)
 
-		// Check if the node is ready, fail the cnr
+		// Check if the node is not ready, fail the cnr
 		_, ok := readyNodesSet[nodeHash]
 		if !ok {
 			return fmt.Errorf("node %s/%s not ready", nodeHash, node.Name)
