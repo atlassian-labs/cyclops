@@ -16,7 +16,7 @@ func (in *CycleNodeRequest) GetNodeGroupNames() []string {
 	return buildNodeGroupNames(in.Spec.NodeGroupsList, in.Spec.NodeGroupName)
 }
 
-// IsPartOfNodeGroup returns whether the CycleNodeRequest is part of the
+// IsFromNodeGroup returns whether the CycleNodeRequest is part of the
 // provided NodeGroup by comparing the list of named cloud provider nodegroups
 // defined in each one. Ordering does not affect equality.
 func (in *CycleNodeRequest) IsFromNodeGroup(nodegroup NodeGroup) bool {
