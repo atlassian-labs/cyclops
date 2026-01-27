@@ -687,8 +687,8 @@ func (t *CycleNodeRequestTransitioner) removeScaleDownDisabledAnnotation(nodeNam
 
 // cleanupScaleDownDisabledAnnotations removes the cluster-autoscaler scale-down-disabled annotation
 // from nodes that were created during this CycleNodeRequest's cycling operation.
-// This is called when the CycleNodeRequest is Successful, Healing, or Failed to allow Cluster Autoscaler
-// to resume normal operation. This is a best-effort operation and failures should not block the cycling process.
+// This is called when the CycleNodeRequest is in the Healing state to allow Cluster Autoscaler
+// to resume normal operation. This is a best-effort operation and failures should not block the healing process.
 // This function is idempotent and safe to call multiple times.
 func (t *CycleNodeRequestTransitioner) cleanupScaleDownDisabledAnnotations() error {
 	startTime := time.Now()
