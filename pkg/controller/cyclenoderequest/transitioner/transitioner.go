@@ -17,6 +17,14 @@ type transitionFunc func() (reconcile.Result, error)
 // different request types.
 const cycleNodeLabel = "cyclops.atlassian.com/terminate"
 
+// clusterAutoscalerScaleDownDisabledAnnotation is the annotation key used to prevent
+// Cluster Autoscaler from scaling down a node. This is used to protect new nodes
+// during the cycling process from being removed by Cluster Autoscaler before
+// the corresponding old nodes are fully terminated.
+// See: https://github.com/kubernetes/autoscaler/blob/master/cluster-autoscaler/FAQ.md#how-can-i-prevent-cluster-autoscaler-from-scaling-down-a-particular-node
+const clusterAutoscalerScaleDownDisabledAnnotation = "cluster-autoscaler.kubernetes.io/scale-down-disabled"
+const clusterAutoscalerScaleDownDisabledValue = "true"
+
 var (
 	transitionDuration = 10 * time.Second
 	requeueDuration    = 30 * time.Second

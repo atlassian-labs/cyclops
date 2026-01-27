@@ -74,6 +74,17 @@ func AddAnnotationToNode(nodeName string, annotationName string, annotationValue
 	return PatchNode(nodeName, patches, client)
 }
 
+// RemoveAnnotationFromNode performs a patch operation on a node to remove an annotation from the node
+func RemoveAnnotationFromNode(nodeName string, annotationName string, client kubernetes.Interface) error {
+	patches := []Patch{
+		{
+			Op:   "remove",
+			Path: fmt.Sprintf("/metadata/annotations/%s", strings.Replace(annotationName, "/", "~1", -1)),
+		},
+	}
+	return PatchNode(nodeName, patches, client)
+}
+
 // AddFinalizerToNode updates a node to add a finalizer to it
 func AddFinalizerToNode(node *v1.Node, finalizerName string, client kubernetes.Interface) error {
 	controllerutil.AddFinalizer(node, finalizerName)

@@ -64,6 +64,75 @@ var (
 	)
 )
 
+var (
+	// AnnotationAddSuccess tracks successful annotation additions
+	// Note: Using only nodegroup label to keep cardinality low (consistent with existing Cyclops metrics)
+	AnnotationAddSuccess = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name:      fmt.Sprintf("%v_annotation_add_success_total", namespace),
+			Help:      "Total number of successful cluster-autoscaler scale-down-disabled annotation additions",
+		},
+		[]string{"nodegroup"},
+	)
+
+	// AnnotationAddFailure tracks failed annotation additions
+	AnnotationAddFailure = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name:      fmt.Sprintf("%v_annotation_add_failure_total", namespace),
+			Help:      "Total number of failed cluster-autoscaler scale-down-disabled annotation additions",
+		},
+		[]string{"nodegroup", "error_type"},
+	)
+
+	// AnnotationRemoveSuccess tracks successful annotation removals
+	AnnotationRemoveSuccess = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name:      fmt.Sprintf("%v_annotation_remove_success_total", namespace),
+			Help:      "Total number of successful cluster-autoscaler scale-down-disabled annotation removals",
+		},
+		[]string{"nodegroup"},
+	)
+
+	// AnnotationRemoveFailure tracks failed annotation removals
+	AnnotationRemoveFailure = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name:      fmt.Sprintf("%v_annotation_remove_failure_total", namespace),
+			Help:      "Total number of failed cluster-autoscaler scale-down-disabled annotation removals",
+		},
+		[]string{"nodegroup", "error_type"},
+	)
+
+	// NodesWithAnnotation tracks current nodes with the annotation
+	// Note: Includes node_name here because we need to track which specific nodes currently have the annotation
+	// Cardinality is bounded by the number of nodes with annotations (typically small)
+	NodesWithAnnotation = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name:      fmt.Sprintf("%v_nodes_with_scale_down_disabled_annotation", namespace),
+			Help:      "Current number of nodes with cluster-autoscaler scale-down-disabled annotation (1 = has annotation, 0 = does not have annotation)",
+		},
+		[]string{"nodegroup", "node_name"},
+	)
+
+	// AnnotationCleanupAttempts tracks cleanup operation attempts
+	AnnotationCleanupAttempts = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name:      fmt.Sprintf("%v_annotation_cleanup_attempts_total", namespace),
+			Help:      "Total number of annotation cleanup attempts",
+		},
+		[]string{"nodegroup", "result"}, // result: "success", "partial_failure", "failure"
+	)
+
+	// AnnotationCleanupDuration tracks cleanup operation duration
+	AnnotationCleanupDuration = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:      fmt.Sprintf("%v_annotation_cleanup_duration_seconds", namespace),
+			Help:      "Duration of annotation cleanup operations in seconds",
+			Buckets:   prometheus.ExponentialBuckets(0.1, 2, 10), // 0.1s to ~51s
+		},
+		[]string{"nodegroup"},
+	)
+)
+
 // Register registers the custom metrics with prometheus
 func Register(client client.Client, logger logr.Logger, namespace string) {
 	collector := cyclopsCollector{
@@ -75,6 +144,17 @@ func Register(client client.Client, logger logr.Logger, namespace string) {
 		cycleNodeStatusList:  &v1.CycleNodeStatusList{},
 	}
 	metrics.Registry.MustRegister(collector)
+
+	// Register annotation metrics
+	metrics.Registry.MustRegister(
+		AnnotationAddSuccess,
+		AnnotationAddFailure,
+		AnnotationRemoveSuccess,
+		AnnotationRemoveFailure,
+		NodesWithAnnotation,
+		AnnotationCleanupAttempts,
+		AnnotationCleanupDuration,
+	)
 
 	go func() {
 		for {

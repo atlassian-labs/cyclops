@@ -13,6 +13,7 @@ import (
 	"github.com/atlassian-labs/cyclops/pkg/k8s"
 	"github.com/pkg/errors"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -398,6 +399,26 @@ func (t *CycleNodeRequestTransitioner) transitionScalingUp() (reconcile.Result, 
 		}
 	}
 
+	// Add cluster-autoscaler scale-down-disabled annotation to new nodes to prevent
+	// Cluster Autoscaler from removing them before the corresponding old nodes are terminated.
+	// This protects new nodes during the cycling process.
+	// Explicitly type newNodes to ensure corev1 import is recognized by the compiler.
+	var newNodes []corev1.Node
+	newNodes = findNodesCreatedAfter(kubeNodes, scaleUpStarted.Time)
+	for _, newNode := range newNodes {
+		if err := t.addScaleDownDisabledAnnotation(newNode.Name); err != nil {
+			// Log warning but don't fail - annotation is best-effort and shouldn't block cycling
+			t.rm.Logger.Info("Failed to add scale-down-disabled annotation to new node",
+				"nodeName", newNode.Name,
+				"error", err)
+			t.rm.LogEvent(t.cycleNodeRequest, "AnnotationWarning",
+				"Failed to add scale-down-disabled annotation to node %s: %v", newNode.Name, err)
+		} else {
+			t.rm.Logger.Info("Added scale-down-disabled annotation to new node",
+				"nodeName", newNode.Name)
+		}
+	}
+
 	t.rm.LogEvent(t.cycleNodeRequest, "ScalingUpCompleted", "New nodes are now ready")
 	return t.transitionObject(v1.CycleNodeRequestCordoningNode)
 }
@@ -491,6 +512,14 @@ func (t *CycleNodeRequestTransitioner) transitionCordoning() (reconcile.Result, 
 // to trigger another ScaleUp operation.
 func (t *CycleNodeRequestTransitioner) transitionWaitingTermination() (reconcile.Result, error) {
 	t.rm.LogEvent(t.cycleNodeRequest, "WaitingTermination", "Waiting for instances to terminate")
+
+	// Periodically attempt to cleanup scale-down-disabled annotations in case previous cleanup attempts failed.
+	// This ensures annotations don't remain on nodes permanently if cleanup failed earlier.
+	// This is idempotent and safe to call multiple times.
+	if err := t.cleanupScaleDownDisabledAnnotations(); err != nil {
+		// Log warning but don't fail - annotation cleanup is best-effort
+		t.rm.Logger.Info("Failed to cleanup scale-down-disabled annotations during WaitingTermination", "error", err)
+	}
 
 	// While there are CycleNodeStatus objects not in Failed or Successful, stay in this phase and wait for them
 	// to finish.
@@ -587,6 +616,14 @@ func (t *CycleNodeRequestTransitioner) transitionSuccessful() (reconcile.Result,
 
 	if shouldRequeue {
 		return reconcile.Result{Requeue: true, RequeueAfter: transitionDuration}, nil
+	}
+
+	// Remove cluster-autoscaler scale-down-disabled annotations from nodes now that
+	// all cycling is complete. This allows Cluster Autoscaler to resume normal operation.
+	// This is best-effort and failures should not block the successful transition.
+	if err := t.cleanupScaleDownDisabledAnnotations(); err != nil {
+		// Log warning but don't fail - annotation cleanup is best-effort
+		t.rm.Logger.Info("Failed to cleanup scale-down-disabled annotations", "error", err)
 	}
 
 	// Delete failed sibling CNRs regardless of whether the CNR for the

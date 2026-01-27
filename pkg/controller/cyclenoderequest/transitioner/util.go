@@ -18,6 +18,8 @@ import (
 
 	v1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
 	"github.com/atlassian-labs/cyclops/pkg/cloudprovider"
+	"github.com/atlassian-labs/cyclops/pkg/k8s"
+	"github.com/atlassian-labs/cyclops/pkg/metrics"
 )
 
 // transitionToHealing transitions the current cycleNodeRequest to healing which will always transiting to failed
@@ -588,4 +590,174 @@ func countNodesCreatedAfter(nodes map[string]corev1.Node, cutoffTime time.Time) 
 		}
 	}
 	return count
+}
+
+// findNodesCreatedAfter returns all nodes in the given map that are created after the specified time
+func findNodesCreatedAfter(nodes map[string]corev1.Node, cutoffTime time.Time) []corev1.Node {
+	var result []corev1.Node
+	for _, node := range nodes {
+		if node.CreationTimestamp.Time.After(cutoffTime) {
+			result = append(result, node)
+		}
+	}
+	return result
+}
+
+// getNodegroupForMetrics returns a nodegroup identifier for metrics labeling.
+// Since a CycleNodeRequest can have multiple nodegroups, we use the first one or "unknown" if none.
+func (t *CycleNodeRequestTransitioner) getNodegroupForMetrics() string {
+	nodeGroups := t.cycleNodeRequest.GetNodeGroupNames()
+	if len(nodeGroups) > 0 {
+		return nodeGroups[0]
+	}
+	return "unknown"
+}
+
+// addScaleDownDisabledAnnotation adds the cluster-autoscaler scale-down-disabled annotation
+// to a node to prevent Cluster Autoscaler from removing it during cycling.
+// This is a best-effort operation and failures should not block the cycling process.
+func (t *CycleNodeRequestTransitioner) addScaleDownDisabledAnnotation(nodeName string) error {
+	nodegroup := t.getNodegroupForMetrics()
+	
+	err := k8s.AddAnnotationToNode(
+		nodeName,
+		clusterAutoscalerScaleDownDisabledAnnotation,
+		clusterAutoscalerScaleDownDisabledValue,
+		t.rm.RawClient,
+	)
+	
+	if err != nil {
+		// Extract error type for better categorization
+		errorType := "unknown"
+		errStr := err.Error()
+		if strings.Contains(errStr, "not found") {
+			errorType = "node_not_found"
+		} else if strings.Contains(errStr, "forbidden") || strings.Contains(errStr, "unauthorized") {
+			errorType = "permission_denied"
+		} else if strings.Contains(errStr, "conflict") {
+			errorType = "conflict"
+		}
+		
+		metrics.AnnotationAddFailure.WithLabelValues(nodegroup, errorType).Inc()
+		return err
+	}
+	
+	metrics.AnnotationAddSuccess.WithLabelValues(nodegroup).Inc()
+	metrics.NodesWithAnnotation.WithLabelValues(nodegroup, nodeName).Set(1)
+	
+	return nil
+}
+
+// removeScaleDownDisabledAnnotation removes the cluster-autoscaler scale-down-disabled annotation
+// from a node to allow Cluster Autoscaler to consider it for scale-down again.
+// This is a best-effort operation and failures should not block the cycling process.
+// Uses retry logic to handle transient API errors.
+func (t *CycleNodeRequestTransitioner) removeScaleDownDisabledAnnotation(nodeName string) error {
+	nodegroup := t.getNodegroupForMetrics()
+	
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		return k8s.RemoveAnnotationFromNode(
+			nodeName,
+			clusterAutoscalerScaleDownDisabledAnnotation,
+			t.rm.RawClient,
+		)
+	})
+	
+	if err != nil {
+		// Extract error type for better categorization
+		errorType := "unknown"
+		errStr := err.Error()
+		if strings.Contains(errStr, "not found") {
+			errorType = "node_not_found"
+		} else if strings.Contains(errStr, "forbidden") || strings.Contains(errStr, "unauthorized") {
+			errorType = "permission_denied"
+		} else if strings.Contains(errStr, "conflict") {
+			errorType = "conflict"
+		}
+		
+		metrics.AnnotationRemoveFailure.WithLabelValues(nodegroup, errorType).Inc()
+		return err
+	}
+	
+	metrics.AnnotationRemoveSuccess.WithLabelValues(nodegroup).Inc()
+	metrics.NodesWithAnnotation.WithLabelValues(nodegroup, nodeName).Set(0)
+	
+	return nil
+}
+
+// cleanupScaleDownDisabledAnnotations removes the cluster-autoscaler scale-down-disabled annotation
+// from all nodes in the nodegroups that have it. This is called when the CycleNodeRequest is
+// Successful (and periodically in WaitingTermination) to allow Cluster Autoscaler to resume normal operation.
+// This is a best-effort operation and failures should not block the cycling process.
+// This function is idempotent and safe to call multiple times.
+func (t *CycleNodeRequestTransitioner) cleanupScaleDownDisabledAnnotations() error {
+	startTime := time.Now()
+	nodegroup := t.getNodegroupForMetrics()
+	defer func() {
+		metrics.AnnotationCleanupDuration.WithLabelValues(nodegroup).Observe(time.Since(startTime).Seconds())
+	}()
+	
+	// Get all nodes in the nodegroups for this CycleNodeRequest
+	kubeNodes, err := t.listReadyNodes(true)
+	if err != nil {
+		// Log error but don't fail - this is best-effort cleanup
+		metrics.AnnotationCleanupAttempts.WithLabelValues(nodegroup, "failure").Inc()
+		t.rm.Logger.Info("Failed to list nodes for annotation cleanup", "error", err)
+		return nil
+	}
+
+	var nodesWithAnnotation []string
+	var failedNodes []string
+	var successCount int
+
+	// Find nodes that have the annotation and attempt to remove it
+	for _, node := range kubeNodes {
+		if node.Annotations != nil {
+			if val, exists := node.Annotations[clusterAutoscalerScaleDownDisabledAnnotation]; exists && val == clusterAutoscalerScaleDownDisabledValue {
+				nodesWithAnnotation = append(nodesWithAnnotation, node.Name)
+				if err := t.removeScaleDownDisabledAnnotation(node.Name); err != nil {
+					// Log warning but continue - this is best-effort cleanup
+					// Track failed nodes for monitoring/debugging
+					failedNodes = append(failedNodes, node.Name)
+					t.rm.Logger.Info("Failed to remove scale-down-disabled annotation from node",
+						"nodeName", node.Name,
+						"error", err)
+					t.rm.LogEvent(t.cycleNodeRequest, "AnnotationCleanupWarning",
+						"Failed to remove scale-down-disabled annotation from node %s: %v", node.Name, err)
+				} else {
+					successCount++
+					t.rm.Logger.Info("Removed scale-down-disabled annotation from node",
+						"nodeName", node.Name)
+				}
+			}
+		}
+	}
+
+	// Update metrics based on cleanup result
+	if len(failedNodes) == 0 && len(nodesWithAnnotation) > 0 {
+		metrics.AnnotationCleanupAttempts.WithLabelValues(nodegroup, "success").Inc()
+	} else if len(failedNodes) > 0 {
+		metrics.AnnotationCleanupAttempts.WithLabelValues(nodegroup, "partial_failure").Inc()
+	} else {
+		// No annotations found to clean up
+		metrics.AnnotationCleanupAttempts.WithLabelValues(nodegroup, "success").Inc()
+	}
+
+	// Log summary for monitoring
+	if len(nodesWithAnnotation) > 0 {
+		t.rm.Logger.Info("Annotation cleanup summary",
+			"totalNodesWithAnnotation", len(nodesWithAnnotation),
+			"successfullyRemoved", successCount,
+			"failedToRemove", len(failedNodes),
+			"failedNodes", failedNodes)
+	}
+
+	// If there were failures, log a warning event for visibility
+	if len(failedNodes) > 0 {
+		t.rm.LogWarningEvent(t.cycleNodeRequest, "AnnotationCleanupPartialFailure",
+			"Failed to remove scale-down-disabled annotation from %d node(s). These nodes may remain protected from Cluster Autoscaler scale-down. Failed nodes: %v",
+			len(failedNodes), failedNodes)
+	}
+
+	return nil
 }
