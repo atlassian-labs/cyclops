@@ -530,14 +530,6 @@ func (t *CycleNodeRequestTransitioner) transitionWaitingTermination() (reconcile
 
 // transitionHealing handles healing CycleNodeRequests
 func (t *CycleNodeRequestTransitioner) transitionHealing() (reconcile.Result, error) {
-	// Clean up scale-down-disabled annotations from nodes we annotated during this cycling operation.
-	// This ensures annotations don't remain if cycling fails and we need to rollback.
-	// This is best-effort and failures should not block the healing process.
-	if err := t.cleanupScaleDownDisabledAnnotations(); err != nil {
-		// Log warning but don't fail - annotation cleanup is best-effort
-		t.rm.Logger.Info("Failed to cleanup scale-down-disabled annotations during Healing", "error", err)
-	}
-
 	nodeGroups, err := t.rm.CloudProvider.GetNodeGroups(t.cycleNodeRequest.GetNodeGroupNames())
 	if err != nil {
 		return t.transitionToFailed(err)
@@ -574,6 +566,27 @@ func (t *CycleNodeRequestTransitioner) transitionHealing() (reconcile.Result, er
 				node.Name, err)
 		}
 
+		// remove the scale-down-disabled annotation from any new nodes that were created during this cycle
+		// This is best-effort and failures should not block the healing process
+		if t.cycleNodeRequest.Status.ScaleUpStarted != nil {
+			kubeNodes, err := t.listReadyNodes(true)
+			if err == nil {
+				nodesCreatedDuringCycle := findNodesCreatedAfter(kubeNodes, t.cycleNodeRequest.Status.ScaleUpStarted.Time)
+				for _, newNode := range nodesCreatedDuringCycle {
+					if newNode.Annotations != nil {
+						if val, exists := newNode.Annotations[clusterAutoscalerScaleDownDisabledAnnotation]; exists && val == clusterAutoscalerScaleDownDisabledValue {
+							if err := t.removeScaleDownDisabledAnnotation(newNode.Name); err != nil {
+								// Log warning but don't fail - annotation removal is best-effort during healing
+								t.rm.Logger.Info("Failed to remove scale-down-disabled annotation from node during healing",
+									"nodeName", newNode.Name,
+									"error", err)
+							}
+						}
+					}
+				}
+			}
+		}
+
 		// un-cordon after attach as well
 		t.rm.LogEvent(t.cycleNodeRequest, "UncordoningNodes", "Uncordoning nodes in node group: %v", node.Name)
 
@@ -595,14 +608,6 @@ func (t *CycleNodeRequestTransitioner) transitionHealing() (reconcile.Result, er
 
 // transitionFailed handles failed CycleNodeRequests
 func (t *CycleNodeRequestTransitioner) transitionFailed() (reconcile.Result, error) {
-	// Clean up scale-down-disabled annotations from nodes we annotated during this cycling operation.
-	// This ensures annotations don't remain if cycling fails.
-	// This is best-effort and failures should not block the failed transition.
-	if err := t.cleanupScaleDownDisabledAnnotations(); err != nil {
-		// Log warning but don't fail - annotation cleanup is best-effort
-		t.rm.Logger.Info("Failed to cleanup scale-down-disabled annotations during Failed", "error", err)
-	}
-
 	shouldRequeue, err := t.finalReapChildren()
 	if err != nil {
 		return t.transitionToFailed(err)
@@ -623,14 +628,6 @@ func (t *CycleNodeRequestTransitioner) transitionSuccessful() (reconcile.Result,
 
 	if shouldRequeue {
 		return reconcile.Result{Requeue: true, RequeueAfter: transitionDuration}, nil
-	}
-
-	// Remove cluster-autoscaler scale-down-disabled annotations from nodes now that
-	// all cycling is complete. This allows Cluster Autoscaler to resume normal operation.
-	// This is best-effort and failures should not block the successful transition.
-	if err := t.cleanupScaleDownDisabledAnnotations(); err != nil {
-		// Log warning but don't fail - annotation cleanup is best-effort
-		t.rm.Logger.Info("Failed to cleanup scale-down-disabled annotations", "error", err)
 	}
 
 	// Delete failed sibling CNRs regardless of whether the CNR for the
