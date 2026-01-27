@@ -13,7 +13,6 @@ import (
 	"github.com/atlassian-labs/cyclops/pkg/k8s"
 	"github.com/pkg/errors"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -402,8 +401,7 @@ func (t *CycleNodeRequestTransitioner) transitionScalingUp() (reconcile.Result, 
 	// Add cluster-autoscaler scale-down-disabled annotation to new nodes to prevent
 	// Cluster Autoscaler from removing them before the corresponding old nodes are terminated.
 	// This protects new nodes during the cycling process.
-	var newNodes []corev1.Node
-	newNodes = findNodesCreatedAfter(kubeNodes, scaleUpStarted.Time)
+	newNodes := findNodesCreatedAfter(kubeNodes, scaleUpStarted.Time)
 	for _, newNode := range newNodes {
 		if err := t.addScaleDownDisabledAnnotation(newNode.Name); err != nil {
 			// Log warning but don't fail - annotation is best-effort and shouldn't block cycling
