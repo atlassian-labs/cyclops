@@ -686,9 +686,9 @@ func (t *CycleNodeRequestTransitioner) removeScaleDownDisabledAnnotation(nodeNam
 }
 
 // cleanupScaleDownDisabledAnnotations removes the cluster-autoscaler scale-down-disabled annotation
-// from all nodes in the nodegroups that have it. This is called when the CycleNodeRequest is
-// Successful (and periodically in WaitingTermination) to allow Cluster Autoscaler to resume normal operation.
-// This is a best-effort operation and failures should not block the cycling process.
+// from nodes that were created during this CycleNodeRequest's cycling operation.
+// This is called when the CycleNodeRequest is Successful, Healing, or Failed to allow Cluster Autoscaler
+// to resume normal operation. This is a best-effort operation and failures should not block the cycling process.
 // This function is idempotent and safe to call multiple times.
 func (t *CycleNodeRequestTransitioner) cleanupScaleDownDisabledAnnotations() error {
 	startTime := time.Now()
@@ -696,6 +696,15 @@ func (t *CycleNodeRequestTransitioner) cleanupScaleDownDisabledAnnotations() err
 	defer func() {
 		metrics.AnnotationCleanupDuration.WithLabelValues(nodegroup).Observe(time.Since(startTime).Seconds())
 	}()
+	
+	// Only clean up if we have a scaleUpStarted timestamp (meaning we actually started scaling up)
+	// If scaleUpStarted is nil, we never added any annotations, so nothing to clean up
+	if t.cycleNodeRequest.Status.ScaleUpStarted == nil {
+		t.rm.Logger.Info("No scaleUpStarted timestamp, skipping annotation cleanup (no annotations were added)")
+		return nil
+	}
+	
+	scaleUpStarted := t.cycleNodeRequest.Status.ScaleUpStarted
 	
 	// Get all nodes in the nodegroups for this CycleNodeRequest
 	kubeNodes, err := t.listReadyNodes(true)
@@ -710,8 +719,12 @@ func (t *CycleNodeRequestTransitioner) cleanupScaleDownDisabledAnnotations() err
 	var failedNodes []string
 	var successCount int
 
-	// Find nodes that have the annotation and attempt to remove it
-	for _, node := range kubeNodes {
+	// Only clean up annotations from nodes that:
+	// 1. Were created after scaleUpStarted (nodes created during THIS cycling operation)
+	// 2. Have the annotation (that we added)
+	// This ensures we don't remove annotations added by other means.
+	nodesCreatedDuringCycle := findNodesCreatedAfter(kubeNodes, scaleUpStarted.Time)
+	for _, node := range nodesCreatedDuringCycle {
 		if node.Annotations != nil {
 			if val, exists := node.Annotations[clusterAutoscalerScaleDownDisabledAnnotation]; exists && val == clusterAutoscalerScaleDownDisabledValue {
 				nodesWithAnnotation = append(nodesWithAnnotation, node.Name)
