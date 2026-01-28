@@ -713,7 +713,6 @@ func (t *CycleNodeRequestTransitioner) cleanupScaleDownDisabledAnnotations() {
 					t.rm.LogEvent(t.cycleNodeRequest, "AnnotationCleanupWarning",
 						"Failed to remove scale-down-disabled annotation from node %s during %s: %v", newNode.Name, phase, err)
 				} else {
-					// Log success for observability and debugging - matches pattern of "Added" log
 					t.rm.Logger.Info("Removed scale-down-disabled annotation from node",
 						"phase", phase,
 						"nodeName", newNode.Name)
