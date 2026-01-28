@@ -684,3 +684,36 @@ func (t *CycleNodeRequestTransitioner) removeScaleDownDisabledAnnotation(nodeNam
 	
 	return nil
 }
+
+// cleanupScaleDownDisabledAnnotations removes the cluster-autoscaler scale-down-disabled annotation
+// from nodes that were created during the cycle. This is called during both Healing and Successful
+// phases to ensure annotations are cleaned up regardless of how the cycle completes.
+// This is a best-effort operation and failures should not block the transition.
+func (t *CycleNodeRequestTransitioner) cleanupScaleDownDisabledAnnotations() {
+	if t.cycleNodeRequest.Status.ScaleUpStarted == nil {
+		return
+	}
+
+	kubeNodes, err := t.listReadyNodes(true)
+	if err != nil {
+		return
+	}
+
+	phase := string(t.cycleNodeRequest.Status.Phase)
+	nodesCreatedDuringCycle := findNodesCreatedAfter(kubeNodes, t.cycleNodeRequest.Status.ScaleUpStarted.Time)
+	for _, newNode := range nodesCreatedDuringCycle {
+		if newNode.Annotations != nil {
+			if val, exists := newNode.Annotations[clusterAutoscalerScaleDownDisabledAnnotation]; exists && val == clusterAutoscalerScaleDownDisabledValue {
+				if err := t.removeScaleDownDisabledAnnotation(newNode.Name); err != nil {
+					// Log warning but don't fail - annotation removal is best-effort
+					t.rm.Logger.Info("Failed to remove scale-down-disabled annotation from node",
+						"phase", phase,
+						"nodeName", newNode.Name,
+						"error", err)
+					t.rm.LogEvent(t.cycleNodeRequest, "AnnotationCleanupWarning",
+						"Failed to remove scale-down-disabled annotation from node %s during %s: %v", newNode.Name, phase, err)
+				}
+			}
+		}
+	}
+}
