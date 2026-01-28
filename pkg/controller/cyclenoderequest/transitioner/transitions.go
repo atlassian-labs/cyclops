@@ -564,10 +564,6 @@ func (t *CycleNodeRequestTransitioner) transitionHealing() (reconcile.Result, er
 				node.Name, err)
 		}
 
-		// remove the scale-down-disabled annotation from any new nodes that were created during this cycle
-		// This is best-effort and failures should not block the healing process
-		t.cleanupScaleDownDisabledAnnotations()
-
 		// un-cordon after attach as well
 		t.rm.LogEvent(t.cycleNodeRequest, "UncordoningNodes", "Uncordoning nodes in node group: %v", node.Name)
 
@@ -583,6 +579,11 @@ func (t *CycleNodeRequestTransitioner) transitionHealing() (reconcile.Result, er
 			return t.transitionToFailed(err)
 		}
 	}
+
+	// remove the scale-down-disabled annotation from any new nodes that were created during this cycle
+	// This is best-effort and failures should not block the healing process
+	// Called outside the loop to ensure it runs even if NodesToTerminate is empty (e.g., all nodes already terminated)
+	t.cleanupScaleDownDisabledAnnotations()
 
 	return t.transitionToFailed(nil)
 }

@@ -689,12 +689,14 @@ func (t *CycleNodeRequestTransitioner) removeScaleDownDisabledAnnotation(nodeNam
 // from nodes that were created during the cycle. This is called during both Healing and Successful
 // phases to ensure annotations are cleaned up regardless of how the cycle completes.
 // This is a best-effort operation and failures should not block the transition.
+// Uses listNodes instead of listReadyNodes to ensure cleanup happens even if nodes are not Ready yet,
+// which is important when cycling fails in the Healing phase.
 func (t *CycleNodeRequestTransitioner) cleanupScaleDownDisabledAnnotations() {
 	if t.cycleNodeRequest.Status.ScaleUpStarted == nil {
 		return
 	}
 
-	kubeNodes, err := t.listReadyNodes(true)
+	kubeNodes, err := t.listNodes(true)
 	if err != nil {
 		return
 	}
