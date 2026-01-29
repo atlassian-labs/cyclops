@@ -398,22 +398,25 @@ func (t *CycleNodeRequestTransitioner) transitionScalingUp() (reconcile.Result, 
 		}
 	}
 
-	// Add cluster-autoscaler scale-down-disabled annotation to new nodes to prevent
-	// Cluster Autoscaler from removing them before the corresponding old nodes are terminated.
-	// This protects new nodes during the cycling process.
-	newNodes := findNodesCreatedAfter(kubeNodes, scaleUpStarted.Time)
-	for _, newNode := range newNodes {
-		if err := t.addScaleDownDisabledAnnotation(newNode.Name); err != nil {
-			// Log warning but don't fail - annotation is best-effort and shouldn't block cycling
-			t.rm.Logger.Info("Failed to add scale-down-disabled annotation to new node",
-				"nodeName", newNode.Name,
-				"error", err)
-			t.rm.LogEvent(t.cycleNodeRequest, "AnnotationWarning",
-				"Failed to add scale-down-disabled annotation to node %s: %v", newNode.Name, err)
-		} else {
-			t.rm.Logger.Info("Added scale-down-disabled annotation to new node",
-				"nodeName", newNode.Name)
+	// Add scale-down-disabled annotation to new nodes if enabled
+	if t.shouldManageAnnotations() {
+		newNodes := findNodesCreatedAfter(kubeNodes, scaleUpStarted.Time)
+		for _, newNode := range newNodes {
+			if err := t.addScaleDownDisabledAnnotation(newNode.Name); err != nil {
+				// Log warning but don't fail - annotation is best-effort and shouldn't block cycling
+				t.rm.Logger.Info("Failed to add scale-down-disabled annotation to new node",
+					"nodeName", newNode.Name,
+					"error", err)
+				t.rm.LogEvent(t.cycleNodeRequest, "AnnotationWarning",
+					"Failed to add scale-down-disabled annotation to node %s: %v", newNode.Name, err)
+			} else {
+				t.rm.Logger.Info("Added scale-down-disabled annotation to new node",
+					"nodeName", newNode.Name)
+			}
 		}
+	} else {
+		t.rm.Logger.Info("Node annotation management disabled for this CNR",
+			"cnr", t.cycleNodeRequest.Name)
 	}
 
 	t.rm.LogEvent(t.cycleNodeRequest, "ScalingUpCompleted", "New nodes are now ready")
@@ -580,10 +583,13 @@ func (t *CycleNodeRequestTransitioner) transitionHealing() (reconcile.Result, er
 		}
 	}
 
-	// remove the scale-down-disabled annotation from any new nodes that were created during this cycle
-	// This is best-effort and failures should not block the healing process
-	// Called outside the loop to ensure it runs even if NodesToTerminate is empty (e.g., all nodes already terminated)
-	t.cleanupScaleDownDisabledAnnotations()
+	// Cleanup scale-down-disabled annotations if enabled
+	if t.shouldManageAnnotations() {
+		t.cleanupScaleDownDisabledAnnotations()
+	} else {
+		t.rm.Logger.Info("Skipping annotation cleanup (disabled)",
+			"cnr", t.cycleNodeRequest.Name)
+	}
 
 	return t.transitionToFailed(nil)
 }
@@ -612,9 +618,13 @@ func (t *CycleNodeRequestTransitioner) transitionSuccessful() (reconcile.Result,
 		return reconcile.Result{Requeue: true, RequeueAfter: transitionDuration}, nil
 	}
 
-	// Remove the scale-down-disabled annotation from any new nodes that were created during this cycle
-	// This is best-effort and failures should not block the successful transition
-	t.cleanupScaleDownDisabledAnnotations()
+	// Cleanup scale-down-disabled annotations if enabled
+	if t.shouldManageAnnotations() {
+		t.cleanupScaleDownDisabledAnnotations()
+	} else {
+		t.rm.Logger.Info("Skipping annotation cleanup (disabled)",
+			"cnr", t.cycleNodeRequest.Name)
+	}
 
 	// Delete failed sibling CNRs regardless of whether the CNR for the
 	// transitioner should be deleted. If failed CNRs pile up that will prevent

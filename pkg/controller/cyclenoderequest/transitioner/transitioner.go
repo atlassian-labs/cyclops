@@ -25,6 +25,12 @@ const cycleNodeLabel = "cyclops.atlassian.com/terminate"
 const clusterAutoscalerScaleDownDisabledAnnotation = "cluster-autoscaler.kubernetes.io/scale-down-disabled"
 const clusterAutoscalerScaleDownDisabledValue = "true"
 
+// nodeGroupAnnotationKey is the annotation key on NodeGroup resources that controls whether
+// Cluster Autoscaler annotation management is enabled or disabled.
+// Value: "disabled" or "false" → opt-out (disable annotation management)
+// Value: missing/empty → default enabled (opt-out approach)
+const nodeGroupAnnotationKey = "cyclops.atlassian.com/cluster-autoscaler-scale-down-disabled"
+
 var (
 	transitionDuration = 10 * time.Second
 	requeueDuration    = 30 * time.Second

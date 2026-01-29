@@ -613,6 +613,41 @@ func (t *CycleNodeRequestTransitioner) getNodegroupForMetrics() string {
 	return "unknown"
 }
 
+// getNodeGroup finds the NodeGroup resource that matches this CNR.
+func (t *CycleNodeRequestTransitioner) getNodeGroup() (*v1.NodeGroup, error) {
+	var nodeGroupList v1.NodeGroupList
+	if err := t.rm.Client.List(context.TODO(), &nodeGroupList); err != nil {
+		return nil, err
+	}
+
+	for i := range nodeGroupList.Items {
+		ng := &nodeGroupList.Items[i]
+		if t.cycleNodeRequest.IsFromNodeGroup(*ng) {
+			return ng, nil
+		}
+	}
+
+	return nil, nil
+}
+
+// shouldManageAnnotations returns true if annotations should be managed.
+func (t *CycleNodeRequestTransitioner) shouldManageAnnotations() bool {
+	nodeGroup, err := t.getNodeGroup()
+	if err != nil || nodeGroup == nil {
+		return true
+	}
+
+	annotationValue := nodeGroup.Annotations[nodeGroupAnnotationKey]
+	if annotationValue == "disabled" || annotationValue == "false" {
+		t.rm.Logger.Info("Node annotations disabled via NodeGroup annotation",
+			"nodeGroup", nodeGroup.Name,
+			"annotation", nodeGroupAnnotationKey)
+		return false
+	}
+
+	return true
+}
+
 // addScaleDownDisabledAnnotation adds the cluster-autoscaler scale-down-disabled annotation
 // to a node to prevent Cluster Autoscaler from removing it during cycling.
 // This is a best-effort operation and failures should not block the cycling process.
