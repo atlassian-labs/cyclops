@@ -16,7 +16,7 @@ func isRetryableError(err error) bool {
 
 	// Check for network errors (timeouts, connection refused, etc.)
 	if netErr, ok := err.(net.Error); ok {
-		if netErr.Timeout() || netErr.Temporary() {
+		if netErr.Timeout() {
 			return true
 		}
 	}

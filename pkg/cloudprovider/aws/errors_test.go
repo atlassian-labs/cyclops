@@ -2,11 +2,10 @@ package aws
 
 import (
 	"errors"
-	"net"
 	"testing"
-	"time"
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/go-logr/logr/testr"
 )
 
 // mockNetError is a mock implementation of net.Error for testing
@@ -37,9 +36,9 @@ func TestIsTransientError(t *testing.T) {
 			expected: true,
 		},
 		{
-			name:     "temporary error",
+			name:     "temporary error (deprecated, no longer detected)",
 			err:      &mockNetError{temporary: true, msg: "temporary"},
-			expected: true,
+			expected: false,
 		},
 		{
 			name:     "i/o timeout string",
@@ -96,7 +95,8 @@ func TestRetryOnTransientError(t *testing.T) {
 			return nil
 		}
 
-		err := retryOnTransientError(fn, nil)
+		logger := testr.NewWithOptions(t, testr.Options{Verbosity: 10})
+		err := retryOnTransientError(fn, logger)
 		if err != nil {
 			t.Errorf("expected no error, got %v", err)
 		}
@@ -115,7 +115,8 @@ func TestRetryOnTransientError(t *testing.T) {
 			return nil
 		}
 
-		err := retryOnTransientError(fn, nil)
+		logger := testr.NewWithOptions(t, testr.Options{Verbosity: 10})
+		err := retryOnTransientError(fn, logger)
 		if err != nil {
 			t.Errorf("expected no error, got %v", err)
 		}
@@ -132,7 +133,8 @@ func TestRetryOnTransientError(t *testing.T) {
 			return nonTransientErr
 		}
 
-		err := retryOnTransientError(fn, nil)
+		logger := testr.NewWithOptions(t, testr.Options{Verbosity: 10})
+		err := retryOnTransientError(fn, logger)
 		if err != nonTransientErr {
 			t.Errorf("expected non-transient error, got %v", err)
 		}
@@ -149,7 +151,8 @@ func TestRetryOnTransientError(t *testing.T) {
 			return transientErr
 		}
 
-		err := retryOnTransientError(fn, nil)
+		logger := testr.NewWithOptions(t, testr.Options{Verbosity: 10})
+		err := retryOnTransientError(fn, logger)
 		if err != transientErr {
 			t.Errorf("expected transient error after exhausting retries, got %v", err)
 		}
@@ -176,9 +179,9 @@ func TestIsNetworkError(t *testing.T) {
 			expected: true,
 		},
 		{
-			name:     "temporary error",
+			name:     "temporary error (deprecated, no longer detected)",
 			err:      &mockNetError{temporary: true, msg: "temp"},
-			expected: true,
+			expected: false,
 		},
 		{
 			name:     "dial tcp error",

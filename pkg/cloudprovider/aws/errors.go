@@ -30,10 +30,9 @@ func isNetworkError(err error) bool {
 		return false
 	}
 
-	// Check for net.Error (includes timeouts, temporary errors, etc.)
+	// Check for net.Error (includes timeouts)
 	if netErr, ok := err.(net.Error); ok {
-		// Timeouts and temporary errors should be retried
-		if netErr.Timeout() || netErr.Temporary() {
+		if netErr.Timeout() {
 			return true
 		}
 	}

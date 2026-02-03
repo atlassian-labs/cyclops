@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/go-logr/logr"
+	"github.com/go-logr/logr/testr"
 )
 
 // TestRetryOnTransientError_IOTimeout reproduces the original issue
@@ -26,7 +26,7 @@ func TestRetryOnTransientError_IOTimeout(t *testing.T) {
 			return nil
 		}
 
-		logger := &testLogger{t: t}
+		logger := testr.NewWithOptions(t, testr.Options{Verbosity: 10})
 		err := retryOnTransientError(fn, logger)
 
 		if err != nil {
@@ -56,7 +56,7 @@ func TestRetryOnTransientError_AWSThrottling(t *testing.T) {
 			return nil
 		}
 
-		logger := &testLogger{t: t}
+		logger := testr.NewWithOptions(t, testr.Options{Verbosity: 10})
 		err := retryOnTransientError(fn, logger)
 
 		if err != nil {
@@ -85,7 +85,7 @@ func TestRetryOnTransientError_AWSServiceUnavailable(t *testing.T) {
 			return nil
 		}
 
-		logger := &testLogger{t: t}
+		logger := testr.NewWithOptions(t, testr.Options{Verbosity: 10})
 		err := retryOnTransientError(fn, logger)
 
 		if err != nil {
@@ -113,7 +113,7 @@ func TestRetryOnTransientError_PermanentError(t *testing.T) {
 			return permanentErr
 		}
 
-		logger := &testLogger{t: t}
+		logger := testr.NewWithOptions(t, testr.Options{Verbosity: 10})
 		err := retryOnTransientError(fn, logger)
 
 		if err != permanentErr {
@@ -144,7 +144,7 @@ func TestRetryOnTransientError_BackoffTiming(t *testing.T) {
 			return nil
 		}
 
-		logger := &testLogger{t: t}
+		logger := testr.NewWithOptions(t, testr.Options{Verbosity: 10})
 		startTime := time.Now()
 		err := retryOnTransientError(fn, logger)
 		totalDuration := time.Since(startTime)
@@ -180,7 +180,7 @@ func TestRetryOnTransientError_ExhaustsRetries(t *testing.T) {
 			return persistentErr
 		}
 
-		logger := &testLogger{t: t}
+		logger := testr.NewWithOptions(t, testr.Options{Verbosity: 10})
 		err := retryOnTransientError(fn, logger)
 
 		if err != persistentErr {
@@ -210,7 +210,7 @@ func TestRetryOnTransientError_ConnectionReset(t *testing.T) {
 			return nil
 		}
 
-		logger := &testLogger{t: t}
+		logger := testr.NewWithOptions(t, testr.Options{Verbosity: 10})
 		err := retryOnTransientError(fn, logger)
 
 		if err != nil {
@@ -239,7 +239,7 @@ func TestRetryOnTransientError_TLSHandshakeTimeout(t *testing.T) {
 			return nil
 		}
 
-		logger := &testLogger{t: t}
+		logger := testr.NewWithOptions(t, testr.Options{Verbosity: 10})
 		err := retryOnTransientError(fn, logger)
 
 		if err != nil {
@@ -272,7 +272,7 @@ func TestRetryOnTransientError_MultipleTransientErrors(t *testing.T) {
 			return nil
 		}
 
-		logger := &testLogger{t: t}
+		logger := testr.NewWithOptions(t, testr.Options{Verbosity: 10})
 		err := retryOnTransientError(fn, logger)
 
 		if err != nil {
@@ -288,31 +288,5 @@ func TestRetryOnTransientError_MultipleTransientErrors(t *testing.T) {
 	})
 }
 
-// testLogger implements logr.Logger for testing
-type testLogger struct {
-	t *testing.T
-}
-
-func (l *testLogger) Info(msg string, keysAndValues ...interface{}) {
-	l.t.Logf("[INFO] %s %v", msg, keysAndValues)
-}
-
-func (l *testLogger) Enabled() bool {
-	return true
-}
-
-func (l *testLogger) Error(err error, msg string, keysAndValues ...interface{}) {
-	l.t.Logf("[ERROR] %s: %v %v", msg, err, keysAndValues)
-}
-
-func (l *testLogger) V(level int) logr.Logger {
-	return l
-}
-
-func (l *testLogger) WithValues(keysAndValues ...interface{}) logr.Logger {
-	return l
-}
-
-func (l *testLogger) WithName(name string) logr.Logger {
-	return l
-}
+// Using testr.NewWithOptions from go-logr/logr/testr for testing
+// This provides a proper logr.Logger implementation that logs to *testing.T

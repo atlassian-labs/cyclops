@@ -2,7 +2,6 @@ package transitioner
 
 import (
 	"errors"
-	"fmt"
 	"testing"
 	"time"
 
@@ -10,6 +9,7 @@ import (
 	"github.com/atlassian-labs/cyclops/pkg/cloudprovider"
 	"github.com/atlassian-labs/cyclops/pkg/controller"
 	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/go-logr/logr/testr"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -237,7 +237,7 @@ func TestEndToEnd_EquilibriumTimeout(t *testing.T) {
 		node := createTestNode("test-node-1", "aws:///us-west-2a/i-1234567890abcdef0")
 
 		// Set equilibrium wait to past the timeout
-		cnr.Status.EquilibriumWaitStarted = metav1.Time{
+		cnr.Status.EquilibriumWaitStarted = &metav1.Time{
 			Time: time.Now().Add(-10 * time.Minute), // Past the 5 minute limit
 		}
 
@@ -331,7 +331,7 @@ func createTestCycleNodeRequest(name string, phase v1.CycleNodeRequestPhase) *v1
 		},
 		Status: v1.CycleNodeRequestStatus{
 			Phase: phase,
-			EquilibriumWaitStarted: metav1.Time{
+			EquilibriumWaitStarted: &metav1.Time{
 				Time: time.Now(),
 			},
 		},
@@ -354,7 +354,7 @@ func createTestNode(name, providerID string) *corev1.Node {
 
 func createTestResourceManager(t *testing.T, cnr *v1.CycleNodeRequest, node *corev1.Node, cp cloudprovider.CloudProvider) *controller.ResourceManager {
 	scheme := runtime.NewScheme()
-	_ = v1.AddToScheme(scheme)
+	_ = v1.SchemeBuilder.AddToScheme(scheme)
 	_ = corev1.AddToScheme(scheme)
 	fakeClient := fake.NewClientBuilder().
 		WithScheme(scheme).
@@ -364,7 +364,7 @@ func createTestResourceManager(t *testing.T, cnr *v1.CycleNodeRequest, node *cor
 	return &controller.ResourceManager{
 		Client:        fakeClient,
 		CloudProvider: cp,
-		Logger:        &testLogger{t: t},
+		Logger:        testr.NewWithOptions(t, testr.Options{Verbosity: 10}),
 	}
 }
 
@@ -385,18 +385,83 @@ func (m *mockCloudProviderAlwaysFails) TerminateInstance(providerID string) erro
 	return m.error
 }
 
-func (m *mockCloudProviderAlwaysFails) DetachInstance(nodeGroupName, providerID string) error {
-	return m.error
-}
-
-func (m *mockCloudProviderAlwaysFails) AttachInstance(nodeGroupName, providerID string) error {
-	return m.error
-}
-
-func (m *mockCloudProviderAlwaysFails) AddInstanceToNodeGroup(nodeGroupName string, nodeGroup cloudprovider.NodeGroupOptions) error {
-	return m.error
-}
-
 func (m *mockCloudProviderAlwaysFails) Name() string {
 	return "mock-aws-failing"
+}
+
+// mockCloudProviderWithTransientErrors simulates AWS transient failures
+type mockCloudProviderWithTransientErrors struct {
+	callCount             int
+	failuresBeforeSuccess int
+	errorToReturn         error
+}
+
+func (m *mockCloudProviderWithTransientErrors) GetNodeGroups(names []string) (cloudprovider.NodeGroups, error) {
+	m.callCount++
+	if m.callCount <= m.failuresBeforeSuccess {
+		return nil, m.errorToReturn
+	}
+	// Success after N failures
+	return &mockNodeGroups{}, nil
+}
+
+func (m *mockCloudProviderWithTransientErrors) InstancesExist(providerIDs []string) (map[string]interface{}, error) {
+	return make(map[string]interface{}), nil
+}
+
+func (m *mockCloudProviderWithTransientErrors) TerminateInstance(providerID string) error {
+	return nil
+}
+
+func (m *mockCloudProviderWithTransientErrors) Name() string {
+	return "mock-aws"
+}
+
+// mockNodeGroups is a simple mock implementation
+type mockNodeGroups struct{}
+
+func (m *mockNodeGroups) Instances() map[string]cloudprovider.Instance {
+	return map[string]cloudprovider.Instance{
+		"aws:///us-west-2a/i-1234567890abcdef0": &mockInstance{
+			id:         "i-1234567890abcdef0",
+			providerID: "aws:///us-west-2a/i-1234567890abcdef0",
+		},
+	}
+}
+
+func (m *mockNodeGroups) DetachInstance(providerID string) (bool, error) {
+	return false, nil
+}
+
+func (m *mockNodeGroups) AttachInstance(providerID, nodeGroup string) (bool, error) {
+	return false, nil
+}
+
+func (m *mockNodeGroups) ReadyInstances() map[string]cloudprovider.Instance {
+	return m.Instances()
+}
+
+func (m *mockNodeGroups) NotReadyInstances() map[string]cloudprovider.Instance {
+	return make(map[string]cloudprovider.Instance)
+}
+
+type mockInstance struct {
+	id         string
+	providerID string
+}
+
+func (m *mockInstance) ID() string {
+	return m.id
+}
+
+func (m *mockInstance) OutOfDate() bool {
+	return false
+}
+
+func (m *mockInstance) MatchesProviderID(providerID string) bool {
+	return m.providerID == providerID
+}
+
+func (m *mockInstance) NodeGroupName() string {
+	return "test-nodegroup"
 }
