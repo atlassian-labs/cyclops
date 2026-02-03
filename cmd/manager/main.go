@@ -47,6 +47,12 @@ var (
 	deleteCNRRequeue                 = app.Flag("delete-cnr-requeue", "How often to check if a CNR can be deleted").Default("24h").Duration()
 	defaultCNScyclingExpiry          = app.Flag("default-cns-cycling-expiry", "Fail the CNS if it has been cycling for this long").Default("3h").Duration()
 	unhealthyPodTerminationThreshold = app.Flag("unhealthy-pod-termination-after", "How long to tolerate an un-evictable yet unhealthy pod before forcefully removing it").Default("5m").Duration()
+
+	// Retry configuration flags
+	awsRetryEnabled   = app.Flag("aws-retry-enabled", "Enable retry logic for transient AWS API errors").Default("true").Bool()
+	awsMaxRetries     = app.Flag("aws-max-retries", "Maximum number of retry attempts for transient AWS errors").Default("5").Int()
+	awsInitialDelayMs = app.Flag("aws-initial-delay-ms", "Initial delay in milliseconds before the first retry (exponential backoff)").Default("5000").Int()
+	awsMaxDelayMs     = app.Flag("aws-max-delay-ms", "Maximum delay in milliseconds between retry attempts").Default("60000").Int()
 )
 
 var log = logf.Log.WithName("cmd")
@@ -95,8 +101,8 @@ func main() {
 	// Register the custom metrics
 	metrics.Register(mgr.GetClient(), log, *namespace)
 
-	// Setup the cloud provider
-	cloudProvider, err := builder.BuildCloudProvider(*cloudProviderName, logger)
+	// Setup the cloud provider with retry configuration
+	cloudProvider, err := builder.BuildCloudProviderWithRetryConfig(*cloudProviderName, logger, *awsRetryEnabled, *awsMaxRetries, *awsInitialDelayMs, *awsMaxDelayMs)
 	if err != nil {
 		log.Error(err, "Unable to build cloud provider")
 		os.Exit(1)

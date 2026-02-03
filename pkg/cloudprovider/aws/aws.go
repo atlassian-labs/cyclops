@@ -71,6 +71,7 @@ type provider struct {
 	autoScalingService autoscalingiface.AutoScalingAPI
 	ec2Service         ec2iface.EC2API
 	logger             logr.Logger
+	retryConfig        RetryConfig
 }
 
 type autoscalingGroups struct {
@@ -78,6 +79,7 @@ type autoscalingGroups struct {
 	ec2Service         ec2iface.EC2API
 	groups             []*autoscaling.Group
 	logger             logr.Logger
+	retryConfig        RetryConfig
 }
 
 type instance struct {
@@ -93,9 +95,17 @@ func (p *provider) Name() string {
 
 // GetNodeGroups gets a Autoscaling groups
 func (p *provider) GetNodeGroups(names []string) (cloudprovider.NodeGroups, error) {
-	result, err := p.autoScalingService.DescribeAutoScalingGroups(&autoscaling.DescribeAutoScalingGroupsInput{
-		AutoScalingGroupNames: aws.StringSlice(names),
-	})
+	var result *autoscaling.DescribeAutoScalingGroupsOutput
+	var err error
+
+	// Retry with exponential backoff for transient errors
+	err = retryOnTransientErrorWithConfig(func() error {
+		result, err = p.autoScalingService.DescribeAutoScalingGroups(&autoscaling.DescribeAutoScalingGroupsInput{
+			AutoScalingGroupNames: aws.StringSlice(names),
+		})
+		return err
+	}, p.logger, p.retryConfig)
+
 	if err != nil {
 		return nil, err
 	}
@@ -110,6 +120,7 @@ func (p *provider) GetNodeGroups(names []string) (cloudprovider.NodeGroups, erro
 		autoScalingService: p.autoScalingService,
 		ec2Service:         p.ec2Service,
 		logger:             p.logger,
+		retryConfig:        p.retryConfig,
 	}, nil
 }
 
@@ -129,11 +140,18 @@ func (p *provider) InstancesExist(providerIDs []string) (map[string]interface{},
 		instanceIDs = append(instanceIDs, instanceID)
 	}
 
-	output, err := p.ec2Service.DescribeInstances(
-		&ec2.DescribeInstancesInput{
-			InstanceIds: aws.StringSlice(instanceIDs),
-		},
-	)
+	var output *ec2.DescribeInstancesOutput
+	var err error
+
+	// Retry with exponential backoff for transient errors
+	err = retryOnTransientErrorWithConfig(func() error {
+		output, err = p.ec2Service.DescribeInstances(
+			&ec2.DescribeInstancesInput{
+				InstanceIds: aws.StringSlice(instanceIDs),
+			},
+		)
+		return err
+	}, p.logger, p.retryConfig)
 
 	if err != nil {
 		return nil, err
@@ -161,9 +179,14 @@ func (p *provider) TerminateInstance(providerID string) error {
 		return err
 	}
 
-	_, err = p.ec2Service.TerminateInstances(&ec2.TerminateInstancesInput{
-		InstanceIds: aws.StringSlice([]string{instanceID}),
-	})
+	// Retry with exponential backoff for transient errors
+	err = retryOnTransientErrorWithConfig(func() error {
+		_, err := p.ec2Service.TerminateInstances(&ec2.TerminateInstancesInput{
+			InstanceIds: aws.StringSlice([]string{instanceID}),
+		})
+		return err
+	}, p.logger, p.retryConfig)
+
 	return err
 }
 
