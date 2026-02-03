@@ -26,7 +26,7 @@ func DefaultRetryConfig() RetryConfig {
 	return RetryConfig{
 		Enabled:        true,
 		MaxRetries:     5,
-		InitialDelayMs: 5000, // 5 seconds - safe default
+		InitialDelayMs: 5000,  // 5 seconds - safe default
 		MaxDelayMs:     60000, // 60 seconds max
 	}
 }

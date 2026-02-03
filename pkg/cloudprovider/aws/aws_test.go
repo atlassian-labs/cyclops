@@ -438,7 +438,7 @@ func TestInstance_OutOfDate(t *testing.T) {
 				MixedInstancesPolicy: &autoscaling.MixedInstancesPolicy{
 					LaunchTemplate: &autoscaling.LaunchTemplate{
 						LaunchTemplateSpecification: &autoscaling.LaunchTemplateSpecification{
-					                Version: aws.String(launchTemplateLatestVersion),
+							Version: aws.String(launchTemplateLatestVersion),
 						},
 					},
 				},
@@ -453,7 +453,7 @@ func TestInstance_OutOfDate(t *testing.T) {
 				MixedInstancesPolicy: &autoscaling.MixedInstancesPolicy{
 					LaunchTemplate: &autoscaling.LaunchTemplate{
 						LaunchTemplateSpecification: &autoscaling.LaunchTemplateSpecification{
-					                Version: aws.String(launchTemplateLatestVersion),
+							Version: aws.String(launchTemplateLatestVersion),
 						},
 					},
 				},
