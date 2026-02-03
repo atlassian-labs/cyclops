@@ -2,6 +2,7 @@ package aws
 
 import (
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/atlassian-labs/cyclops/pkg/cloudprovider"
@@ -59,6 +60,10 @@ func NewCloudProviderWithRetryConfig(logger logr.Logger, retryConfig RetryConfig
 	var creds *credentials.Credentials
 
 	// Configure AWS SDK with retry logic and timeouts
+	httpClient := &http.Client{
+		Timeout: 30 * time.Second,
+	}
+
 	config := &aws.Config{
 		Credentials: creds,
 		// Maximum number of retries for API calls
@@ -73,9 +78,7 @@ func NewCloudProviderWithRetryConfig(logger logr.Logger, retryConfig RetryConfig
 			},
 		},
 		// HTTP client timeout (increased from default to handle slow networks)
-		HTTPClient: &aws.HTTPClient{
-			Timeout: 30 * time.Second,
-		},
+		HTTPClient: httpClient,
 	}
 
 	ec2Service := ec2.New(sess, config)

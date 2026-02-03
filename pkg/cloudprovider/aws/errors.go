@@ -160,14 +160,12 @@ func retryOnTransientErrorWithConfig(fn func() error, logger logr.Logger, config
 		lastErr = err
 
 		// Log the transient error and retry attempt
-		if logger != nil {
-			logger.Info("Transient AWS error, retrying",
-				"attempt", attempt+1,
-				"maxRetries", config.MaxRetries,
-				"delayMs", delayMs,
-				"retryEnabled", config.Enabled,
-				"error", err.Error())
-		}
+		logger.Info("Transient AWS error, retrying",
+			"attempt", attempt+1,
+			"maxRetries", config.MaxRetries,
+			"delayMs", delayMs,
+			"retryEnabled", config.Enabled,
+			"error", err.Error())
 
 		// Don't sleep on the last attempt
 		if attempt < config.MaxRetries-1 {
