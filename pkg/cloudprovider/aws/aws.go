@@ -59,12 +59,12 @@ func verifyIfErrorOccurred(apiErr error, expectedMessage ...string) (bool, error
 }
 
 func verifyIfErrorOccurredWithDefaults(apiErr error, expectedMessage string) (bool, error) {
-	skip_errs := []string{
+	skipErrs := []string{
 		// default errors we wanted to skip
 		"is not in correct state",
 		expectedMessage,
 	}
-	return verifyIfErrorOccurred(apiErr, skip_errs...)
+	return verifyIfErrorOccurred(apiErr, skipErrs...)
 }
 
 type provider struct {
@@ -134,7 +134,6 @@ func (p *provider) InstancesExist(providerIDs []string) (map[string]interface{},
 			InstanceIds: aws.StringSlice(instanceIDs),
 		},
 	)
-
 	if err != nil {
 		return nil, err
 	}

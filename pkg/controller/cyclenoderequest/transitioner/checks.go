@@ -139,7 +139,7 @@ func (t *CycleNodeRequestTransitioner) makeRequest(httpMethod string, httpClient
 		return 0, nil, err
 	}
 
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	bytes, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -242,7 +242,7 @@ func (t *CycleNodeRequestTransitioner) performInitialHealthChecks(kubeNodes map[
 // performCyclingHealthChecks before terminating an instance selected for termination. Cycling pauses
 // until all health checks pass for the new instance before terminating the old one
 func (t *CycleNodeRequestTransitioner) performCyclingHealthChecks(kubeNodes map[string]corev1.Node) (bool, error) {
-	var allHealthChecksPassed bool = true
+	allHealthChecksPassed := true
 
 	// Find new instsances attached to the nodegroup and perform health checks on them
 	// before terminating the old ones they are replacing
@@ -376,7 +376,7 @@ func (t *CycleNodeRequestTransitioner) sendPreTerminationTrigger(node v1.CycleNo
 // It monitors the progress shutdown progress. Cyclops will wait until this endpoint returns the expected response before
 // proceeding to terminate the node.
 func (t *CycleNodeRequestTransitioner) performPreTerminationHealthChecks(node v1.CycleNodeRequestNode) (bool, error) {
-	var allHealthChecksPassed bool = true
+	allHealthChecksPassed := true
 	nodeHash := getNodeHash(node)
 
 	// Check that the trigger has already been send to the node before performing any health checks

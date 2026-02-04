@@ -13,7 +13,7 @@ import (
 	"github.com/go-logr/logr"
 )
 
-// NewCloudProvider returns a new AWS cloud provider
+// NewCloudProvider returns a new AWS cloud provider using the AWS SDK's default retry behavior
 func NewCloudProvider(logger logr.Logger) (cloudprovider.CloudProvider, error) {
 	sess, err := session.NewSession()
 	if err != nil {
@@ -21,7 +21,19 @@ func NewCloudProvider(logger logr.Logger) (cloudprovider.CloudProvider, error) {
 	}
 
 	var creds *credentials.Credentials
-	config := &aws.Config{Credentials: creds}
+
+	// Configure AWS SDK with default retry logic
+	// The AWS SDK v1 automatically uses client.DefaultRetryer which handles:
+	// - Exponential backoff
+	// - Retries for throttling errors
+	// - Retries for transient network errors
+	// - Retries for 5xx server errors
+	config := &aws.Config{
+		Credentials: creds,
+		// Use AWS SDK's default retry behavior (3 retries with exponential backoff)
+		// This is sufficient for most use cases
+		MaxRetries: aws.Int(3),
+	}
 
 	ec2Service := ec2.New(sess, config)
 	autoScalingService := autoscaling.New(sess, config)
@@ -33,7 +45,7 @@ func NewCloudProvider(logger logr.Logger) (cloudprovider.CloudProvider, error) {
 	}
 
 	// Log the provider we used
-	credValue, err := autoScalingService.Client.Config.Credentials.Get()
+	credValue, err := config.Credentials.Get()
 	if err != nil {
 		return nil, err
 	}

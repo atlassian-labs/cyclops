@@ -11,6 +11,7 @@ import (
 type builderFunc func(logger logr.Logger) (cloudprovider.CloudProvider, error)
 
 // BuildCloudProvider returns a cloud provider based on the provided name
+// Uses the AWS SDK's built-in retry behavior
 func BuildCloudProvider(name string, logger logr.Logger) (cloudprovider.CloudProvider, error) {
 	buildFuncs := map[string]builderFunc{
 		aws.ProviderName: aws.NewCloudProvider,

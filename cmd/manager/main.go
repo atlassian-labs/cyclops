@@ -96,6 +96,7 @@ func main() {
 	metrics.Register(mgr.GetClient(), log, *namespace)
 
 	// Setup the cloud provider
+	// Uses AWS SDK's built-in retry behavior
 	cloudProvider, err := builder.BuildCloudProvider(*cloudProviderName, logger)
 	if err != nil {
 		log.Error(err, "Unable to build cloud provider")
