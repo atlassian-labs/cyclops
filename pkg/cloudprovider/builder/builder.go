@@ -10,7 +10,8 @@ import (
 
 type builderFunc func(logger logr.Logger) (cloudprovider.CloudProvider, error)
 
-// BuildCloudProvider returns a cloud provider based on the provided name with default retry configuration
+// BuildCloudProvider returns a cloud provider based on the provided name
+// Uses the AWS SDK's built-in retry behavior
 func BuildCloudProvider(name string, logger logr.Logger) (cloudprovider.CloudProvider, error) {
 	buildFuncs := map[string]builderFunc{
 		aws.ProviderName: aws.NewCloudProvider,
@@ -22,15 +23,4 @@ func BuildCloudProvider(name string, logger logr.Logger) (cloudprovider.CloudPro
 	}
 
 	return builder(logger)
-}
-
-// BuildCloudProviderWithRetryConfig returns a cloud provider with custom retry configuration
-func BuildCloudProviderWithRetryConfig(name string, logger logr.Logger, retryEnabled bool, maxRetries, initialDelayMs, maxDelayMs int) (cloudprovider.CloudProvider, error) {
-	switch name {
-	case aws.ProviderName:
-		retryConfig := aws.NewRetryConfig(retryEnabled, maxRetries, initialDelayMs, maxDelayMs)
-		return aws.NewCloudProviderWithRetryConfig(logger, retryConfig)
-	default:
-		return nil, fmt.Errorf("builder for cloud provider %v not found", name)
-	}
 }
