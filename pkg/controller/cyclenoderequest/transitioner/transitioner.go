@@ -17,6 +17,25 @@ type transitionFunc func() (reconcile.Result, error)
 // different request types.
 const cycleNodeLabel = "cyclops.atlassian.com/terminate"
 
+// cyclopsManagedAnnotation marks nodes where Cyclops added the scale-down-disabled annotation.
+// Used to track which annotations we added vs pre-existing ones (for safe cleanup).
+// Only remove the cluster-autoscaler annotation if this marker annotation also exists.
+const cyclopsManagedAnnotation = "cyclops.atlassian.com/annotation-managed"
+
+// clusterAutoscalerScaleDownDisabledAnnotation is the annotation key used to prevent
+// Cluster Autoscaler from scaling down a node. This is used to protect new nodes
+// during the cycling process from being removed by Cluster Autoscaler before
+// the corresponding old nodes are fully terminated.
+// See: https://github.com/kubernetes/autoscaler/blob/master/cluster-autoscaler/FAQ.md#how-can-i-prevent-cluster-autoscaler-from-scaling-down-a-particular-node
+const clusterAutoscalerScaleDownDisabledAnnotation = "cluster-autoscaler.kubernetes.io/scale-down-disabled"
+const clusterAutoscalerScaleDownDisabledValue = "true"
+
+// nodeGroupAnnotationKey is the annotation key on NodeGroup resources that controls whether
+// Cluster Autoscaler annotation management is enabled or disabled.
+// Value: "true" → opt-out (disable annotation management)
+// Value: "false" or missing/empty → default enabled (annotation management enabled)
+const nodeGroupAnnotationKey = "cyclops.atlassian.com/disable-annotation-management"
+
 var (
 	transitionDuration = 10 * time.Second
 	requeueDuration    = 30 * time.Second

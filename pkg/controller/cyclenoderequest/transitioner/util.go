@@ -18,6 +18,8 @@ import (
 
 	v1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
 	"github.com/atlassian-labs/cyclops/pkg/cloudprovider"
+	"github.com/atlassian-labs/cyclops/pkg/k8s"
+	"github.com/atlassian-labs/cyclops/pkg/metrics"
 )
 
 // transitionToHealing transitions the current cycleNodeRequest to healing which will always transiting to failed
@@ -588,4 +590,256 @@ func countNodesCreatedAfter(nodes map[string]corev1.Node, cutoffTime time.Time) 
 		}
 	}
 	return count
+}
+
+// findNodesCreatedAfter returns all nodes in the given map that are created after the specified time
+func findNodesCreatedAfter(nodes map[string]corev1.Node, cutoffTime time.Time) []corev1.Node {
+	var result []corev1.Node
+	for _, node := range nodes {
+		if node.CreationTimestamp.Time.After(cutoffTime) {
+			result = append(result, node)
+		}
+	}
+	return result
+}
+
+// getNodegroupForMetrics returns a nodegroup identifier for metrics labeling.
+// Since a CycleNodeRequest can have multiple nodegroups, we use the first one or "unknown" if none.
+func (t *CycleNodeRequestTransitioner) getNodegroupForMetrics() string {
+	nodeGroups := t.cycleNodeRequest.GetNodeGroupNames()
+	if len(nodeGroups) > 0 {
+		return nodeGroups[0]
+	}
+	return "unknown"
+}
+
+// getNodeGroup finds the NodeGroup resource that matches this CNR.
+func (t *CycleNodeRequestTransitioner) getNodeGroup() (*v1.NodeGroup, error) {
+	var nodeGroupList v1.NodeGroupList
+	if err := t.rm.Client.List(context.TODO(), &nodeGroupList); err != nil {
+		return nil, err
+	}
+
+	for i := range nodeGroupList.Items {
+		ng := &nodeGroupList.Items[i]
+		if t.cycleNodeRequest.IsFromNodeGroup(*ng) {
+			return ng, nil
+		}
+	}
+
+	return nil, nil
+}
+
+// shouldManageAnnotations checks if Cyclops should manage cluster-autoscaler annotations on nodes.
+// Returns true if annotations should be added/removed (default behavior).
+// Returns false if opt-out is enabled via NodeGroup annotation.
+//
+// Opt-out mechanism:
+//   - NodeGroup annotation: cyclops.atlassian.com/disable-annotation-management
+//   - Value "true" → opt-out (do NOT add/remove annotations)
+//   - Value "false" or missing → default enabled (add/remove annotations)
+//
+// Default behavior (when NodeGroup not found or annotation missing): enabled (return true)
+func (t *CycleNodeRequestTransitioner) shouldManageAnnotations() bool {
+	nodeGroup, err := t.getNodeGroup()
+	if err != nil {
+		t.rm.Logger.Info("Failed to get NodeGroup, defaulting to annotation management enabled",
+			"cnr", t.cycleNodeRequest.Name,
+			"error", err)
+		return true
+	}
+	if nodeGroup == nil {
+		t.rm.Logger.Info("NodeGroup not found for CNR, defaulting to annotation management enabled",
+			"cnr", t.cycleNodeRequest.Name,
+			"nodeGroupNames", t.cycleNodeRequest.GetNodeGroupNames())
+		return true
+	}
+
+	annotationValue := nodeGroup.Annotations[nodeGroupAnnotationKey]
+	t.rm.Logger.Info("Checking NodeGroup annotation for opt-out",
+		"cnr", t.cycleNodeRequest.Name,
+		"nodeGroup", nodeGroup.Name,
+		"annotation", nodeGroupAnnotationKey,
+		"value", annotationValue)
+	if annotationValue == "true" {
+		t.rm.Logger.Info("Node annotations disabled via NodeGroup annotation",
+			"nodeGroup", nodeGroup.Name,
+			"annotation", nodeGroupAnnotationKey)
+		return false
+	}
+
+	return true
+}
+
+// addScaleDownDisabledAnnotation adds the cluster-autoscaler scale-down-disabled annotation
+// to a node to prevent Cluster Autoscaler from removing it during cycling.
+// This is a best-effort operation and failures should not block the cycling process.
+// Note: This function should only be called when shouldManageAnnotations() returns true.
+// If the annotation already exists, it is preserved (not overwritten) for backward compatibility.
+func (t *CycleNodeRequestTransitioner) addScaleDownDisabledAnnotation(nodeName string) error {
+	// Defensive check: ensure annotation management is enabled
+	if !t.shouldManageAnnotations() {
+		t.rm.Logger.Info("Skipping annotation addition - management disabled",
+			"nodeName", nodeName,
+			"cnr", t.cycleNodeRequest.Name)
+		return nil
+	}
+	
+	// Check if annotation already exists - preserve existing value for backward compatibility
+	node, err := t.rm.RawClient.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+	if err == nil && node.Annotations != nil {
+		if existingValue, exists := node.Annotations[clusterAutoscalerScaleDownDisabledAnnotation]; exists {
+			t.rm.Logger.Info("Annotation already exists on node, preserving existing value",
+				"nodeName", nodeName,
+				"existingValue", existingValue,
+				"cnr", t.cycleNodeRequest.Name)
+			return nil
+		}
+	}
+	
+	nodegroup := t.getNodegroupForMetrics()
+	
+	err = k8s.AddAnnotationToNode(
+		nodeName,
+		clusterAutoscalerScaleDownDisabledAnnotation,
+		clusterAutoscalerScaleDownDisabledValue,
+		t.rm.RawClient,
+	)
+	
+	if err != nil {
+		// Extract error type for better categorization
+		errorType := "unknown"
+		errStr := err.Error()
+		if strings.Contains(errStr, "not found") {
+			errorType = "node_not_found"
+		} else if strings.Contains(errStr, "forbidden") || strings.Contains(errStr, "unauthorized") {
+			errorType = "permission_denied"
+		} else if strings.Contains(errStr, "conflict") {
+			errorType = "conflict"
+		}
+		
+		metrics.AnnotationAddFailure.WithLabelValues(nodegroup, errorType).Inc()
+		return err
+	}
+	
+	// Add marker annotation to track that we added the cluster-autoscaler annotation
+	// This ensures we only remove annotations we added, not pre-existing ones
+	if markerErr := k8s.AddAnnotationToNode(
+		nodeName,
+		cyclopsManagedAnnotation,
+		"true",
+		t.rm.RawClient,
+	); markerErr != nil {
+		// Log but don't fail - marker is for tracking, not critical
+		t.rm.Logger.Info("Failed to add managed annotation marker to node",
+			"nodeName", nodeName,
+			"error", markerErr)
+	} else {
+		t.rm.Logger.Info("Added managed annotation marker to node",
+			"nodeName", nodeName,
+			"cnr", t.cycleNodeRequest.Name)
+	}
+	
+	metrics.AnnotationAddSuccess.WithLabelValues(nodegroup).Inc()
+	metrics.NodesWithAnnotation.WithLabelValues(nodegroup, nodeName).Set(1)
+	
+	return nil
+}
+
+// removeScaleDownDisabledAnnotation removes the cluster-autoscaler scale-down-disabled annotation
+// from a node to allow Cluster Autoscaler to consider it for scale-down again.
+// This is a best-effort operation and failures should not block the cycling process.
+// Uses retry logic to handle transient API errors.
+func (t *CycleNodeRequestTransitioner) removeScaleDownDisabledAnnotation(nodeName string) error {
+	nodegroup := t.getNodegroupForMetrics()
+	
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		return k8s.RemoveAnnotationFromNode(
+			nodeName,
+			clusterAutoscalerScaleDownDisabledAnnotation,
+			t.rm.RawClient,
+		)
+	})
+	
+	if err != nil {
+		// Extract error type for better categorization
+		errorType := "unknown"
+		errStr := err.Error()
+		if strings.Contains(errStr, "not found") {
+			errorType = "node_not_found"
+		} else if strings.Contains(errStr, "forbidden") || strings.Contains(errStr, "unauthorized") {
+			errorType = "permission_denied"
+		} else if strings.Contains(errStr, "conflict") {
+			errorType = "conflict"
+		}
+		
+		metrics.AnnotationRemoveFailure.WithLabelValues(nodegroup, errorType).Inc()
+		return err
+	}
+	
+	// Remove the marker annotation since we're removing the cluster-autoscaler annotation
+	if markerErr := k8s.RemoveAnnotationFromNode(
+		nodeName,
+		cyclopsManagedAnnotation,
+		t.rm.RawClient,
+	); markerErr != nil {
+		// Log but don't fail - marker cleanup is best-effort
+		t.rm.Logger.Info("Failed to remove managed annotation marker from node",
+			"nodeName", nodeName,
+			"error", markerErr)
+	}
+	
+	metrics.AnnotationRemoveSuccess.WithLabelValues(nodegroup).Inc()
+	metrics.NodesWithAnnotation.WithLabelValues(nodegroup, nodeName).Set(0)
+	
+	return nil
+}
+
+// cleanupScaleDownDisabledAnnotations removes the cluster-autoscaler scale-down-disabled annotation
+// from nodes that were created during the cycle. This is called during both Healing and Successful
+// phases to ensure annotations are cleaned up regardless of how the cycle completes.
+// This is a best-effort operation and failures should not block the transition.
+// Uses listNodes instead of listReadyNodes to ensure cleanup happens even if nodes are not Ready yet,
+// which is important when cycling fails in the Healing phase.
+func (t *CycleNodeRequestTransitioner) cleanupScaleDownDisabledAnnotations() {
+	if t.cycleNodeRequest.Status.ScaleUpStarted == nil {
+		return
+	}
+
+	kubeNodes, err := t.listNodes(true)
+	if err != nil {
+		return
+	}
+
+	phase := string(t.cycleNodeRequest.Status.Phase)
+	nodesCreatedDuringCycle := findNodesCreatedAfter(kubeNodes, t.cycleNodeRequest.Status.ScaleUpStarted.Time)
+	for _, newNode := range nodesCreatedDuringCycle {
+		if newNode.Annotations != nil {
+			if val, exists := newNode.Annotations[clusterAutoscalerScaleDownDisabledAnnotation]; exists && val == clusterAutoscalerScaleDownDisabledValue {
+				// Only remove annotations we added (marked with cyclopsManagedAnnotation).
+				// This ensures we don't remove pre-existing annotations that may have been set by
+				// ASG Launch Template user data, cloud-init, or other bootstrap scripts.
+				if newNode.Annotations[cyclopsManagedAnnotation] != "true" {
+					t.rm.Logger.Info("Skipping annotation removal - annotation was not added by Cyclops",
+						"phase", phase,
+						"nodeName", newNode.Name)
+					continue
+				}
+				
+				if err := t.removeScaleDownDisabledAnnotation(newNode.Name); err != nil {
+					// Log warning but don't fail - annotation removal is best-effort
+					t.rm.Logger.Info("Failed to remove scale-down-disabled annotation from node",
+						"phase", phase,
+						"nodeName", newNode.Name,
+						"error", err)
+					t.rm.LogEvent(t.cycleNodeRequest, "AnnotationCleanupWarning",
+						"Failed to remove scale-down-disabled annotation from node %s during %s: %v", newNode.Name, phase, err)
+				} else {
+					t.rm.Logger.Info("Removed scale-down-disabled annotation from node",
+						"phase", phase,
+						"nodeName", newNode.Name)
+				}
+			}
+		}
+	}
 }

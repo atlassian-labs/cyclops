@@ -408,6 +408,27 @@ func (t *CycleNodeRequestTransitioner) transitionScalingUp() (reconcile.Result, 
 		}
 	}
 
+	// Add scale-down-disabled annotation to new nodes if enabled
+	if t.shouldManageAnnotations() {
+		newNodes := findNodesCreatedAfter(kubeNodes, scaleUpStarted.Time)
+		for _, newNode := range newNodes {
+			if err := t.addScaleDownDisabledAnnotation(newNode.Name); err != nil {
+				// Log warning but don't fail - annotation is best-effort and shouldn't block cycling
+				t.rm.Logger.Info("Failed to add scale-down-disabled annotation to new node",
+					"nodeName", newNode.Name,
+					"error", err)
+				t.rm.LogEvent(t.cycleNodeRequest, "AnnotationWarning",
+					"Failed to add scale-down-disabled annotation to node %s: %v", newNode.Name, err)
+			} else {
+				t.rm.Logger.Info("Added scale-down-disabled annotation to new node",
+					"nodeName", newNode.Name)
+			}
+		}
+	} else {
+		t.rm.Logger.Info("Node annotation management disabled for this CNR",
+			"cnr", t.cycleNodeRequest.Name)
+	}
+
 	t.rm.LogEvent(t.cycleNodeRequest, "ScalingUpCompleted", "New nodes are now ready")
 	return t.transitionObject(v1.CycleNodeRequestCordoningNode)
 }
@@ -572,6 +593,14 @@ func (t *CycleNodeRequestTransitioner) transitionHealing() (reconcile.Result, er
 		}
 	}
 
+	// Cleanup scale-down-disabled annotations if enabled
+	if t.shouldManageAnnotations() {
+		t.cleanupScaleDownDisabledAnnotations()
+	} else {
+		t.rm.Logger.Info("Skipping annotation cleanup (disabled)",
+			"cnr", t.cycleNodeRequest.Name)
+	}
+
 	return t.transitionToFailed(nil)
 }
 
@@ -597,6 +626,14 @@ func (t *CycleNodeRequestTransitioner) transitionSuccessful() (reconcile.Result,
 
 	if shouldRequeue {
 		return reconcile.Result{Requeue: true, RequeueAfter: transitionDuration}, nil
+	}
+
+	// Cleanup scale-down-disabled annotations if enabled
+	if t.shouldManageAnnotations() {
+		t.cleanupScaleDownDisabledAnnotations()
+	} else {
+		t.rm.Logger.Info("Skipping annotation cleanup (disabled)",
+			"cnr", t.cycleNodeRequest.Name)
 	}
 
 	// Delete failed sibling CNRs regardless of whether the CNR for the
