@@ -75,6 +75,16 @@ func (t *CycleNodeRequestTransitioner) transitionPending() (reconcile.Result, er
 	// should be all the nodes in each, regardless of it they exist in both.
 	kubeNodes, nodeGroupInstances, err := t.findAllNodesForCycle()
 	if err != nil {
+		// Check if this is a retryable error (network timeout, etc.)
+		if isRetryableError(err) {
+			t.rm.Logger.Info("Retryable error encountered, requeuing", "error", err.Error())
+			// Requeue with backoff instead of transitioning to Healing
+			return reconcile.Result{
+				Requeue:      true,
+				RequeueAfter: requeueDuration,
+			}, nil
+		}
+		// Non-retryable error, transition to Healing
 		return t.transitionToHealing(err)
 	}
 
