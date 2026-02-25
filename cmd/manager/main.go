@@ -93,7 +93,7 @@ func main() {
 	}
 
 	// Register the custom metrics
-	metrics.Register(mgr.GetClient(), log, *namespace)
+	metrics.Register(mgr.GetClient(), log, *namespace, version)
 
 	// Setup the cloud provider
 	cloudProvider, err := builder.BuildCloudProvider(*cloudProviderName, logger)

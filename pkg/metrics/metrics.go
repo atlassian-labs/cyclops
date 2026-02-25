@@ -133,8 +133,19 @@ var (
 	)
 )
 
+// BuildInfo exposes the version of cyclops as a metric
+var BuildInfo = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name:      fmt.Sprintf("%v_build_info", namespace),
+		Help:      "Build information for the cyclops binary",
+	},
+	[]string{"version"},
+)
+
 // Register registers the custom metrics with prometheus
-func Register(client client.Client, logger logr.Logger, namespace string) {
+func Register(client client.Client, logger logr.Logger, namespace string, version string) {
+	// Set the build info metric
+	BuildInfo.WithLabelValues(version).Set(1)
 	collector := cyclopsCollector{
 		client:               client,
 		logger:               logger,
@@ -145,8 +156,9 @@ func Register(client client.Client, logger logr.Logger, namespace string) {
 	}
 	metrics.Registry.MustRegister(collector)
 
-	// Register annotation metrics
+	// Register annotation metrics and build info
 	metrics.Registry.MustRegister(
+		BuildInfo,
 		AnnotationAddSuccess,
 		AnnotationAddFailure,
 		AnnotationRemoveSuccess,
