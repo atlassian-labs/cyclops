@@ -182,7 +182,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 	}
 	switch {
 	case versionCheckResult.skipCheck:
-		logger.Info("API version check skipped", "severity", "warning",
+		logger.V(0).Info("API version check skipped",
 			"clientAnnotation", cnrClientAPIVersionAnnotation,
 			"controllerVersion", apiVersion)
 	case versionCheckResult.failed:
