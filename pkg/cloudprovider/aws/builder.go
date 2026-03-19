@@ -6,7 +6,6 @@ import (
 	"github.com/atlassian-labs/cyclops/pkg/cloudprovider"
 	fakeaws "github.com/atlassian-labs/cyclops/pkg/cloudprovider/aws/fake"
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/ec2"
@@ -20,16 +19,14 @@ func NewCloudProvider(logger logr.Logger) (cloudprovider.CloudProvider, error) {
 		return nil, err
 	}
 
-	var creds *credentials.Credentials
-
 	// Configure AWS SDK with default retry logic
 	// The AWS SDK v1 automatically uses client.DefaultRetryer which handles:
 	// - Exponential backoff
 	// - Retries for throttling errors
 	// - Retries for transient network errors
 	// - Retries for 5xx server errors
+	// AWS SDK uses its default credential chain (env vars → shared credentials file → IAM instance profile / IRSA).
 	config := &aws.Config{
-		Credentials: creds,
 		// Use AWS SDK's default retry behavior (3 retries with exponential backoff)
 		// This is sufficient for most use cases
 		MaxRetries: aws.Int(3),
@@ -44,8 +41,9 @@ func NewCloudProvider(logger logr.Logger) (cloudprovider.CloudProvider, error) {
 		logger:             logger,
 	}
 
-	// Log the provider we used
-	credValue, err := config.Credentials.Get()
+	// Log the provider we used. Credentials are resolved by the session's
+	// default chain, so read them from the session rather than the config.
+	credValue, err := sess.Config.Credentials.Get()
 	if err != nil {
 		return nil, err
 	}

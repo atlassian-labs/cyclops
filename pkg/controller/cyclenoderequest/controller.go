@@ -117,6 +117,48 @@ func tlsCertsValid(tlsConfig v1.TLSConfig) error {
 	return nil
 }
 
+// apiVersionCheckResult holds the outcome of checkAPIVersionCompatibility.
+type apiVersionCheckResult struct {
+
+	skipCheck bool
+	// failed indicates the CNR should be marked as Failed.
+	failed bool
+	// failMsg is the human-readable reason when failed is true.
+	failMsg string
+}
+
+// Validates that the client API version in CNR annotation is compatible with the controller's build-time API version.
+func checkAPIVersionCompatibility(cnrAnnotation, controllerVersion string) (apiVersionCheckResult, error) {
+	// No annotation set by the client, skip check.
+	if cnrAnnotation == "" || cnrAnnotation == "undefined" {
+		return apiVersionCheckResult{skipCheck: true}, nil
+	}
+
+	// Controller binary was not stamped with an API version at build time, skip check.
+	if controllerVersion == "undefined" {
+		return apiVersionCheckResult{skipCheck: true}, nil
+	}
+
+	controllerAPIVersion, err := version.NewVersion(controllerVersion)
+	if err != nil {
+		return apiVersionCheckResult{}, err
+	}
+
+	clientAPIVersion, err := version.NewVersion(cnrAnnotation)
+	if err != nil {
+		return apiVersionCheckResult{}, err
+	}
+
+	if clientAPIVersion.LessThan(controllerAPIVersion) {
+		return apiVersionCheckResult{
+			failed:  true,
+			failMsg: "Client API version " + cnrAnnotation + " does not match controller API version " + controllerVersion,
+		}, nil
+	}
+
+	return apiVersionCheckResult{}, nil
+}
+
 // Reconcile reconciles the incoming request, usually a cycleNodeRequest
 func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	logger := log.WithValues("name", request.Name, "namespace", request.Namespace, "controller", controllerName)
@@ -134,19 +176,18 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 	}
 
 	cnrClientAPIVersionAnnotation := cycleNodeRequest.Annotations[ClientAPIVersionAnnotation]
-	if cnrClientAPIVersionAnnotation != "" {
-		controllerAPIVersion, err := version.NewVersion(apiVersion)
-		if err != nil {
-			return reconcile.Result{}, err
-		}
-		clientAPIVersion, err := version.NewVersion(cnrClientAPIVersionAnnotation)
-		if err != nil {
-			return reconcile.Result{}, err
-		}
-		if clientAPIVersion.LessThan(controllerAPIVersion) {
-			cycleNodeRequest.Status.Phase = v1.CycleNodeRequestFailed
-			cycleNodeRequest.Status.Message = "Client API version " + cnrClientAPIVersionAnnotation + " does not match controller API version " + apiVersion
-		}
+	versionCheckResult, err := checkAPIVersionCompatibility(cnrClientAPIVersionAnnotation, apiVersion)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+	switch {
+	case versionCheckResult.skipCheck:
+		logger.V(0).Info("API version check skipped",
+			"clientAnnotation", cnrClientAPIVersionAnnotation,
+			"controllerVersion", apiVersion)
+	case versionCheckResult.failed:
+		cycleNodeRequest.Status.Phase = v1.CycleNodeRequestFailed
+		cycleNodeRequest.Status.Message = versionCheckResult.failMsg
 	}
 
 	if r.notifier != nil {
