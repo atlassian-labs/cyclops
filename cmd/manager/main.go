@@ -13,6 +13,7 @@ import (
 	cnrTransitioner "github.com/atlassian-labs/cyclops/pkg/controller/cyclenoderequest/transitioner"
 	"github.com/atlassian-labs/cyclops/pkg/controller/cyclenodestatus"
 	cnsTransitioner "github.com/atlassian-labs/cyclops/pkg/controller/cyclenodestatus/transitioner"
+	nodecontroller "github.com/atlassian-labs/cyclops/pkg/controller/node"
 	"github.com/atlassian-labs/cyclops/pkg/metrics"
 	"github.com/atlassian-labs/cyclops/pkg/notifications"
 	"github.com/atlassian-labs/cyclops/pkg/notifications/notifierbuilder"
@@ -137,6 +138,11 @@ func main() {
 	_, err = cyclenodestatus.NewReconciler(mgr, cloudProvider, notifier, *namespace, cnsOptions)
 	if err != nil {
 		log.Error(err, "Unable to add cycleNodeStatus controller")
+		os.Exit(1)
+	}
+	_, err = nodecontroller.NewReconciler(mgr, *namespace)
+	if err != nil {
+		log.Error(err, "Unable to add node controller")
 		os.Exit(1)
 	}
 
