@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/atlassian-labs/cyclops/pkg/cloudprovider"
 	"github.com/aws/aws-sdk-go/aws"
@@ -290,6 +291,24 @@ func (a *autoscalingGroups) DetachInstance(providerID string) (alreadyDetaching 
 		InstanceIds:                    aws.StringSlice([]string{instanceID}),
 		ShouldDecrementDesiredCapacity: aws.Bool(false),
 	})
+
+	// Tag the instance with the detach timestamp so orphaned instances
+	// (where re-attach fails during healing) can be identified and cleaned up.
+	// Tag failure is non-fatal — logged but does not affect the detach result.
+	if apiErr == nil {
+		_, tagErr := a.ec2Service.CreateTags(&ec2.CreateTagsInput{
+			Resources: aws.StringSlice([]string{instanceID}),
+			Tags: []*ec2.Tag{
+				{
+					Key:   aws.String("cyclops:detached-at"),
+					Value: aws.String(time.Now().UTC().Format(time.RFC3339)),
+				},
+			},
+		})
+		if tagErr != nil {
+			a.logger.Error(tagErr, "failed to tag detached instance", "instanceID", instanceID)
+		}
+	}
 
 	return verifyIfErrorOccurred(apiErr, alreadyDetachingMessage)
 }
