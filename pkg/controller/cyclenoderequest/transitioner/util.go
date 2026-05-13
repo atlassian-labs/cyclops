@@ -743,6 +743,9 @@ func (t *CycleNodeRequestTransitioner) addScaleDownDisabledAnnotation(nodeName s
 	metrics.AnnotationAddSuccess.WithLabelValues(nodegroup).Inc()
 	metrics.NodesWithAnnotation.WithLabelValues(nodegroup, nodeName).Set(1)
 
+	// Track this node so cleanup is deterministic and not time-based.
+	t.cycleNodeRequest.Status.AnnotatedNodes = append(t.cycleNodeRequest.Status.AnnotatedNodes, nodeName)
+
 	return nil
 }
 
@@ -796,50 +799,45 @@ func (t *CycleNodeRequestTransitioner) removeScaleDownDisabledAnnotation(nodeNam
 }
 
 // cleanupScaleDownDisabledAnnotations removes the cluster-autoscaler scale-down-disabled annotation
-// from nodes that were created during the cycle. This is called during both Healing and Successful
-// phases to ensure annotations are cleaned up regardless of how the cycle completes.
+// from nodes that were annotated by this CNR during cycling. It uses the deterministic
+// AnnotatedNodes list on the CNR status rather than a time-based query, which fixes two bugs:
+//
+//  1. With concurrency < total nodes, ScaleUpStarted was overwritten each batch, so only
+//     the last batch's nodes were found by the old time-based lookup.
+//  2. After a pod restart, old Successful CNRs would run cleanup with stale ScaleUpStarted
+//     timestamps, finding and removing annotations from nodes belonging to newer active CNRs.
+//
+// The AnnotatedNodes list is cleared after cleanup so that subsequent requeues of this CNR
+// in the Successful phase are no-ops — preventing cross-contamination with other CNRs.
+//
 // This is a best-effort operation and failures should not block the transition.
-// Uses listNodes instead of listReadyNodes to ensure cleanup happens even if nodes are not Ready yet,
-// which is important when cycling fails in the Healing phase.
 func (t *CycleNodeRequestTransitioner) cleanupScaleDownDisabledAnnotations() {
-	if t.cycleNodeRequest.Status.ScaleUpStarted == nil {
-		return
-	}
-
-	kubeNodes, err := t.listNodes(true)
-	if err != nil {
+	if len(t.cycleNodeRequest.Status.AnnotatedNodes) == 0 {
 		return
 	}
 
 	phase := string(t.cycleNodeRequest.Status.Phase)
-	nodesCreatedDuringCycle := findNodesCreatedAfter(kubeNodes, t.cycleNodeRequest.Status.ScaleUpStarted.Time)
-	for _, newNode := range nodesCreatedDuringCycle {
-		if newNode.Annotations != nil {
-			if val, exists := newNode.Annotations[clusterAutoscalerScaleDownDisabledAnnotation]; exists && val == clusterAutoscalerScaleDownDisabledValue {
-				// Only remove annotations we added (marked with cyclopsManagedAnnotation).
-				// This ensures we don't remove pre-existing annotations that may have been set by
-				// ASG Launch Template user data, cloud-init, or other bootstrap scripts.
-				if newNode.Annotations[cyclopsManagedAnnotation] != "true" {
-					t.rm.Logger.Info("Skipping annotation removal - annotation was not added by Cyclops",
-						"phase", phase,
-						"nodeName", newNode.Name)
-					continue
-				}
+	var failedNodes []string
 
-				if err := t.removeScaleDownDisabledAnnotation(newNode.Name); err != nil {
-					// Log warning but don't fail - annotation removal is best-effort
-					t.rm.Logger.Info("Failed to remove scale-down-disabled annotation from node",
-						"phase", phase,
-						"nodeName", newNode.Name,
-						"error", err)
-					t.rm.LogEvent(t.cycleNodeRequest, "AnnotationCleanupWarning",
-						"Failed to remove scale-down-disabled annotation from node %s during %s: %v", newNode.Name, phase, err)
-				} else {
-					t.rm.Logger.Info("Removed scale-down-disabled annotation from node",
-						"phase", phase,
-						"nodeName", newNode.Name)
-				}
-			}
+	for _, nodeName := range t.cycleNodeRequest.Status.AnnotatedNodes {
+		if err := t.removeScaleDownDisabledAnnotation(nodeName); err != nil {
+			// Log warning but don't fail - annotation removal is best-effort.
+			t.rm.Logger.Info("Failed to remove scale-down-disabled annotation from node",
+				"phase", phase,
+				"nodeName", nodeName,
+				"error", err)
+			t.rm.LogEvent(t.cycleNodeRequest, "AnnotationCleanupWarning",
+				"Failed to remove scale-down-disabled annotation from node %s during %s: %v", nodeName, phase, err)
+			failedNodes = append(failedNodes, nodeName)
+		} else {
+			t.rm.Logger.Info("Removed scale-down-disabled annotation from node",
+				"phase", phase,
+				"nodeName", nodeName)
 		}
 	}
+
+	// Keep only the nodes that failed cleanup so they can be retried on the next
+	// requeue. If all succeeded, this clears the list and subsequent requeues are
+	// no-ops — preventing old Successful CNRs from interfering with active ones.
+	t.cycleNodeRequest.Status.AnnotatedNodes = failedNodes
 }

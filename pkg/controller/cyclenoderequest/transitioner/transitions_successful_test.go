@@ -6,8 +6,11 @@ import (
 	"time"
 
 	v1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
+	"github.com/atlassian-labs/cyclops/pkg/mock"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
+	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -48,6 +51,155 @@ func TestSuccessfulNoDelete(t *testing.T) {
 	)
 
 	assert.Len(t, list.Items, 1)
+}
+
+// Test that cleanup removes annotations from all nodes tracked in AnnotatedNodes,
+// and clears the list afterwards so subsequent requeues are no-ops.
+func TestSuccessfulCleansUpAnnotatedNodes(t *testing.T) {
+	// Simulate nodes that were annotated across multiple batches.
+	node1 := &mock.Node{
+		Name:            "node-1",
+		InstanceID:      "i-node1",
+		Nodegroup:       "ng-1",
+		NodeReady:       corev1.ConditionTrue,
+		LabelKey:        "role",
+		LabelValue:      "worker",
+		AnnotationKey:   clusterAutoscalerScaleDownDisabledAnnotation,
+		AnnotationValue: clusterAutoscalerScaleDownDisabledValue,
+	}
+	node2 := &mock.Node{
+		Name:            "node-2",
+		InstanceID:      "i-node2",
+		Nodegroup:       "ng-1",
+		NodeReady:       corev1.ConditionTrue,
+		LabelKey:        "role",
+		LabelValue:      "worker",
+		AnnotationKey:   clusterAutoscalerScaleDownDisabledAnnotation,
+		AnnotationValue: clusterAutoscalerScaleDownDisabledValue,
+	}
+	node3 := &mock.Node{
+		Name:            "node-3",
+		InstanceID:      "i-node3",
+		Nodegroup:       "ng-1",
+		NodeReady:       corev1.ConditionTrue,
+		LabelKey:        "role",
+		LabelValue:      "worker",
+		AnnotationKey:   clusterAutoscalerScaleDownDisabledAnnotation,
+		AnnotationValue: clusterAutoscalerScaleDownDisabledValue,
+	}
+
+	nodeGroup := &v1.NodeGroup{
+		ObjectMeta: metav1.ObjectMeta{Name: "ng-1"},
+		Spec: v1.NodeGroupSpec{
+			NodeGroupName: "ng-1",
+			NodeSelector:  metav1.LabelSelector{MatchLabels: map[string]string{"role": "worker"}},
+		},
+	}
+
+	cnr := &v1.CycleNodeRequest{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "cnr-cleanup",
+			Namespace:         "kube-system",
+			CreationTimestamp:  metav1.Now(),
+		},
+		Spec: v1.CycleNodeRequestSpec{
+			NodeGroupName: "ng-1",
+			Selector:      metav1.LabelSelector{MatchLabels: map[string]string{"role": "worker"}},
+			CycleSettings: v1.CycleSettings{},
+		},
+		Status: v1.CycleNodeRequestStatus{
+			Phase:          v1.CycleNodeRequestSuccessful,
+			AnnotatedNodes: []string{"node-1", "node-2", "node-3"},
+		},
+	}
+
+	fakeTransitioner := NewFakeTransitioner(cnr,
+		WithKubeNodes([]*mock.Node{node1, node2, node3}),
+		WithCloudProviderInstances([]*mock.Node{node1, node2, node3}),
+		WithExtraKubeObject(nodeGroup),
+	)
+
+	// Run the Successful phase
+	_, err := fakeTransitioner.Run()
+	require.NoError(t, err)
+
+	// Verify annotations were removed from all 3 nodes
+	for _, name := range []string{"node-1", "node-2", "node-3"} {
+		node, err := fakeTransitioner.Client.RawClient.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
+		require.NoError(t, err)
+		_, hasAnnotation := node.Annotations[clusterAutoscalerScaleDownDisabledAnnotation]
+		assert.False(t, hasAnnotation, "scale-down-disabled annotation should be removed from %s", name)
+	}
+
+	// Verify AnnotatedNodes was cleared
+	assert.Empty(t, fakeTransitioner.cycleNodeRequest.Status.AnnotatedNodes,
+		"AnnotatedNodes should be empty after successful cleanup")
+}
+
+// Test that when AnnotatedNodes is empty, cleanup is a no-op and does not
+// interfere with other CNRs. This is the core fix for Bug 2.
+func TestSuccessfulCleanupIsNoOpWhenAnnotatedNodesEmpty(t *testing.T) {
+	// This node belongs to a different, active CNR. It has the annotation set.
+	otherNode := &mock.Node{
+		Name:            "other-node",
+		InstanceID:      "i-other",
+		Nodegroup:       "ng-1",
+		NodeReady:       corev1.ConditionTrue,
+		LabelKey:        "role",
+		LabelValue:      "worker",
+		AnnotationKey:   clusterAutoscalerScaleDownDisabledAnnotation,
+		AnnotationValue: clusterAutoscalerScaleDownDisabledValue,
+		Creation:        time.Now().Add(-1 * time.Hour),
+	}
+
+	nodeGroup := &v1.NodeGroup{
+		ObjectMeta: metav1.ObjectMeta{Name: "ng-1"},
+		Spec: v1.NodeGroupSpec{
+			NodeGroupName: "ng-1",
+			NodeSelector:  metav1.LabelSelector{MatchLabels: map[string]string{"role": "worker"}},
+		},
+	}
+
+	// An OLD Successful CNR that already cleaned up. AnnotatedNodes is empty.
+	// With the old time-based code, ScaleUpStarted from 6 days ago would cause
+	// this CNR to find and strip annotations from otherNode.
+	oldTime := metav1.NewTime(time.Now().Add(-6 * 24 * time.Hour))
+	oldCNR := &v1.CycleNodeRequest{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "cnr-old-successful",
+			Namespace:         "kube-system",
+			CreationTimestamp:  metav1.NewTime(time.Now().Add(-6 * 24 * time.Hour)),
+		},
+		Spec: v1.CycleNodeRequestSpec{
+			NodeGroupName: "ng-1",
+			Selector:      metav1.LabelSelector{MatchLabels: map[string]string{"role": "worker"}},
+			CycleSettings: v1.CycleSettings{},
+		},
+		Status: v1.CycleNodeRequestStatus{
+			Phase:          v1.CycleNodeRequestSuccessful,
+			ScaleUpStarted: &oldTime,
+			AnnotatedNodes: nil, // Already cleaned up
+		},
+	}
+
+	fakeTransitioner := NewFakeTransitioner(oldCNR,
+		WithKubeNodes([]*mock.Node{otherNode}),
+		WithCloudProviderInstances([]*mock.Node{otherNode}),
+		WithExtraKubeObject(nodeGroup),
+	)
+
+	// Run the Successful phase (simulating a pod restart re-queue)
+	_, err := fakeTransitioner.Run()
+	require.NoError(t, err)
+
+	// The critical assertion: otherNode's annotation must still be present.
+	// Bug 2 would have removed it because ScaleUpStarted is 6 days old.
+	node, err := fakeTransitioner.Client.RawClient.CoreV1().Nodes().Get(context.TODO(), "other-node", metav1.GetOptions{})
+	require.NoError(t, err)
+	val, hasAnnotation := node.Annotations[clusterAutoscalerScaleDownDisabledAnnotation]
+	assert.True(t, hasAnnotation,
+		"annotation must NOT be removed from other-node by an old Successful CNR")
+	assert.Equal(t, clusterAutoscalerScaleDownDisabledValue, val)
 }
 
 // Test that if the phase executes before the CNR deletion expiry time then the
