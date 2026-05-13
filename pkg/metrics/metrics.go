@@ -131,6 +131,32 @@ var (
 		},
 		[]string{"nodegroup"},
 	)
+
+	// --- Node Cleanup Controller metrics (safety-net reconciler) ---
+
+	// NodeCleanupAnnotationsRemoved tracks how many stale annotations the node
+	// cleanup controller has removed. A non-zero rate means the normal CNR
+	// lifecycle failed to clean up after itself.
+	NodeCleanupAnnotationsRemoved = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: fmt.Sprintf("%v_node_cleanup_annotations_removed_total", namespace),
+			Help: "Total number of stale scale-down-disabled annotations removed by the node cleanup controller",
+		},
+	)
+
+	// NodeCleanupReconciles tracks reconcile outcomes for the node cleanup controller.
+	// Labels:
+	//   result: "cleaned"              – stale annotations were removed
+	//           "active_cnr_skipped"   – node is covered by an active CNR, left alone
+	//           "no_nodegroup_skipped" – node is not selected by any NodeGroup, left alone
+	//           "error"                – reconcile failed with an error
+	NodeCleanupReconciles = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: fmt.Sprintf("%v_node_cleanup_reconciles_total", namespace),
+			Help: "Total number of node cleanup controller reconcile outcomes",
+		},
+		[]string{"result"},
+	)
 )
 
 // Register registers the custom metrics with prometheus
@@ -154,6 +180,8 @@ func Register(client client.Client, logger logr.Logger, namespace string) {
 		NodesWithAnnotation,
 		AnnotationCleanupAttempts,
 		AnnotationCleanupDuration,
+		NodeCleanupAnnotationsRemoved,
+		NodeCleanupReconciles,
 	)
 
 	go func() {

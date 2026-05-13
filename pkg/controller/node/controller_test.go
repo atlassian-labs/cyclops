@@ -6,6 +6,8 @@ import (
 	"time"
 
 	atlassianv1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
+	"github.com/atlassian-labs/cyclops/pkg/metrics"
+	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -324,6 +326,82 @@ func TestHasCyclopsManagedAnnotationPredicate(t *testing.T) {
 			Object: testNode("n", nil, nil),
 		}
 		assert.False(t, p.Generic(e))
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Metric helpers
+// ---------------------------------------------------------------------------
+
+// getCounterValue reads the current value of a prometheus Counter.
+func getCounterValue(c interface{ Write(*dto.Metric) error }) float64 {
+	var m dto.Metric
+	_ = c.Write(&m)
+	if m.Counter != nil {
+		return m.Counter.GetValue()
+	}
+	return 0
+}
+
+// resetCleanupMetrics resets the node cleanup metrics so tests don't interfere
+// with each other.
+func resetCleanupMetrics() {
+	metrics.NodeCleanupReconciles.Reset()
+	// NodeCleanupAnnotationsRemoved is a plain Counter and cannot be reset,
+	// so we read its value before/after instead.
+}
+
+// ---------------------------------------------------------------------------
+// Metric tests
+// ---------------------------------------------------------------------------
+
+func TestReconcile_Metrics(t *testing.T) {
+	t.Run("cleaned emits cleaned metrics", func(t *testing.T) {
+		resetCleanupMetrics()
+
+		node := testNode("node-m1", workerLabels, bothAnnotations())
+		ng := testNodeGroup("ng-m1", workerLabels)
+		r, _ := newTestReconciler(node, ng)
+
+		// Snapshot the counter before reconcile.
+		removedBefore := getCounterValue(metrics.NodeCleanupAnnotationsRemoved)
+
+		_, err := r.Reconcile(context.Background(), requestFor("node-m1"))
+		require.NoError(t, err)
+
+		assert.Equal(t, float64(1), getCounterValue(metrics.NodeCleanupReconciles.WithLabelValues("cleaned")),
+			"cleaned reconcile counter should be 1")
+		assert.Equal(t, removedBefore+1, getCounterValue(metrics.NodeCleanupAnnotationsRemoved),
+			"annotations removed counter should increment by 1")
+	})
+
+	t.Run("active CNR emits active_cnr_skipped metric", func(t *testing.T) {
+		resetCleanupMetrics()
+
+		node := testNode("node-m2", workerLabels, bothAnnotations())
+		ng := testNodeGroup("ng-m2", workerLabels)
+		cnr := testCNR("cnr-m2", atlassianv1.CycleNodeRequestScalingUp, workerLabels)
+		r, _ := newTestReconciler(node, ng, cnr)
+
+		_, err := r.Reconcile(context.Background(), requestFor("node-m2"))
+		require.NoError(t, err)
+
+		assert.Equal(t, float64(1), getCounterValue(metrics.NodeCleanupReconciles.WithLabelValues("active_cnr_skipped")),
+			"active_cnr_skipped reconcile counter should be 1")
+	})
+
+	t.Run("no nodegroup emits no_nodegroup_skipped metric", func(t *testing.T) {
+		resetCleanupMetrics()
+
+		node := testNode("node-m3", workerLabels, bothAnnotations())
+		// No NodeGroup created.
+		r, _ := newTestReconciler(node)
+
+		_, err := r.Reconcile(context.Background(), requestFor("node-m3"))
+		require.NoError(t, err)
+
+		assert.Equal(t, float64(1), getCounterValue(metrics.NodeCleanupReconciles.WithLabelValues("no_nodegroup_skipped")),
+			"no_nodegroup_skipped reconcile counter should be 1")
 	})
 }
 

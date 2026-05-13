@@ -6,6 +6,7 @@ import (
 
 	atlassianv1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
 	"github.com/atlassian-labs/cyclops/pkg/k8s"
+	"github.com/atlassian-labs/cyclops/pkg/metrics"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,7 +26,7 @@ import (
 
 const (
 	controllerName       = "node.controller"
-	reconcileConcurrency = 10
+	reconcileConcurrency = 1
 	requeueAfter         = 5 * time.Minute
 
 	// cyclopsManagedAnnotation marks nodes where Cyclops added the scale-down-disabled annotation.
@@ -115,7 +116,14 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 		return reconcile.Result{}, err
 	}
 	if !managed {
+		// Defensive: this path should be unreachable. The hasCyclopsManagedAnnotation
+		// predicate ensures we only reconcile nodes that Cyclops annotated during
+		// cycling, and Cyclops only annotates nodes selected by a NodeGroup.
+		// The only way to reach here is if the NodeGroup was deleted after the
+		// annotation was applied, or if someone manually added the annotation.
+		// Expect this metric to stay at 0.
 		logger.Info("Node is not selected by any NodeGroup, skipping")
+		metrics.NodeCleanupReconciles.WithLabelValues("no_nodegroup_skipped").Inc()
 		return reconcile.Result{}, nil
 	}
 
@@ -123,10 +131,12 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 	active, err := r.isNodeInActiveCNR(ctx, nodeLabels)
 	if err != nil {
 		logger.Error(err, "Failed to check active CycleNodeRequests")
+		metrics.NodeCleanupReconciles.WithLabelValues("error").Inc()
 		return reconcile.Result{}, err
 	}
 	if active {
 		logger.Info("Node is still involved in an active CycleNodeRequest, requeueing", "requeueAfter", requeueAfter)
+		metrics.NodeCleanupReconciles.WithLabelValues("active_cnr_skipped").Inc()
 		return reconcile.Result{RequeueAfter: requeueAfter}, nil
 	}
 
@@ -135,15 +145,19 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 
 	if err := removeAnnotationWithRetry(node.Name, clusterAutoscalerScaleDownDisabledAnnotation, r.rawClient); err != nil {
 		logger.Error(err, "Failed to remove cluster-autoscaler annotation")
+		metrics.NodeCleanupReconciles.WithLabelValues("error").Inc()
 		return reconcile.Result{}, err
 	}
 
 	if err := removeAnnotationWithRetry(node.Name, cyclopsManagedAnnotation, r.rawClient); err != nil {
 		logger.Error(err, "Failed to remove Cyclops managed annotation")
+		metrics.NodeCleanupReconciles.WithLabelValues("error").Inc()
 		return reconcile.Result{}, err
 	}
 
 	logger.Info("Successfully removed stale annotations from node")
+	metrics.NodeCleanupAnnotationsRemoved.Inc()
+	metrics.NodeCleanupReconciles.WithLabelValues("cleaned").Inc()
 	return reconcile.Result{}, nil
 }
 
