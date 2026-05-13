@@ -40,6 +40,10 @@ func (t *CycleNodeRequestTransitioner) transitionToFailed(err error) (reconcile.
 // transitionToUnsuccessful transitions the current cycleNodeRequest to healing/failed
 func (t *CycleNodeRequestTransitioner) transitionToUnsuccessful(phase v1.CycleNodeRequestPhase, err error) (reconcile.Result, error) {
 	t.cycleNodeRequest.Status.Phase = phase
+
+	// Clear AnnotatedNodes so it is persisted as empty with this status update.
+	// This ensures subsequent requeues won't re-run cleanup.
+	t.cycleNodeRequest.Status.AnnotatedNodes = nil
 	// don't try to append message if it's nil
 	if err != nil {
 		if t.cycleNodeRequest.Status.Message != "" {
@@ -68,8 +72,20 @@ func (t *CycleNodeRequestTransitioner) transitionToUnsuccessful(phase v1.CycleNo
 
 // transitionToSuccessful transitions the current cycleNodeRequest to successful
 func (t *CycleNodeRequestTransitioner) transitionToSuccessful() (reconcile.Result, error) {
+	// Run annotation cleanup before persisting the Successful phase. This ensures
+	// annotations are removed and the AnnotatedNodes list is persisted as empty
+	// in a single status update, so subsequent requeues are no-ops.
+	if t.shouldManageAnnotations() {
+		t.cleanupScaleDownDisabledAnnotations()
+	}
+
 	t.rm.LogEvent(t.cycleNodeRequest, "Successful", "Successfully cycled nodes")
 	t.cycleNodeRequest.Status.Phase = v1.CycleNodeRequestSuccessful
+
+	// Clear any remaining AnnotatedNodes (including failed-to-remove ones) so
+	// subsequent requeues don't re-run cleanup. The node cleanup controller will
+	// catch any that failed to be removed here.
+	t.cycleNodeRequest.Status.AnnotatedNodes = nil
 
 	// Notify that the cycling has succeeded
 	if t.rm.Notifier != nil {

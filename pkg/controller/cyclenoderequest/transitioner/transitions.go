@@ -532,6 +532,14 @@ func (t *CycleNodeRequestTransitioner) transitionWaitingTermination() (reconcile
 		return t.transitionToHealing(err)
 	}
 
+	// When a batch completes and we're looping back to Initialised, clean up
+	// the annotations from this batch's replacement nodes. Their old counterparts
+	// have been terminated, so the protection is no longer needed. This avoids
+	// accumulating protected nodes across the entire cycle duration.
+	if desiredPhase == v1.CycleNodeRequestInitialised && t.shouldManageAnnotations() {
+		t.cleanupScaleDownDisabledAnnotations()
+	}
+
 	if err := t.rm.UpdateObject(t.cycleNodeRequest); err != nil {
 		return t.transitionToHealing(err)
 	}
@@ -593,14 +601,6 @@ func (t *CycleNodeRequestTransitioner) transitionHealing() (reconcile.Result, er
 		}
 	}
 
-	// Cleanup scale-down-disabled annotations if enabled
-	if t.shouldManageAnnotations() {
-		t.cleanupScaleDownDisabledAnnotations()
-	} else {
-		t.rm.Logger.Info("Skipping annotation cleanup (disabled)",
-			"cnr", t.cycleNodeRequest.Name)
-	}
-
 	return t.transitionToFailed(nil)
 }
 
@@ -626,14 +626,6 @@ func (t *CycleNodeRequestTransitioner) transitionSuccessful() (reconcile.Result,
 
 	if shouldRequeue {
 		return reconcile.Result{Requeue: true, RequeueAfter: transitionDuration}, nil
-	}
-
-	// Cleanup scale-down-disabled annotations if enabled
-	if t.shouldManageAnnotations() {
-		t.cleanupScaleDownDisabledAnnotations()
-	} else {
-		t.rm.Logger.Info("Skipping annotation cleanup (disabled)",
-			"cnr", t.cycleNodeRequest.Name)
 	}
 
 	// Delete failed sibling CNRs regardless of whether the CNR for the

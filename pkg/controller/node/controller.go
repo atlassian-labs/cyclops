@@ -135,7 +135,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 		return reconcile.Result{}, err
 	}
 	if active {
-		logger.Info("Node is still involved in an active CycleNodeRequest, requeueing", "requeueAfter", requeueAfter)
+		logger.V(1).Info("Node is still involved in an active CycleNodeRequest, requeueing", "requeueAfter", requeueAfter)
 		metrics.NodeCleanupReconciles.WithLabelValues("active_cnr_skipped").Inc()
 		return reconcile.Result{RequeueAfter: requeueAfter}, nil
 	}

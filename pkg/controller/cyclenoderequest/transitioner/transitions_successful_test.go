@@ -53,10 +53,12 @@ func TestSuccessfulNoDelete(t *testing.T) {
 	assert.Len(t, list.Items, 1)
 }
 
-// Test that cleanup removes annotations from all nodes tracked in AnnotatedNodes,
-// and clears the list afterwards so subsequent requeues are no-ops.
+// Test that cleanup removes annotations from all nodes tracked in AnnotatedNodes
+// during the transition to Successful, and that AnnotatedNodes is persisted as empty
+// so subsequent requeues are no-ops.
 func TestSuccessfulCleansUpAnnotatedNodes(t *testing.T) {
 	// Simulate nodes that were annotated across multiple batches.
+	// These are replacement nodes that already exist in the cluster.
 	node1 := &mock.Node{
 		Name:            "node-1",
 		InstanceID:      "i-node1",
@@ -96,6 +98,9 @@ func TestSuccessfulCleansUpAnnotatedNodes(t *testing.T) {
 		},
 	}
 
+	// Start the CNR in Initialised phase with no NodesToTerminate remaining.
+	// checkIfTransitioning will see 0 nodes left to cycle and call
+	// transitionToSuccessful, which runs cleanup and persists AnnotatedNodes = nil.
 	cnr := &v1.CycleNodeRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "cnr-cleanup",
@@ -105,11 +110,19 @@ func TestSuccessfulCleansUpAnnotatedNodes(t *testing.T) {
 		Spec: v1.CycleNodeRequestSpec{
 			NodeGroupName: "ng-1",
 			Selector:      metav1.LabelSelector{MatchLabels: map[string]string{"role": "worker"}},
-			CycleSettings: v1.CycleSettings{},
+			CycleSettings: v1.CycleSettings{
+				Concurrency: 1,
+				Method:      v1.CycleNodeRequestMethodDrain,
+			},
 		},
 		Status: v1.CycleNodeRequestStatus{
-			Phase:          v1.CycleNodeRequestSuccessful,
-			AnnotatedNodes: []string{"node-1", "node-2", "node-3"},
+			Phase:              v1.CycleNodeRequestInitialised,
+			ActiveChildren:     0,
+			NumNodesCycled:     3,
+			NodesToTerminate:   []v1.CycleNodeRequestNode{},
+			AnnotatedNodes:     []string{"node-1", "node-2", "node-3"},
+			CurrentNodes:       []v1.CycleNodeRequestNode{},
+			ScaleUpStarted:     &metav1.Time{Time: time.Now().Add(-10 * time.Minute)},
 		},
 	}
 
@@ -119,9 +132,13 @@ func TestSuccessfulCleansUpAnnotatedNodes(t *testing.T) {
 		WithExtraKubeObject(nodeGroup),
 	)
 
-	// Run the Successful phase
+	// Run from Initialised — should transition to Successful via checkIfTransitioning
 	_, err := fakeTransitioner.Run()
 	require.NoError(t, err)
+
+	// Verify the CNR transitioned to Successful
+	assert.Equal(t, v1.CycleNodeRequestSuccessful, fakeTransitioner.cycleNodeRequest.Status.Phase,
+		"CNR should have transitioned to Successful")
 
 	// Verify annotations were removed from all 3 nodes
 	for _, name := range []string{"node-1", "node-2", "node-3"} {
@@ -131,9 +148,13 @@ func TestSuccessfulCleansUpAnnotatedNodes(t *testing.T) {
 		assert.False(t, hasAnnotation, "scale-down-disabled annotation should be removed from %s", name)
 	}
 
-	// Verify AnnotatedNodes was cleared
-	assert.Empty(t, fakeTransitioner.cycleNodeRequest.Status.AnnotatedNodes,
-		"AnnotatedNodes should be empty after successful cleanup")
+	// Verify AnnotatedNodes was persisted as empty to the API server
+	persistedCNR := &v1.CycleNodeRequest{}
+	err = fakeTransitioner.Client.K8sClient.Get(context.TODO(),
+		types.NamespacedName{Name: "cnr-cleanup", Namespace: "kube-system"}, persistedCNR)
+	require.NoError(t, err, "should be able to read CNR back from API server")
+	assert.Empty(t, persistedCNR.Status.AnnotatedNodes,
+		"AnnotatedNodes should be empty in the persisted CNR (prevents re-running cleanup on requeue)")
 }
 
 // Test that when AnnotatedNodes is empty, cleanup is a no-op and does not
@@ -200,6 +221,112 @@ func TestSuccessfulCleanupIsNoOpWhenAnnotatedNodesEmpty(t *testing.T) {
 	assert.True(t, hasAnnotation,
 		"annotation must NOT be removed from other-node by an old Successful CNR")
 	assert.Equal(t, clusterAutoscalerScaleDownDisabledValue, val)
+}
+
+// Test that annotations are cleaned up per-batch when transitioning from
+// WaitingTermination back to Initialised, rather than accumulating until
+// the final Successful transition.
+func TestWaitingTerminationCleansUpAnnotationsPerBatch(t *testing.T) {
+	// A replacement node that was annotated during this batch's ScalingUp.
+	replacementNode := &mock.Node{
+		Name:            "replacement-1",
+		InstanceID:      "i-replacement1",
+		Nodegroup:       "ng-1",
+		NodeReady:       corev1.ConditionTrue,
+		LabelKey:        "role",
+		LabelValue:      "worker",
+		AnnotationKey:   clusterAutoscalerScaleDownDisabledAnnotation,
+		AnnotationValue: clusterAutoscalerScaleDownDisabledValue,
+	}
+
+	// A node still waiting to be cycled in a future batch.
+	pendingNode := &mock.Node{
+		Name:       "pending-1",
+		InstanceID: "i-pending1",
+		Nodegroup:  "ng-1",
+		NodeReady:  corev1.ConditionTrue,
+		LabelKey:   "role",
+		LabelValue: "worker",
+	}
+
+	nodeGroup := &v1.NodeGroup{
+		ObjectMeta: metav1.ObjectMeta{Name: "ng-1"},
+		Spec: v1.NodeGroupSpec{
+			NodeGroupName: "ng-1",
+			NodeSelector:  metav1.LabelSelector{MatchLabels: map[string]string{"role": "worker"}},
+		},
+	}
+
+	// A completed CNS for this batch (Successful = old node terminated).
+	cns := &v1.CycleNodeStatus{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "cns-batch1",
+			Namespace: "kube-system",
+			Labels:    map[string]string{"name": "cnr-perbatch"},
+		},
+		Status: v1.CycleNodeStatusStatus{
+			Phase: v1.CycleNodeStatusSuccessful,
+		},
+	}
+
+	// CNR is in WaitingTermination with 1 node still available to cycle.
+	cnr := &v1.CycleNodeRequest{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:             "cnr-perbatch",
+			Namespace:        "kube-system",
+			CreationTimestamp: metav1.Now(),
+		},
+		Spec: v1.CycleNodeRequestSpec{
+			NodeGroupName: "ng-1",
+			Selector:      metav1.LabelSelector{MatchLabels: map[string]string{"role": "worker"}},
+			CycleSettings: v1.CycleSettings{
+				Concurrency: 1,
+				Method:      v1.CycleNodeRequestMethodDrain,
+			},
+		},
+		Status: v1.CycleNodeRequestStatus{
+			Phase:          v1.CycleNodeRequestWaitingTermination,
+			ActiveChildren: 1,
+			NumNodesCycled: 1,
+			NodesAvailable: []v1.CycleNodeRequestNode{
+				{Name: "pending-1", ProviderID: "i-pending1"},
+			},
+			NodesToTerminate:   []v1.CycleNodeRequestNode{},
+			AnnotatedNodes:     []string{"replacement-1"},
+			CurrentNodes:       []v1.CycleNodeRequestNode{},
+			ScaleUpStarted:     &metav1.Time{Time: time.Now().Add(-5 * time.Minute)},
+		},
+	}
+
+	fakeTransitioner := NewFakeTransitioner(cnr,
+		WithKubeNodes([]*mock.Node{replacementNode, pendingNode}),
+		WithCloudProviderInstances([]*mock.Node{replacementNode, pendingNode}),
+		WithExtraKubeObject(nodeGroup),
+		WithExtraKubeObject(cns),
+	)
+
+	// Run from WaitingTermination — should reap the Successful CNS and
+	// transition back to Initialised, cleaning up annotations in between.
+	_, err := fakeTransitioner.Run()
+	require.NoError(t, err)
+
+	// Verify it transitioned back to Initialised
+	assert.Equal(t, v1.CycleNodeRequestInitialised, fakeTransitioner.cycleNodeRequest.Status.Phase,
+		"CNR should have transitioned back to Initialised for next batch")
+
+	// Verify the annotation was removed from the replacement node
+	node, err := fakeTransitioner.Client.RawClient.CoreV1().Nodes().Get(context.TODO(), "replacement-1", metav1.GetOptions{})
+	require.NoError(t, err)
+	_, hasAnnotation := node.Annotations[clusterAutoscalerScaleDownDisabledAnnotation]
+	assert.False(t, hasAnnotation, "scale-down-disabled annotation should be removed after batch completes")
+
+	// Verify AnnotatedNodes was cleared (persisted via UpdateObject in transitionWaitingTermination)
+	persistedCNR := &v1.CycleNodeRequest{}
+	err = fakeTransitioner.Client.K8sClient.Get(context.TODO(),
+		types.NamespacedName{Name: "cnr-perbatch", Namespace: "kube-system"}, persistedCNR)
+	require.NoError(t, err)
+	assert.Empty(t, persistedCNR.Status.AnnotatedNodes,
+		"AnnotatedNodes should be empty after per-batch cleanup")
 }
 
 // Test that if the phase executes before the CNR deletion expiry time then the
