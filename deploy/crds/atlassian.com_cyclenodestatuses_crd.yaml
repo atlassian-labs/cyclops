@@ -1,6 +1,9 @@
+---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.14.0
   name: cyclenodestatuses.atlassian.com
 spec:
   group: atlassian.com
@@ -40,14 +43,19 @@ spec:
         description: CycleNodeStatus is the Schema for the cyclenodestatus API
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
             type: object
@@ -59,20 +67,21 @@ spec:
                   the node.
                 properties:
                   concurrency:
-                    description: Concurrency is the number of nodes that one CycleNodeRequest
-                      will work on in parallel. Defaults to the size of the node group.
+                    description: |-
+                      Concurrency is the number of nodes that one CycleNodeRequest will work on in parallel.
+                      Defaults to the size of the node group.
                     format: int64
                     type: integer
                   cyclingTimeout:
-                    description: CyclingTimeout is a string in time duration format
-                      that defines how long a until an in-progress CNS request timeout
-                      from the time it's worked on by the controller. If no cyclingTimeout
-                      is provided, CNS will use the default controller CNS cyclingTimeout.
+                    description: |-
+                      CyclingTimeout is a string in time duration format that defines how long a until an
+                      in-progress CNS request timeout from the time it's worked on by the controller.
+                      If no cyclingTimeout is provided, CNS will use the default controller CNS cyclingTimeout.
                     type: string
                   ignoreNamespaces:
-                    description: IgnoreNamespaces is a list of namespace names in
-                      which running pods should be ignored when deciding whether a
-                      node has no more pods running.
+                    description: |-
+                      IgnoreNamespaces is a list of namespace names in which running pods should be ignored
+                      when deciding whether a node has no more pods running.
                     items:
                       type: string
                     type: array
@@ -81,17 +90,16 @@ spec:
                       items:
                         type: string
                       type: array
-                    description: 'IgnorePodLabels is a map of values for labels that
-                      describes which pods should be ignored when deciding whether
-                      a node has no more pods running. This map defines a union: any
-                      pod that matches any of the values for a given label name will
-                      be ignored.'
+                    description: |-
+                      IgnorePodLabels is a map of values for labels that describes which pods should be ignored when
+                      deciding whether a node has no more pods running. This map defines a union: any pod that
+                      matches any of the values for a given label name will be ignored.
                     type: object
                   labelsToRemove:
-                    description: LabelsToRemove is an array of labels to remove off
-                      of the pods running on the node This can be used to remove a
-                      pod from a service/endpoint before evicting/deleting it to prevent
-                      traffic being sent to it.
+                    description: |-
+                      LabelsToRemove is an array of labels to remove off of the pods running on the node
+                      This can be used to remove a pod from a service/endpoint before evicting/deleting
+                      it to prevent traffic being sent to it.
                     items:
                       type: string
                     type: array
@@ -123,8 +131,9 @@ spec:
                     description: Name of the node
                     type: string
                   nodeGroupName:
-                    description: NodeGroupName stores current cloud provider node
-                      group name which this node belongs to
+                    description: |-
+                      NodeGroupName stores current cloud provider node group name
+                      which this node belongs to
                     type: string
                   privateIp:
                     description: Private ip of the instance

@@ -13,7 +13,7 @@ MANAGER_BIN = cyclops
 CLI_BIN = kubectl-cycle
 OBSERVER_BIN = observer
 
-.PHONY: build-manager build-observer build-cli install-cli build docker build-manager-linux build-observer-linux build-cli-linux build-linux docker-save local srcclr
+.PHONY: build-manager build-observer build-cli install-cli build docker build-manager-linux build-observer-linux build-cli-linux build-linux docker-save local srcclr generate generate-crds generate-deepcopy
 .DEFAULT_GOAL := build
 
 install-cli:
@@ -60,20 +60,18 @@ lint:
 docker:
 	docker buildx build --build-arg ENVVAR="$(ENVVAR)" -t $(IMAGE) --platform linux/$(ARCH) .
 
-# New version of operator-sdk no longer support generate CRDs directly
-# Build from release v0.19.0 with commit hash
-install-operator-sdk:
-	mkdir -p $(GOPATH)/src/github.com/operator-framework
-	-cd $(GOPATH)/src/github.com/operator-framework && git clone https://github.com/operator-framework/operator-sdk
-	git -C $(GOPATH)/src/github.com/operator-framework/operator-sdk checkout master
-	git -C $(GOPATH)/src/github.com/operator-framework/operator-sdk checkout tags/v0.19.0
-	$(MAKE) -C $(GOPATH)/src/github.com/operator-framework/operator-sdk tidy
-	$(MAKE) -C $(GOPATH)/src/github.com/operator-framework/operator-sdk install
+# Generate CRDs and deepcopy functions using controller-gen.
+# Install controller-gen: go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.14.0
+generate: generate-crds generate-deepcopy
 
-# See https://sdk.operatorframework.io/docs/golang/quickstart/
 generate-crds:
-	mkdir -p build deploy/crds
-	touch build/Dockerfile
-	operator-sdk generate k8s
-	operator-sdk generate crds --crd-version v1
-	rm -rf build/
+	mkdir -p deploy/crds
+	controller-gen crd paths="./pkg/apis/atlassian/v1/..." output:crd:dir=deploy/crds
+	@# Rename to match existing _crd.yaml convention
+	@for f in deploy/crds/atlassian.com_*.yaml; do \
+		crd="$${f%.yaml}_crd.yaml"; \
+		[ "$$f" != "$$crd" ] && [ ! "$$(echo $$f | grep _crd.yaml)" ] && mv "$$f" "$$crd" || true; \
+	done
+
+generate-deepcopy:
+	controller-gen object paths="./pkg/apis/atlassian/v1/..."
