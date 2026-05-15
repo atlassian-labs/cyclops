@@ -48,6 +48,9 @@ var (
 	deleteCNRRequeue                 = app.Flag("delete-cnr-requeue", "How often to check if a CNR can be deleted").Default("24h").Duration()
 	defaultCNScyclingExpiry          = app.Flag("default-cns-cycling-expiry", "Fail the CNS if it has been cycling for this long").Default("3h").Duration()
 	unhealthyPodTerminationThreshold = app.Flag("unhealthy-pod-termination-after", "How long to tolerate an un-evictable yet unhealthy pod before forcefully removing it").Default("5m").Duration()
+
+	nodeControllerReconcileConcurrency = app.Flag("node-controller-reconcile-concurrency", "Maximum number of concurrent node controller reconciles").Default("1").Int()
+	nodeControllerRequeueAfter         = app.Flag("node-controller-requeue-after", "How often the node controller rechecks annotated nodes that are still covered by an active CNR").Default("5m").Duration()
 )
 
 var log = logf.Log.WithName("cmd")
@@ -129,6 +132,12 @@ func main() {
 		UnhealthyPodTerminationThreshold: *unhealthyPodTerminationThreshold,
 	}
 
+	// Configure the node controller options
+	nodeOptions := nodecontroller.Options{
+		ReconcileConcurrency: *nodeControllerReconcileConcurrency,
+		RequeueAfter:         *nodeControllerRequeueAfter,
+	}
+
 	// Set up and register the controllers that will share resources between them
 	_, err = cyclenoderequest.NewReconciler(mgr, cloudProvider, notifier, *namespace, cnrOptions)
 	if err != nil {
@@ -140,7 +149,7 @@ func main() {
 		log.Error(err, "Unable to add cycleNodeStatus controller")
 		os.Exit(1)
 	}
-	_, err = nodecontroller.NewReconciler(mgr, *namespace)
+	_, err = nodecontroller.NewReconciler(mgr, *namespace, nodeOptions)
 	if err != nil {
 		log.Error(err, "Unable to add node controller")
 		os.Exit(1)

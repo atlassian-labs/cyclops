@@ -36,3 +36,8 @@ func (in *CycleNodeRequest) IsFromSameNodeGroup(cnr CycleNodeRequest) bool {
 		cnr.GetNodeGroupNames(),
 	)
 }
+
+// IsTerminal returns true when the CycleNodeRequest lifecycle has ended.
+func (in *CycleNodeRequest) IsTerminal() bool {
+	return in.Status.Phase == CycleNodeRequestSuccessful || in.Status.Phase == CycleNodeRequestFailed
+}

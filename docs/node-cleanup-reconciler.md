@@ -1,125 +1,46 @@
-# Node Cleanup Reconciler
+# Node Controller
 
-## Problem
+The node controller is a controller-runtime reconciler for Kubernetes `Node` objects. Its current responsibility is to remove stale Cyclops-managed Cluster Autoscaler annotations that can be left behind when a `CycleNodeRequest` is deleted before normal CNR cleanup runs.
 
-When a CycleNodeRequest (CNR) is deleted mid-lifecycle -- before reaching the
-Successful or Healing phase -- the existing annotation cleanup in
-`cleanupScaleDownDisabledAnnotations` (`pkg/controller/cyclenoderequest/transitioner/util.go`)
-never runs. This leaves two stale annotations on nodes:
+## Why it exists
 
-- `cluster-autoscaler.kubernetes.io/scale-down-disabled` -- prevents Cluster
-  Autoscaler from scaling down the node
-- `cyclops.atlassian.com/annotation-managed` -- Cyclops marker tracking that it
-  added the above annotation
+Cyclops adds these annotations to replacement nodes during cycling:
 
-These orphaned annotations block Cluster Autoscaler indefinitely on affected
-nodes.
+- `cluster-autoscaler.kubernetes.io/scale-down-disabled=true`
+- `cyclops.atlassian.com/annotation-managed=true`
 
-## What was implemented
+The first annotation prevents Cluster Autoscaler from removing replacement nodes before the old nodes have drained and terminated. The second annotation records that Cyclops added the protection, so Cyclops does not remove annotations that were pre-existing on a node.
 
-A new controller-runtime reconciler that watches Node objects and eventually
-cleans up stale annotations left behind by deleted CNRs. It deliberately avoids
-finalizers in favour of eventual consistency -- cleanup doesn't need to be
-immediate.
+If a CNR disappears mid-cycle, the normal CNR transitioner cleanup may never run. The node controller acts as an eventual-consistency backstop so those nodes are not protected from scale-down forever.
 
-### Files changed
+## How it works
 
-| File | Change |
-|------|--------|
-| `pkg/controller/node/controller.go` | New reconciler (created) |
-| `pkg/controller/node/controller_test.go` | Unit, predicate, and integration tests (created) |
-| `cmd/manager/main.go` | Registers the new reconciler alongside the existing CNR and CNS controllers |
-| `Makefile` | Version bump 1.10.4 → 1.10.5 |
+The controller watches `Node` objects using the manager's shared cache. A predicate only enqueues nodes with the Cyclops marker annotation, so ordinary node changes do not enter the reconcile loop.
 
-### How it works
+For each matching node, the controller:
 
-The reconciler uses the manager's shared Node cache (the same one the CNR
-transitioner already populates via `ResourceManager.ListNodes`), so it adds zero
-additional API traffic.
+1. Confirms both the Cyclops marker and scale-down-disabled annotations are still present.
+2. Confirms the node is selected by at least one `NodeGroup`.
+3. Checks whether any non-terminal CNR in the configured namespace still selects the node.
+4. Requeues after the configured interval if an active CNR still covers the node.
+5. Removes both annotations if no active CNR covers the node.
 
-**Watch predicate:** Only nodes carrying the `cyclops.atlassian.com/annotation-managed`
-annotation pass the predicate and enter the reconcile loop. All other nodes are
-ignored at the watch level.
+`Successful` and `Failed` CNRs are terminal. Other phases, including `Healing`, are considered active.
 
-**Reconcile flow:**
+## Configuration
 
-1. Get the node from the cache.
-2. Guard: if either annotation is missing, return early (nothing to clean up).
-3. List all `NodeGroup` resources (cluster-scoped). Check whether the node's
-   labels match at least one NodeGroup's `spec.nodeSelector`. If not, the node
-   is not under Cyclops management -- skip it.
-4. List all `CycleNodeRequest` resources in the configured namespace. For each
-   non-terminal CNR (phase is not `Successful` or `Failed`), check whether its
-   `spec.selector` matches the node's labels.
-5. If the node matches an active CNR: requeue after 5 minutes and leave
-   annotations in place.
-6. If no active CNR covers the node: remove both annotations via JSON Patch
-   (with retry-on-conflict).
+The controller defaults are intentionally conservative:
 
-The `namespace` field on the reconciler is used solely to scope the CNR list
-query -- CycleNodeRequests are namespaced (defaults to `kube-system`).
-NodeGroups are cluster-scoped and don't require a namespace.
+- `--node-controller-reconcile-concurrency=1`
+- `--node-controller-requeue-after=5m`
 
-### Design decisions and trade-offs
+The controller is a safety net rather than a high-throughput reconciler, so one worker is normally enough. The requeue interval controls how often annotated nodes are rechecked while they are still covered by an active CNR.
 
-**No finalizer:** The cleanup is best-effort and eventually consistent. A 5-minute
-requeue poll handles the gap between a CNR being deleted and the next reconcile.
+## Observability
 
-**Shared cache:** Earlier iterations explored a dedicated Node cache with a
-transform (to avoid caching full Node objects) and PartialObjectMetadata watches.
-Both were discarded because the CNR transitioner's `ListNodes` already creates a
-full Node informer in the manager's shared cache. A second informer would double
-API traffic for no memory savings. The shared cache gives us access to all Node
-fields -- including `spec.unschedulable` (cordon status) -- for free, which will
-be needed if this reconciler is extended to uncordon nodes.
+The node controller emits cleanup-specific metrics so we can tell when the backstop is doing work:
 
-**NodeGroup gate:** The reconciler only acts on nodes selected by at least one
-NodeGroup. This prevents it from touching nodes that happen to have the
-annotations but are outside Cyclops management.
+- `cyclops_node_cleanup_annotations_removed_total`
+- `cyclops_node_cleanup_reconciles_total{result=...}`
 
-**Terminal phase definition:** `Successful` and `Failed` are terminal. `Healing`
-is considered active because the existing cleanup logic runs during that phase.
-
-## Extending this reconciler
-
-The most likely next step is uncordoning nodes that were cordoned by a
-deleted CNR. The full `corev1.Node` is available from the shared cache, so
-`node.Spec.Unschedulable` can be checked directly. The `rawClient` on the
-reconciler is already wired for JSON Patch operations via `k8s.UncordonNode`.
-
-Other potential cleanup tasks:
-- Removing the `cyclops.atlassian.com/terminate` label from nodes
-- Removing the `cyclops.atlassian.com/nodegroup` annotation
-- Deleting orphaned `CycleNodeStatus` objects
-
-Each of these would follow the same pattern: check for the marker, verify no
-active CNR covers the node, then remove.
-
-## Tests
-
-All tests are in `pkg/controller/node/controller_test.go`. Run with:
-
-```
-go test ./pkg/controller/node/ -v
-```
-
-**Unit tests (10 cases):** Table-driven, covering:
-- Nodes with/without annotations and with/without matching NodeGroups
-- Active CNRs with matching and non-matching selectors
-- Terminal-only CNRs
-- Single-annotation edge cases
-- Node-not-found
-
-**Predicate tests (7 cases):** Direct tests of the `hasCyclopsManagedAnnotation`
-predicate for Create, Update, Delete, and Generic event types.
-
-**Integration tests (2 cases):**
-- Requeue-then-cleanup flow: first reconcile requeues while a CNR is active,
-  CNR is deleted, second reconcile cleans up.
-- Multiple nodes with mixed state: verifies only the correct node gets cleaned
-  up while others are left untouched.
-
-The tests construct the `Reconciler` directly with fake clients (controller-runtime
-`fake.NewClientBuilder` and client-go `kubernetes/fake`), matching the existing
-test patterns in the transitioner package. The `client` field on the Reconciler
-struct was extracted from `mgr.GetClient()` specifically to enable this.
+A non-zero removal rate means stale annotations reached the node controller instead of being cleaned up by the normal CNR flow.

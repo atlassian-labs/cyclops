@@ -5,6 +5,7 @@ import (
 	"time"
 
 	atlassianv1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
+	cyclopscontroller "github.com/atlassian-labs/cyclops/pkg/controller"
 	"github.com/atlassian-labs/cyclops/pkg/k8s"
 	"github.com/atlassian-labs/cyclops/pkg/metrics"
 	corev1 "k8s.io/api/core/v1"
@@ -12,61 +13,74 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/event"
+	runtimecontroller "sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 const (
-	controllerName       = "node.controller"
-	reconcileConcurrency = 1
-	requeueAfter         = 5 * time.Minute
+	controllerName = "node.controller"
 
-	// cyclopsManagedAnnotation marks nodes where Cyclops added the scale-down-disabled annotation.
-	cyclopsManagedAnnotation = "cyclops.atlassian.com/annotation-managed"
+	// defaultReconcileConcurrency is intentionally low because the node controller
+	// is an eventual-consistency backstop, not a high-throughput controller.
+	defaultReconcileConcurrency = 1
+	defaultRequeueAfter         = 5 * time.Minute
 
-	// clusterAutoscalerScaleDownDisabledAnnotation is the annotation key used to prevent
-	// Cluster Autoscaler from scaling down a node.
-	clusterAutoscalerScaleDownDisabledAnnotation = "cluster-autoscaler.kubernetes.io/scale-down-disabled"
+	cyclopsManagedAnnotation                     = k8s.CyclopsManagedAnnotation
+	clusterAutoscalerScaleDownDisabledAnnotation = k8s.ClusterAutoscalerScaleDownDisabledAnnotation
 )
 
 var log = logf.Log.WithName(controllerName)
 
+// Options contains configuration for the node controller.
+type Options struct {
+	ReconcileConcurrency int
+	RequeueAfter         time.Duration
+}
+
+func (o Options) withDefaults() Options {
+	if o.ReconcileConcurrency <= 0 {
+		o.ReconcileConcurrency = defaultReconcileConcurrency
+	}
+	if o.RequeueAfter <= 0 {
+		o.RequeueAfter = defaultRequeueAfter
+	}
+	return o
+}
+
 // Reconciler watches Node objects and cleans up stale Cyclops-managed annotations
 // left behind when a CycleNodeRequest is deleted before reaching a terminal phase.
 type Reconciler struct {
-	mgr       manager.Manager
 	client    client.Client
 	rawClient kubernetes.Interface
 	namespace string
+	options   Options
 }
 
 // NewReconciler returns a new Reconciler for Nodes and registers it with the manager.
 // It reuses the manager's shared Node cache (already populated by the CNR transitioner)
 // to avoid duplicating API traffic.
-func NewReconciler(mgr manager.Manager, namespace string) (reconcile.Reconciler, error) {
+func NewReconciler(mgr manager.Manager, namespace string, options Options) (reconcile.Reconciler, error) {
 	rawClient := kubernetes.NewForConfigOrDie(mgr.GetConfig())
+	options = options.withDefaults()
 
 	reconciler := &Reconciler{
-		mgr:       mgr,
 		client:    mgr.GetClient(),
 		rawClient: rawClient,
 		namespace: namespace,
+		options:   options,
 	}
 
-	nodeController, err := controller.New(
+	nodeController, err := runtimecontroller.New(
 		controllerName,
 		mgr,
-		controller.Options{
+		runtimecontroller.Options{
 			Reconciler:              reconciler,
-			MaxConcurrentReconciles: reconcileConcurrency,
+			MaxConcurrentReconciles: options.ReconcileConcurrency,
 		})
 	if err != nil {
 		log.Error(err, "Unable to create node controller")
@@ -77,7 +91,7 @@ func NewReconciler(mgr manager.Manager, namespace string) (reconcile.Reconciler,
 		mgr.GetCache(),
 		&corev1.Node{},
 		&handler.TypedEnqueueRequestForObject[*corev1.Node]{},
-		hasCyclopsManagedAnnotation{},
+		cyclopscontroller.NewCyclopsManagedNodePredicate(),
 	)
 	if err := nodeController.Watch(src); err != nil {
 		log.Error(err, "Unable to watch Node objects")
@@ -103,7 +117,10 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 		return reconcile.Result{}, err
 	}
 
-	if !hasAnnotation(node.Annotations, cyclopsManagedAnnotation) || !hasAnnotation(node.Annotations, clusterAutoscalerScaleDownDisabledAnnotation) {
+	if _, ok := node.Annotations[k8s.CyclopsManagedAnnotation]; !ok {
+		return reconcile.Result{}, nil
+	}
+	if _, ok := node.Annotations[k8s.ClusterAutoscalerScaleDownDisabledAnnotation]; !ok {
 		return reconcile.Result{}, nil
 	}
 
@@ -116,7 +133,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 		return reconcile.Result{}, err
 	}
 	if !managed {
-		// Defensive: this path should be unreachable. The hasCyclopsManagedAnnotation
+		// Defensive: this path should be unreachable. The Cyclops-managed node
 		// predicate ensures we only reconcile nodes that Cyclops annotated during
 		// cycling, and Cyclops only annotates nodes selected by a NodeGroup.
 		// The only way to reach here is if the NodeGroup was deleted after the
@@ -135,22 +152,16 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 		return reconcile.Result{}, err
 	}
 	if active {
-		logger.V(1).Info("Node is still involved in an active CycleNodeRequest, requeueing", "requeueAfter", requeueAfter)
+		logger.V(1).Info("Node is still involved in an active CycleNodeRequest, requeueing", "requeueAfter", r.options.RequeueAfter)
 		metrics.NodeCleanupReconciles.WithLabelValues("active_cnr_skipped").Inc()
-		return reconcile.Result{RequeueAfter: requeueAfter}, nil
+		return reconcile.Result{RequeueAfter: r.options.RequeueAfter}, nil
 	}
 
 	// No active CNR covers this node — clean up the stale annotations.
 	logger.Info("Removing stale scale-down-disabled annotations from node")
 
-	if err := removeAnnotationWithRetry(node.Name, clusterAutoscalerScaleDownDisabledAnnotation, r.rawClient); err != nil {
-		logger.Error(err, "Failed to remove cluster-autoscaler annotation")
-		metrics.NodeCleanupReconciles.WithLabelValues("error").Inc()
-		return reconcile.Result{}, err
-	}
-
-	if err := removeAnnotationWithRetry(node.Name, cyclopsManagedAnnotation, r.rawClient); err != nil {
-		logger.Error(err, "Failed to remove Cyclops managed annotation")
+	if err := k8s.RemoveScaleDownDisabledAnnotationsFromNode(node.Name, r.rawClient); err != nil {
+		logger.Error(err, "Failed to remove stale annotations")
 		metrics.NodeCleanupReconciles.WithLabelValues("error").Inc()
 		return reconcile.Result{}, err
 	}
@@ -192,7 +203,7 @@ func (r *Reconciler) isNodeInActiveCNR(ctx context.Context, nodeLabels labels.Se
 	}
 
 	for _, cnr := range cnrList.Items {
-		if isTerminalPhase(cnr.Status.Phase) {
+		if cnr.IsTerminal() {
 			continue
 		}
 
@@ -208,49 +219,3 @@ func (r *Reconciler) isNodeInActiveCNR(ctx context.Context, nodeLabels labels.Se
 
 	return false, nil
 }
-
-// isTerminalPhase returns true for phases where the CNR lifecycle has ended and
-// annotation cleanup has already been handled (or is no longer expected).
-func isTerminalPhase(phase atlassianv1.CycleNodeRequestPhase) bool {
-	return phase == atlassianv1.CycleNodeRequestSuccessful || phase == atlassianv1.CycleNodeRequestFailed
-}
-
-// removeAnnotationWithRetry removes an annotation from a node, retrying on conflict.
-// A not-found error (node deleted or annotation already absent) is treated as success.
-func removeAnnotationWithRetry(nodeName, annotation string, rawClient kubernetes.Interface) error {
-	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		err := k8s.RemoveAnnotationFromNode(nodeName, annotation, rawClient)
-		if err != nil && errors.IsNotFound(err) {
-			return nil
-		}
-		return err
-	})
-}
-
-func hasAnnotation(annotations map[string]string, key string) bool {
-	_, ok := annotations[key]
-	return ok
-}
-
-// hasCyclopsManagedAnnotation is a controller-runtime predicate that passes only
-// Node events where the node carries the cyclopsManagedAnnotation. This avoids
-// reconciling every node in the cluster.
-type hasCyclopsManagedAnnotation struct{}
-
-func (hasCyclopsManagedAnnotation) Create(e event.TypedCreateEvent[*corev1.Node]) bool {
-	return hasAnnotation(e.Object.Annotations, cyclopsManagedAnnotation)
-}
-
-func (hasCyclopsManagedAnnotation) Update(e event.TypedUpdateEvent[*corev1.Node]) bool {
-	return hasAnnotation(e.ObjectNew.Annotations, cyclopsManagedAnnotation)
-}
-
-func (hasCyclopsManagedAnnotation) Delete(event.TypedDeleteEvent[*corev1.Node]) bool {
-	return false
-}
-
-func (hasCyclopsManagedAnnotation) Generic(e event.TypedGenericEvent[*corev1.Node]) bool {
-	return hasAnnotation(e.Object.Annotations, cyclopsManagedAnnotation)
-}
-
-var _ predicate.TypedPredicate[*corev1.Node] = hasCyclopsManagedAnnotation{}

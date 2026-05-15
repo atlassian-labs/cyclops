@@ -51,7 +51,7 @@ var (
 		[]string{
 			"nodegroup_name",
 			"nodegroups_list",
-			"node_selector",           
+			"node_selector",
 			"concurrency",
 			"method",
 			"max_failed_cnrs",
@@ -69,8 +69,8 @@ var (
 	// Note: Using only nodegroup label to keep cardinality low (consistent with existing Cyclops metrics)
 	AnnotationAddSuccess = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name:      fmt.Sprintf("%v_annotation_add_success_total", namespace),
-			Help:      "Total number of successful cluster-autoscaler scale-down-disabled annotation additions",
+			Name: fmt.Sprintf("%v_annotation_add_success_total", namespace),
+			Help: "Total number of successful cluster-autoscaler scale-down-disabled annotation additions",
 		},
 		[]string{"nodegroup"},
 	)
@@ -78,8 +78,8 @@ var (
 	// AnnotationAddFailure tracks failed annotation additions
 	AnnotationAddFailure = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name:      fmt.Sprintf("%v_annotation_add_failure_total", namespace),
-			Help:      "Total number of failed cluster-autoscaler scale-down-disabled annotation additions",
+			Name: fmt.Sprintf("%v_annotation_add_failure_total", namespace),
+			Help: "Total number of failed cluster-autoscaler scale-down-disabled annotation additions",
 		},
 		[]string{"nodegroup", "error_type"},
 	)
@@ -87,8 +87,8 @@ var (
 	// AnnotationRemoveSuccess tracks successful annotation removals
 	AnnotationRemoveSuccess = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name:      fmt.Sprintf("%v_annotation_remove_success_total", namespace),
-			Help:      "Total number of successful cluster-autoscaler scale-down-disabled annotation removals",
+			Name: fmt.Sprintf("%v_annotation_remove_success_total", namespace),
+			Help: "Total number of successful cluster-autoscaler scale-down-disabled annotation removals",
 		},
 		[]string{"nodegroup"},
 	)
@@ -96,8 +96,8 @@ var (
 	// AnnotationRemoveFailure tracks failed annotation removals
 	AnnotationRemoveFailure = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name:      fmt.Sprintf("%v_annotation_remove_failure_total", namespace),
-			Help:      "Total number of failed cluster-autoscaler scale-down-disabled annotation removals",
+			Name: fmt.Sprintf("%v_annotation_remove_failure_total", namespace),
+			Help: "Total number of failed cluster-autoscaler scale-down-disabled annotation removals",
 		},
 		[]string{"nodegroup", "error_type"},
 	)
@@ -107,8 +107,8 @@ var (
 	// Cardinality is bounded by the number of nodes with annotations (typically small)
 	NodesWithAnnotation = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name:      fmt.Sprintf("%v_nodes_with_scale_down_disabled_annotation", namespace),
-			Help:      "Current number of nodes with cluster-autoscaler scale-down-disabled annotation (1 = has annotation, 0 = does not have annotation)",
+			Name: fmt.Sprintf("%v_nodes_with_scale_down_disabled_annotation", namespace),
+			Help: "Current number of nodes with cluster-autoscaler scale-down-disabled annotation (1 = has annotation, 0 = does not have annotation)",
 		},
 		[]string{"nodegroup", "node_name"},
 	)
@@ -116,8 +116,8 @@ var (
 	// AnnotationCleanupAttempts tracks cleanup operation attempts
 	AnnotationCleanupAttempts = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name:      fmt.Sprintf("%v_annotation_cleanup_attempts_total", namespace),
-			Help:      "Total number of annotation cleanup attempts",
+			Name: fmt.Sprintf("%v_annotation_cleanup_attempts_total", namespace),
+			Help: "Total number of annotation cleanup attempts",
 		},
 		[]string{"nodegroup", "result"}, // result: "success", "partial_failure", "failure"
 	)
@@ -125,26 +125,26 @@ var (
 	// AnnotationCleanupDuration tracks cleanup operation duration
 	AnnotationCleanupDuration = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name:      fmt.Sprintf("%v_annotation_cleanup_duration_seconds", namespace),
-			Help:      "Duration of annotation cleanup operations in seconds",
-			Buckets:   prometheus.ExponentialBuckets(0.1, 2, 10), // 0.1s to ~51s
+			Name:    fmt.Sprintf("%v_annotation_cleanup_duration_seconds", namespace),
+			Help:    "Duration of annotation cleanup operations in seconds",
+			Buckets: prometheus.ExponentialBuckets(0.1, 2, 10), // 0.1s to ~51s
 		},
 		[]string{"nodegroup"},
 	)
 
-	// --- Node Cleanup Controller metrics (safety-net reconciler) ---
+	// --- Node controller cleanup metrics (safety-net reconciler) ---
 
 	// NodeCleanupAnnotationsRemoved tracks how many stale annotations the node
-	// cleanup controller has removed. A non-zero rate means the normal CNR
-	// lifecycle failed to clean up after itself.
+	// controller has removed. A non-zero rate means the normal CNR lifecycle
+	// failed to clean up after itself.
 	NodeCleanupAnnotationsRemoved = prometheus.NewCounter(
 		prometheus.CounterOpts{
 			Name: fmt.Sprintf("%v_node_cleanup_annotations_removed_total", namespace),
-			Help: "Total number of stale scale-down-disabled annotations removed by the node cleanup controller",
+			Help: "Total number of stale scale-down-disabled annotations removed by the node controller",
 		},
 	)
 
-	// NodeCleanupReconciles tracks reconcile outcomes for the node cleanup controller.
+	// NodeCleanupReconciles tracks reconcile outcomes for the node controller.
 	// Labels:
 	//   result: "cleaned"              – stale annotations were removed
 	//           "active_cnr_skipped"   – node is covered by an active CNR, left alone
@@ -153,7 +153,7 @@ var (
 	NodeCleanupReconciles = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: fmt.Sprintf("%v_node_cleanup_reconciles_total", namespace),
-			Help: "Total number of node cleanup controller reconcile outcomes",
+			Help: "Total number of node controller cleanup reconcile outcomes",
 		},
 		[]string{"result"},
 	)
@@ -301,11 +301,11 @@ func (c cyclopsCollector) Collect(ch chan<- prometheus.Metric) {
 		float64(len(c.cycleNodeStatusList.Items)),
 	)
 
-    for _, nodegroup := range c.nodeGroupList.Items {
-        ch <- prometheus.MustNewConstMetric(
-            NodeGroupInfo,
-            prometheus.GaugeValue,
-            1.0,
+	for _, nodegroup := range c.nodeGroupList.Items {
+		ch <- prometheus.MustNewConstMetric(
+			NodeGroupInfo,
+			prometheus.GaugeValue,
+			1.0,
 			nodegroup.Spec.NodeGroupName,
 			strings.Join(nodegroup.Spec.NodeGroupsList, ","),
 			nodegroup.Spec.NodeSelector.String(),
@@ -316,6 +316,6 @@ func (c cyclopsCollector) Collect(ch chan<- prometheus.Metric) {
 			fmt.Sprintf("%t", nodegroup.Spec.SkipInitialHealthChecks),
 			fmt.Sprintf("%t", nodegroup.Spec.SkipPreTerminationChecks),
 			fmt.Sprintf("%d", nodegroup.Spec.Priority),
-        )
-    }
+		)
+	}
 }

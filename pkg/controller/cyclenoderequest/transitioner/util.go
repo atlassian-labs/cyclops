@@ -83,8 +83,8 @@ func (t *CycleNodeRequestTransitioner) transitionToSuccessful() (reconcile.Resul
 	t.cycleNodeRequest.Status.Phase = v1.CycleNodeRequestSuccessful
 
 	// Clear any remaining AnnotatedNodes (including failed-to-remove ones) so
-	// subsequent requeues don't re-run cleanup. The node cleanup controller will
-	// catch any that failed to be removed here.
+	// subsequent requeues don't re-run cleanup. The node controller will catch
+	// any that failed to be removed here.
 	t.cycleNodeRequest.Status.AnnotatedNodes = nil
 
 	// Notify that the cycling has succeeded
@@ -772,13 +772,7 @@ func (t *CycleNodeRequestTransitioner) addScaleDownDisabledAnnotation(nodeName s
 func (t *CycleNodeRequestTransitioner) removeScaleDownDisabledAnnotation(nodeName string) error {
 	nodegroup := t.getNodegroupForMetrics()
 
-	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		return k8s.RemoveAnnotationFromNode(
-			nodeName,
-			clusterAutoscalerScaleDownDisabledAnnotation,
-			t.rm.RawClient,
-		)
-	})
+	err := k8s.RemoveScaleDownDisabledAnnotationsFromNode(nodeName, t.rm.RawClient)
 
 	if err != nil {
 		// Extract error type for better categorization
@@ -794,18 +788,6 @@ func (t *CycleNodeRequestTransitioner) removeScaleDownDisabledAnnotation(nodeNam
 
 		metrics.AnnotationRemoveFailure.WithLabelValues(nodegroup, errorType).Inc()
 		return err
-	}
-
-	// Remove the marker annotation since we're removing the cluster-autoscaler annotation
-	if markerErr := k8s.RemoveAnnotationFromNode(
-		nodeName,
-		cyclopsManagedAnnotation,
-		t.rm.RawClient,
-	); markerErr != nil {
-		// Log but don't fail - marker cleanup is best-effort
-		t.rm.Logger.Info("Failed to remove managed annotation marker from node",
-			"nodeName", nodeName,
-			"error", markerErr)
 	}
 
 	metrics.AnnotationRemoveSuccess.WithLabelValues(nodegroup).Inc()

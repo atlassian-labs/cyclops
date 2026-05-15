@@ -6,6 +6,7 @@ import (
 	"time"
 
 	atlassianv1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
+	"github.com/atlassian-labs/cyclops/pkg/k8s"
 	"github.com/atlassian-labs/cyclops/pkg/metrics"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
@@ -17,7 +18,6 @@ import (
 	fakerawclient "k8s.io/client-go/kubernetes/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	fakeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -51,6 +51,7 @@ func newTestReconciler(objs ...client.Object) (*Reconciler, *fakerawclient.Clien
 		client:    fakeClient,
 		rawClient: rawClient,
 		namespace: testNamespace,
+		options:   Options{}.withDefaults(),
 	}
 	return r, rawClient
 }
@@ -106,8 +107,8 @@ func testCNR(name string, phase atlassianv1.CycleNodeRequestPhase, matchLabels m
 
 func bothAnnotations() map[string]string {
 	return map[string]string{
-		cyclopsManagedAnnotation:                    "true",
-		clusterAutoscalerScaleDownDisabledAnnotation: "true",
+		k8s.CyclopsManagedAnnotation:                     "true",
+		k8s.ClusterAutoscalerScaleDownDisabledAnnotation: "true",
 	}
 }
 
@@ -242,7 +243,7 @@ func TestReconcile(t *testing.T) {
 			require.NoError(t, err)
 
 			if tc.expectRequeue {
-				assert.Equal(t, requeueAfter, result.RequeueAfter, "should requeue")
+				assert.Equal(t, defaultRequeueAfter, result.RequeueAfter, "should requeue")
 			} else {
 				assert.Equal(t, time.Duration(0), result.RequeueAfter, "should not requeue")
 			}
@@ -271,65 +272,6 @@ func TestReconcile(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Predicate tests
-// ---------------------------------------------------------------------------
-
-func TestHasCyclopsManagedAnnotationPredicate(t *testing.T) {
-	p := hasCyclopsManagedAnnotation{}
-
-	t.Run("Create with annotation", func(t *testing.T) {
-		e := event.TypedCreateEvent[*corev1.Node]{
-			Object: testNode("n", nil, map[string]string{cyclopsManagedAnnotation: "true"}),
-		}
-		assert.True(t, p.Create(e))
-	})
-
-	t.Run("Create without annotation", func(t *testing.T) {
-		e := event.TypedCreateEvent[*corev1.Node]{
-			Object: testNode("n", nil, nil),
-		}
-		assert.False(t, p.Create(e))
-	})
-
-	t.Run("Update new has annotation", func(t *testing.T) {
-		e := event.TypedUpdateEvent[*corev1.Node]{
-			ObjectOld: testNode("n", nil, nil),
-			ObjectNew: testNode("n", nil, map[string]string{cyclopsManagedAnnotation: "true"}),
-		}
-		assert.True(t, p.Update(e))
-	})
-
-	t.Run("Update new has no annotation", func(t *testing.T) {
-		e := event.TypedUpdateEvent[*corev1.Node]{
-			ObjectOld: testNode("n", nil, map[string]string{cyclopsManagedAnnotation: "true"}),
-			ObjectNew: testNode("n", nil, nil),
-		}
-		assert.False(t, p.Update(e))
-	})
-
-	t.Run("Delete always false", func(t *testing.T) {
-		e := event.TypedDeleteEvent[*corev1.Node]{
-			Object: testNode("n", nil, map[string]string{cyclopsManagedAnnotation: "true"}),
-		}
-		assert.False(t, p.Delete(e))
-	})
-
-	t.Run("Generic with annotation", func(t *testing.T) {
-		e := event.TypedGenericEvent[*corev1.Node]{
-			Object: testNode("n", nil, map[string]string{cyclopsManagedAnnotation: "true"}),
-		}
-		assert.True(t, p.Generic(e))
-	})
-
-	t.Run("Generic without annotation", func(t *testing.T) {
-		e := event.TypedGenericEvent[*corev1.Node]{
-			Object: testNode("n", nil, nil),
-		}
-		assert.False(t, p.Generic(e))
-	})
-}
-
-// ---------------------------------------------------------------------------
 // Metric helpers
 // ---------------------------------------------------------------------------
 
@@ -343,7 +285,7 @@ func getCounterValue(c interface{ Write(*dto.Metric) error }) float64 {
 	return 0
 }
 
-// resetCleanupMetrics resets the node cleanup metrics so tests don't interfere
+// resetCleanupMetrics resets the node controller cleanup metrics so tests don't interfere
 // with each other.
 func resetCleanupMetrics() {
 	metrics.NodeCleanupReconciles.Reset()
@@ -420,7 +362,7 @@ func TestReconcile_RequeueThenCleanup(t *testing.T) {
 	// First reconcile: active CNR exists, should requeue.
 	result, err := r.Reconcile(ctx, requestFor("node-1"))
 	require.NoError(t, err)
-	assert.Equal(t, requeueAfter, result.RequeueAfter, "first reconcile should requeue")
+	assert.Equal(t, defaultRequeueAfter, result.RequeueAfter, "first reconcile should requeue")
 
 	annotations := getNodeAnnotations(t, rawClient, "node-1")
 	assert.Contains(t, annotations, cyclopsManagedAnnotation, "annotations should still be present after requeue")
@@ -460,7 +402,7 @@ func TestReconcile_MultipleNodesMixedState(t *testing.T) {
 	// Actually, node-clean does match the CNR, so it should requeue.
 	result, err := r.Reconcile(ctx, requestFor("node-clean"))
 	require.NoError(t, err)
-	assert.Equal(t, requeueAfter, result.RequeueAfter, "node-clean should requeue while CNR is active")
+	assert.Equal(t, defaultRequeueAfter, result.RequeueAfter, "node-clean should requeue while CNR is active")
 
 	// Delete the CNR so node-clean can be cleaned up.
 	require.NoError(t, r.client.Delete(ctx, cnr))
