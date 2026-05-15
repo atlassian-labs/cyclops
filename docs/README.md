@@ -88,11 +88,11 @@ Flags:
 
 ### Changing or updating CRDs
 
-Whenever you update the CRD objects in the `pkg/apis/atlassian/v1` package you will likely need to generate the OpenAPI and Kubernetes deepcopy code again.
+Whenever you update the CRD objects in the `pkg/apis/atlassian/v1` package you will likely need to regenerate the CRD manifests and Kubernetes deepcopy code.
 
-Run `make install-operator-sdk` if you haven't installed the `operator-sdk` tool yet.
+Run `make controller-gen` to install the pinned `controller-gen` version into `bin/`.
 
-Run `make generate-crds` to generate all the deepcopy and openapi code for the CRDs.  
+Run `make generate` to regenerate both CRD manifests and deepcopy code, or run `make generate-crds` / `make generate-deepcopy` individually. These targets automatically install and use the pinned local `controller-gen` binary if needed.  
 
 ### Testing
 ```bash

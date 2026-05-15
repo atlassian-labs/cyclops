@@ -13,7 +13,12 @@ MANAGER_BIN = cyclops
 CLI_BIN = kubectl-cycle
 OBSERVER_BIN = observer
 
-.PHONY: build-manager build-observer build-cli install-cli build docker build-manager-linux build-observer-linux build-cli-linux build-linux docker-save local srcclr generate generate-crds generate-deepcopy
+LOCALBIN ?= $(CURDIR)/bin
+CONTROLLER_GEN_VERSION = v0.14.0
+CONTROLLER_GEN = $(LOCALBIN)/controller-gen
+CONTROLLER_GEN_STAMP = $(LOCALBIN)/.controller-gen-$(CONTROLLER_GEN_VERSION)
+
+.PHONY: build-manager build-observer build-cli install-cli build docker build-manager-linux build-observer-linux build-cli-linux build-linux docker-save local srcclr generate generate-crds generate-deepcopy controller-gen install-controller-gen
 .DEFAULT_GOAL := build
 
 install-cli:
@@ -60,18 +65,25 @@ lint:
 docker:
 	docker buildx build --build-arg ENVVAR="$(ENVVAR)" -t $(IMAGE) --platform linux/$(ARCH) .
 
-# Generate CRDs and deepcopy functions using controller-gen.
-# Install controller-gen: go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.14.0
+# Generate CRDs and deepcopy functions using the pinned controller-gen version.
 generate: generate-crds generate-deepcopy
 
-generate-crds:
+controller-gen install-controller-gen: $(CONTROLLER_GEN) $(CONTROLLER_GEN_STAMP)
+
+$(CONTROLLER_GEN) $(CONTROLLER_GEN_STAMP):
+	mkdir -p $(LOCALBIN)
+	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_GEN_VERSION)
+	@rm -f $(LOCALBIN)/.controller-gen-*
+	@touch $(CONTROLLER_GEN_STAMP)
+
+generate-crds: $(CONTROLLER_GEN) $(CONTROLLER_GEN_STAMP)
 	mkdir -p deploy/crds
-	controller-gen crd paths="./pkg/apis/atlassian/v1/..." output:crd:dir=deploy/crds
+	$(CONTROLLER_GEN) crd paths="./pkg/apis/atlassian/v1/..." output:crd:dir=deploy/crds
 	@# Rename to match existing _crd.yaml convention
 	@for f in deploy/crds/atlassian.com_*.yaml; do \
 		crd="$${f%.yaml}_crd.yaml"; \
 		[ "$$f" != "$$crd" ] && [ ! "$$(echo $$f | grep _crd.yaml)" ] && mv "$$f" "$$crd" || true; \
 	done
 
-generate-deepcopy:
-	controller-gen object paths="./pkg/apis/atlassian/v1/..."
+generate-deepcopy: $(CONTROLLER_GEN) $(CONTROLLER_GEN_STAMP)
+	$(CONTROLLER_GEN) object paths="./pkg/apis/atlassian/v1/..."
