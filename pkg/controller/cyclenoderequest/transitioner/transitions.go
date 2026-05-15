@@ -374,7 +374,7 @@ func (t *CycleNodeRequestTransitioner) transitionScalingUp() (reconcile.Result, 
 
 	// If either check isn't ready, requeue to check again later
 	// also check if at least one Ready node was created after the scaleUpStarted time
-	if !(allInstancesReady && allKubernetesNodesReady && numNodesCreatedAfterScaleUpStarted > 0) {
+	if !allInstancesReady || !allKubernetesNodesReady || numNodesCreatedAfterScaleUpStarted <= 0 {
 		t.rm.LogEvent(t.cycleNodeRequest, "ScalingUpWaiting", "Waiting for new nodes to be ready")
 		return reconcile.Result{Requeue: true, RequeueAfter: requeueDuration}, nil
 	}

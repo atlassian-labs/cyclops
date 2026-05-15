@@ -1,7 +1,6 @@
 package slack
 
 import (
-	"fmt"
 	"os"
 	"testing"
 
@@ -55,14 +54,13 @@ func Test_getSlackBotToken(t *testing.T) {
 			setEnv: func(t *testing.T) {
 				tempDir := t.TempDir()
 				file, err := os.Create(tempDir + "test_bot_token_file")
-				if err != nil {
-					fmt.Println(err)
-				}
-				defer file.Close()
+				assert.NoError(t, err)
+				defer func() {
+					assert.NoError(t, file.Close())
+				}()
 
-				if _, err = file.WriteString("test_bot_token"); err != nil {
-					fmt.Println(err)
-				}
+				_, err = file.WriteString("test_bot_token")
+				assert.NoError(t, err)
 				t.Setenv(slackBotUserOAuthAccessTokenFile, file.Name())
 			},
 			expect:   "test_bot_token",

@@ -54,7 +54,7 @@ func AddLabelToNode(nodeName string, labelName string, labelValue string, client
 		{
 			Op: "add",
 			// json patch spec maps "~1" to "/" as an escape sequence, so we do the translation here...
-			Path:  fmt.Sprintf("/metadata/labels/%s", strings.Replace(labelName, "/", "~1", -1)),
+			Path:  fmt.Sprintf("/metadata/labels/%s", strings.ReplaceAll(labelName, "/", "~1")),
 			Value: labelValue,
 		},
 	}
@@ -67,7 +67,7 @@ func AddAnnotationToNode(nodeName string, annotationName string, annotationValue
 		{
 			Op: "add",
 			// json patch spec maps "~1" to "/" as an escape sequence, so we do the translation here...
-			Path:  fmt.Sprintf("/metadata/annotations/%s", strings.Replace(annotationName, "/", "~1", -1)),
+			Path:  fmt.Sprintf("/metadata/annotations/%s", strings.ReplaceAll(annotationName, "/", "~1")),
 			Value: annotationValue,
 		},
 	}
@@ -79,7 +79,7 @@ func RemoveAnnotationFromNode(nodeName string, annotationName string, client kub
 	patches := []Patch{
 		{
 			Op:   "remove",
-			Path: fmt.Sprintf("/metadata/annotations/%s", strings.Replace(annotationName, "/", "~1", -1)),
+			Path: fmt.Sprintf("/metadata/annotations/%s", strings.ReplaceAll(annotationName, "/", "~1")),
 		},
 	}
 	return PatchNode(nodeName, patches, client)
@@ -90,7 +90,7 @@ func RemoveLabelFromNode(nodeName string, labelName string, client kubernetes.In
 	patches := []Patch{
 		{
 			Op:   "remove",
-			Path: fmt.Sprintf("/metadata/labels/%s", strings.Replace(labelName, "/", "~1", -1)),
+			Path: fmt.Sprintf("/metadata/labels/%s", strings.ReplaceAll(labelName, "/", "~1")),
 		},
 	}
 	return PatchNode(nodeName, patches, client)
