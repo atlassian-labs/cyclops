@@ -117,7 +117,7 @@ func (t *CycleNodeRequestTransitioner) equilibriumWaitTimedOut() (bool, error) {
 		}
 	}
 
-	return time.Now().After(t.cycleNodeRequest.Status.EquilibriumWaitStarted.Time.Add(nodeEquilibriumWaitLimit)), nil
+	return time.Now().After(t.cycleNodeRequest.Status.EquilibriumWaitStarted.Add(nodeEquilibriumWaitLimit)), nil
 }
 
 // reapChildren reaps CycleNodeStatus children. It returns the state that should be
@@ -585,7 +585,7 @@ func (t *CycleNodeRequestTransitioner) deleteFailedSiblingCNRs() error {
 func countNodesCreatedAfter(nodes map[string]corev1.Node, cutoffTime time.Time) int {
 	count := 0
 	for _, node := range nodes {
-		if node.CreationTimestamp.Time.After(cutoffTime) {
+		if node.CreationTimestamp.After(cutoffTime) {
 			count++
 		}
 	}
@@ -596,7 +596,7 @@ func countNodesCreatedAfter(nodes map[string]corev1.Node, cutoffTime time.Time) 
 func findNodesCreatedAfter(nodes map[string]corev1.Node, cutoffTime time.Time) []corev1.Node {
 	var result []corev1.Node
 	for _, node := range nodes {
-		if node.CreationTimestamp.Time.After(cutoffTime) {
+		if node.CreationTimestamp.After(cutoffTime) {
 			result = append(result, node)
 		}
 	}
@@ -684,7 +684,7 @@ func (t *CycleNodeRequestTransitioner) addScaleDownDisabledAnnotation(nodeName s
 			"cnr", t.cycleNodeRequest.Name)
 		return nil
 	}
-	
+
 	// Check if annotation already exists - preserve existing value for backward compatibility
 	node, err := t.rm.RawClient.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 	if err == nil && node.Annotations != nil {
@@ -696,16 +696,16 @@ func (t *CycleNodeRequestTransitioner) addScaleDownDisabledAnnotation(nodeName s
 			return nil
 		}
 	}
-	
+
 	nodegroup := t.getNodegroupForMetrics()
-	
+
 	err = k8s.AddAnnotationToNode(
 		nodeName,
 		clusterAutoscalerScaleDownDisabledAnnotation,
 		clusterAutoscalerScaleDownDisabledValue,
 		t.rm.RawClient,
 	)
-	
+
 	if err != nil {
 		// Extract error type for better categorization
 		errorType := "unknown"
@@ -717,11 +717,11 @@ func (t *CycleNodeRequestTransitioner) addScaleDownDisabledAnnotation(nodeName s
 		} else if strings.Contains(errStr, "conflict") {
 			errorType = "conflict"
 		}
-		
+
 		metrics.AnnotationAddFailure.WithLabelValues(nodegroup, errorType).Inc()
 		return err
 	}
-	
+
 	// Add marker annotation to track that we added the cluster-autoscaler annotation
 	// This ensures we only remove annotations we added, not pre-existing ones
 	if markerErr := k8s.AddAnnotationToNode(
@@ -739,10 +739,10 @@ func (t *CycleNodeRequestTransitioner) addScaleDownDisabledAnnotation(nodeName s
 			"nodeName", nodeName,
 			"cnr", t.cycleNodeRequest.Name)
 	}
-	
+
 	metrics.AnnotationAddSuccess.WithLabelValues(nodegroup).Inc()
 	metrics.NodesWithAnnotation.WithLabelValues(nodegroup, nodeName).Set(1)
-	
+
 	return nil
 }
 
@@ -752,7 +752,7 @@ func (t *CycleNodeRequestTransitioner) addScaleDownDisabledAnnotation(nodeName s
 // Uses retry logic to handle transient API errors.
 func (t *CycleNodeRequestTransitioner) removeScaleDownDisabledAnnotation(nodeName string) error {
 	nodegroup := t.getNodegroupForMetrics()
-	
+
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		return k8s.RemoveAnnotationFromNode(
 			nodeName,
@@ -760,7 +760,7 @@ func (t *CycleNodeRequestTransitioner) removeScaleDownDisabledAnnotation(nodeNam
 			t.rm.RawClient,
 		)
 	})
-	
+
 	if err != nil {
 		// Extract error type for better categorization
 		errorType := "unknown"
@@ -772,11 +772,11 @@ func (t *CycleNodeRequestTransitioner) removeScaleDownDisabledAnnotation(nodeNam
 		} else if strings.Contains(errStr, "conflict") {
 			errorType = "conflict"
 		}
-		
+
 		metrics.AnnotationRemoveFailure.WithLabelValues(nodegroup, errorType).Inc()
 		return err
 	}
-	
+
 	// Remove the marker annotation since we're removing the cluster-autoscaler annotation
 	if markerErr := k8s.RemoveAnnotationFromNode(
 		nodeName,
@@ -788,10 +788,10 @@ func (t *CycleNodeRequestTransitioner) removeScaleDownDisabledAnnotation(nodeNam
 			"nodeName", nodeName,
 			"error", markerErr)
 	}
-	
+
 	metrics.AnnotationRemoveSuccess.WithLabelValues(nodegroup).Inc()
 	metrics.NodesWithAnnotation.WithLabelValues(nodegroup, nodeName).Set(0)
-	
+
 	return nil
 }
 
@@ -825,7 +825,7 @@ func (t *CycleNodeRequestTransitioner) cleanupScaleDownDisabledAnnotations() {
 						"nodeName", newNode.Name)
 					continue
 				}
-				
+
 				if err := t.removeScaleDownDisabledAnnotation(newNode.Name); err != nil {
 					// Log warning but don't fail - annotation removal is best-effort
 					t.rm.Logger.Info("Failed to remove scale-down-disabled annotation from node",

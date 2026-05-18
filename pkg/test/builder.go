@@ -33,16 +33,16 @@ func BuildFakeClient(nodes []*corev1.Node, pods []*corev1.Pod) (*fake.Clientset,
 	fakeClient := &fake.Clientset{}
 	updateChan := make(chan string, 2*(len(nodes)+len(pods)))
 	// nodes
-	fakeClient.Fake.AddReactor("get", "nodes", func(action core.Action) (bool, runtime.Object, error) {
+	fakeClient.AddReactor("get", "nodes", func(action core.Action) (bool, runtime.Object, error) {
 		getAction := action.(core.GetAction)
 		for _, node := range nodes {
 			if node.Name == getAction.GetName() {
 				return true, node, nil
 			}
 		}
-		return true, nil, fmt.Errorf("No node named: %v", getAction.GetName())
+		return true, nil, fmt.Errorf("no node named: %v", getAction.GetName())
 	})
-	fakeClient.Fake.AddReactor("update", "nodes", func(action core.Action) (bool, runtime.Object, error) {
+	fakeClient.AddReactor("update", "nodes", func(action core.Action) (bool, runtime.Object, error) {
 		updateAction := action.(core.UpdateAction)
 		node := updateAction.GetObject().(*corev1.Node)
 		for _, n := range nodes {
@@ -51,9 +51,9 @@ func BuildFakeClient(nodes []*corev1.Node, pods []*corev1.Pod) (*fake.Clientset,
 				return true, node, nil
 			}
 		}
-		return false, nil, fmt.Errorf("No node named: %v", node.Name)
+		return false, nil, fmt.Errorf("no node named: %v", node.Name)
 	})
-	fakeClient.Fake.AddReactor("list", "nodes", func(action core.Action) (bool, runtime.Object, error) {
+	fakeClient.AddReactor("list", "nodes", func(action core.Action) (bool, runtime.Object, error) {
 		nodesCopy := make([]corev1.Node, 0, len(nodes))
 		for _, n := range nodes {
 			nodesCopy = append(nodesCopy, *n)
@@ -62,16 +62,16 @@ func BuildFakeClient(nodes []*corev1.Node, pods []*corev1.Pod) (*fake.Clientset,
 	})
 
 	// pods
-	fakeClient.Fake.AddReactor("get", "pods", func(action core.Action) (bool, runtime.Object, error) {
+	fakeClient.AddReactor("get", "pods", func(action core.Action) (bool, runtime.Object, error) {
 		getAction := action.(core.GetAction)
 		for _, pod := range pods {
 			if pod.Name == getAction.GetName() && pod.Namespace == getAction.GetNamespace() {
 				return true, pod, nil
 			}
 		}
-		return true, nil, fmt.Errorf("No pod named: %v", getAction.GetName())
+		return true, nil, fmt.Errorf("no pod named: %v", getAction.GetName())
 	})
-	fakeClient.Fake.AddReactor("update", "pods", func(action core.Action) (bool, runtime.Object, error) {
+	fakeClient.AddReactor("update", "pods", func(action core.Action) (bool, runtime.Object, error) {
 		updateAction := action.(core.UpdateAction)
 		pod := updateAction.GetObject().(*corev1.Pod)
 		for _, p := range pods {
@@ -80,9 +80,9 @@ func BuildFakeClient(nodes []*corev1.Node, pods []*corev1.Pod) (*fake.Clientset,
 				return true, pod, nil
 			}
 		}
-		return false, nil, fmt.Errorf("No pod named: %v", pod.Name)
+		return false, nil, fmt.Errorf("no pod named: %v", pod.Name)
 	})
-	fakeClient.Fake.AddReactor("list", "pods", func(action core.Action) (bool, runtime.Object, error) {
+	fakeClient.AddReactor("list", "pods", func(action core.Action) (bool, runtime.Object, error) {
 		podsCopy := make([]corev1.Pod, 0, len(pods))
 		for _, p := range pods {
 			podsCopy = append(podsCopy, *p)

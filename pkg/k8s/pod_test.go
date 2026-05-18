@@ -42,7 +42,7 @@ func TestEvictPod(t *testing.T) {
 		NodeName:  "test-node",
 	})
 	client, _ := test.BuildFakeClient(nil, []*corev1.Pod{pod})
-	client.Fake.AddReactor("create", "pods", func(action testingCore.Action) (bool, runtime.Object, error) {
+	client.AddReactor("create", "pods", func(action testingCore.Action) (bool, runtime.Object, error) {
 		assert.Equal(t, "eviction", action.GetSubresource())
 
 		createAction := action.(testingCore.CreateAction)
@@ -66,7 +66,7 @@ func TestEvictOrForciblyDeletePod(t *testing.T) {
 	podWasForcefullyDeleted := false
 
 	client, _ := test.BuildFakeClient(nil, []*corev1.Pod{pod})
-	client.Fake.AddReactor("create", "pods", func(action testingCore.Action) (bool, runtime.Object, error) {
+	client.AddReactor("create", "pods", func(action testingCore.Action) (bool, runtime.Object, error) {
 		assert.Equal(t, "eviction", action.GetSubresource())
 
 		createAction := action.(testingCore.CreateAction)
@@ -77,7 +77,7 @@ func TestEvictOrForciblyDeletePod(t *testing.T) {
 		podEvictionAttempted = true
 		return true, nil, apiErrors.NewTooManyRequests("pod cannot be removed and is unhealthy", 10)
 	})
-	client.Fake.AddReactor("delete", "pods", func(action testingCore.Action) (bool, runtime.Object, error) {
+	client.AddReactor("delete", "pods", func(action testingCore.Action) (bool, runtime.Object, error) {
 		podWasForcefullyDeleted = true
 		return false, nil, nil
 	})
@@ -137,7 +137,7 @@ func TestEvictPods(t *testing.T) {
 	unhealthyPodDeleted := false
 
 	client, _ := test.BuildFakeClient(nil, pods)
-	client.Fake.AddReactor("create", "pods", func(action testingCore.Action) (bool, runtime.Object, error) {
+	client.AddReactor("create", "pods", func(action testingCore.Action) (bool, runtime.Object, error) {
 		assert.Equal(t, "eviction", action.GetSubresource())
 
 		createAction := action.(testingCore.CreateAction)
@@ -153,7 +153,7 @@ func TestEvictPods(t *testing.T) {
 		}
 		return true, nil, apiErrors.NewNotFound(schema.GroupResource{Group: "", Resource: "pods"}, p.Name)
 	})
-	client.Fake.AddReactor("delete", "pods", func(action testingCore.Action) (bool, runtime.Object, error) {
+	client.AddReactor("delete", "pods", func(action testingCore.Action) (bool, runtime.Object, error) {
 		unhealthyPodDeleted = true
 		return false, nil, nil
 	})

@@ -81,7 +81,7 @@ func EvictPods(pods []*v1.Pod, apiVersion string, client kubernetes.Interface, u
 
 // PodIsDaemonSet returns true if the pod is a daemonset
 func PodIsDaemonSet(pod *v1.Pod) bool {
-	for _, ownerReference := range pod.ObjectMeta.OwnerReferences {
+	for _, ownerReference := range pod.OwnerReferences {
 		if ownerReference.Kind == "DaemonSet" {
 			return true
 		}
@@ -93,7 +93,7 @@ func PodIsDaemonSet(pod *v1.Pod) bool {
 // PodCannotBeDisrupted returns true if the pod cannot be forcibly drained from
 // a node.
 func PodCannotBeDisrupted(pod *v1.Pod) bool {
-	for annotationName, annotationValue := range pod.ObjectMeta.Annotations {
+	for annotationName, annotationValue := range pod.Annotations {
 		if annotationName == doNotDisruptAnnotation && annotationValue == doNotDisruptAnnotationRequiredValue {
 			return true
 		}
@@ -120,7 +120,7 @@ func PodIsLongtermUnhealthy(podStatus v1.PodStatus, unhealthyAfter time.Duration
 
 // PodIsStatic returns true if the pod is static
 func PodIsStatic(pod *v1.Pod) bool {
-	configSource, ok := pod.ObjectMeta.Annotations["kubernetes.io/config.source"]
+	configSource, ok := pod.Annotations["kubernetes.io/config.source"]
 	return ok && configSource == "file"
 }
 

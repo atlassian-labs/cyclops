@@ -34,7 +34,7 @@ func TestSuccessfulNoDelete(t *testing.T) {
 	var list v1.CycleNodeRequestList
 
 	assert.NoError(t,
-		fakeTransitioner.Client.K8sClient.List(context.TODO(), &list, &client.ListOptions{}),
+		fakeTransitioner.K8sClient.List(context.TODO(), &list, &client.ListOptions{}),
 	)
 
 	assert.Len(t, list.Items, 1)
@@ -44,7 +44,7 @@ func TestSuccessfulNoDelete(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.NoError(t,
-		fakeTransitioner.Client.K8sClient.List(context.TODO(), &list, &client.ListOptions{}),
+		fakeTransitioner.K8sClient.List(context.TODO(), &list, &client.ListOptions{}),
 	)
 
 	assert.Len(t, list.Items, 1)
@@ -75,7 +75,7 @@ func TestSuccessfulAfterDeleteTime(t *testing.T) {
 	var list v1.CycleNodeRequestList
 
 	assert.NoError(t,
-		fakeTransitioner.Client.K8sClient.List(context.TODO(), &list, &client.ListOptions{}),
+		fakeTransitioner.K8sClient.List(context.TODO(), &list, &client.ListOptions{}),
 	)
 
 	assert.Len(t, list.Items, 1)
@@ -85,7 +85,7 @@ func TestSuccessfulAfterDeleteTime(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.NoError(t,
-		fakeTransitioner.Client.K8sClient.List(context.TODO(), &list, &client.ListOptions{}),
+		fakeTransitioner.K8sClient.List(context.TODO(), &list, &client.ListOptions{}),
 	)
 
 	assert.Len(t, list.Items, 0)
@@ -116,7 +116,7 @@ func TestSuccessfulBeforeDeleteTime(t *testing.T) {
 	var list v1.CycleNodeRequestList
 
 	assert.NoError(t,
-		fakeTransitioner.Client.K8sClient.List(context.TODO(), &list, &client.ListOptions{}),
+		fakeTransitioner.K8sClient.List(context.TODO(), &list, &client.ListOptions{}),
 	)
 
 	assert.Len(t, list.Items, 1)
@@ -126,7 +126,7 @@ func TestSuccessfulBeforeDeleteTime(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.NoError(t,
-		fakeTransitioner.Client.K8sClient.List(context.TODO(), &list, &client.ListOptions{}),
+		fakeTransitioner.K8sClient.List(context.TODO(), &list, &client.ListOptions{}),
 	)
 
 	assert.Len(t, list.Items, 1)
@@ -267,7 +267,7 @@ func TestSuccessfulDeleteFailedSiblingCNRs(t *testing.T) {
 	var list v1.CycleNodeRequestList
 
 	assert.NoError(t,
-		fakeTransitioner.Client.K8sClient.List(context.TODO(), &list, &client.ListOptions{}),
+		fakeTransitioner.K8sClient.List(context.TODO(), &list, &client.ListOptions{}),
 	)
 
 	assert.Len(t, list.Items, 7)
@@ -277,46 +277,46 @@ func TestSuccessfulDeleteFailedSiblingCNRs(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.NoError(t,
-		fakeTransitioner.Client.K8sClient.List(context.TODO(), &list, &client.ListOptions{}),
+		fakeTransitioner.K8sClient.List(context.TODO(), &list, &client.ListOptions{}),
 	)
 
 	assert.Len(t, list.Items, 5)
 
 	var cnr v1.CycleNodeRequest
 
-	assert.NoError(t, fakeTransitioner.Client.K8sClient.Get(context.TODO(), types.NamespacedName{
+	assert.NoError(t, fakeTransitioner.K8sClient.Get(context.TODO(), types.NamespacedName{
 		Name:      cnr1.Name,
 		Namespace: cnr1.Namespace,
 	}, &cnr))
 
 	// CNR 2 should be deleted
-	assert.Error(t, fakeTransitioner.Client.K8sClient.Get(context.TODO(), types.NamespacedName{
+	assert.Error(t, fakeTransitioner.K8sClient.Get(context.TODO(), types.NamespacedName{
 		Name:      cnr2.Name,
 		Namespace: cnr2.Namespace,
 	}, &cnr))
 
 	// CNR 3 should be deleted
-	assert.Error(t, fakeTransitioner.Client.K8sClient.Get(context.TODO(), types.NamespacedName{
+	assert.Error(t, fakeTransitioner.K8sClient.Get(context.TODO(), types.NamespacedName{
 		Name:      cnr3.Name,
 		Namespace: cnr3.Namespace,
 	}, &cnr))
 
-	assert.NoError(t, fakeTransitioner.Client.K8sClient.Get(context.TODO(), types.NamespacedName{
+	assert.NoError(t, fakeTransitioner.K8sClient.Get(context.TODO(), types.NamespacedName{
 		Name:      cnr4.Name,
 		Namespace: cnr4.Namespace,
 	}, &cnr))
 
-	assert.NoError(t, fakeTransitioner.Client.K8sClient.Get(context.TODO(), types.NamespacedName{
+	assert.NoError(t, fakeTransitioner.K8sClient.Get(context.TODO(), types.NamespacedName{
 		Name:      cnr5.Name,
 		Namespace: cnr5.Namespace,
 	}, &cnr))
 
-	assert.NoError(t, fakeTransitioner.Client.K8sClient.Get(context.TODO(), types.NamespacedName{
+	assert.NoError(t, fakeTransitioner.K8sClient.Get(context.TODO(), types.NamespacedName{
 		Name:      cnr6.Name,
 		Namespace: cnr6.Namespace,
 	}, &cnr))
 
-	assert.NoError(t, fakeTransitioner.Client.K8sClient.Get(context.TODO(), types.NamespacedName{
+	assert.NoError(t, fakeTransitioner.K8sClient.Get(context.TODO(), types.NamespacedName{
 		Name:      cnr7.Name,
 		Namespace: cnr7.Namespace,
 	}, &cnr))
