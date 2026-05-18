@@ -536,6 +536,12 @@ func (t *CycleNodeRequestTransitioner) transitionWaitingTermination() (reconcile
 	// the annotations from this batch's replacement nodes. Their old counterparts
 	// have been terminated, so the protection is no longer needed. This avoids
 	// accumulating protected nodes across the entire cycle duration.
+	//
+	// Trade-off: cluster-autoscaler could theoretically scale down these freshly
+	// drained-onto nodes before the next batch's replacements come up. We accept
+	// this because (a) CA uses the eviction API so pods are rescheduled gracefully,
+	// and (b) keeping protection until the entire CNR completes would leave a
+	// growing set of un-scalable nodes for long-running multi-batch cycles.
 	if desiredPhase == v1.CycleNodeRequestInitialised && t.shouldManageAnnotations() {
 		t.cleanupScaleDownDisabledAnnotations()
 	}

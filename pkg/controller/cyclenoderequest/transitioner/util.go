@@ -41,8 +41,12 @@ func (t *CycleNodeRequestTransitioner) transitionToFailed(err error) (reconcile.
 func (t *CycleNodeRequestTransitioner) transitionToUnsuccessful(phase v1.CycleNodeRequestPhase, err error) (reconcile.Result, error) {
 	t.cycleNodeRequest.Status.Phase = phase
 
-	// Clear AnnotatedNodes so it is persisted as empty with this status update.
-	// This ensures subsequent requeues won't re-run cleanup.
+	// Deliberately skip removing annotations from nodes on the failure path.
+	// Annotation cleanup involves per-node API calls that can fail or be slow,
+	// and we don't want to delay or complicate the transition to a terminal
+	// error state. The node controller safety net will reconcile stale
+	// annotations within its requeue interval (~5 min).
+	// Clear the list so subsequent requeues of this CNR are no-ops.
 	t.cycleNodeRequest.Status.AnnotatedNodes = nil
 	// don't try to append message if it's nil
 	if err != nil {
