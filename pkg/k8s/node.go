@@ -12,7 +12,16 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+)
+
+const (
+	// CyclopsManagedAnnotation marks nodes where Cyclops added the scale-down-disabled annotation.
+	CyclopsManagedAnnotation = "cyclops.atlassian.com/annotation-managed"
+
+	// ClusterAutoscalerScaleDownDisabledAnnotation prevents Cluster Autoscaler from scaling down a node.
+	ClusterAutoscalerScaleDownDisabledAnnotation = "cluster-autoscaler.kubernetes.io/scale-down-disabled"
 )
 
 // CordonNode performs a patch operation on a node to mark it as unschedulable
@@ -83,6 +92,46 @@ func RemoveAnnotationFromNode(nodeName string, annotationName string, client kub
 		},
 	}
 	return PatchNode(nodeName, patches, client)
+}
+
+// RemoveAnnotationsFromNode removes annotations from a node with retry-on-conflict.
+// Missing nodes or annotations are treated as success so callers can use this for
+// best-effort cleanup of stale node state.
+func RemoveAnnotationsFromNode(nodeName string, client kubernetes.Interface, annotationNames ...string) error {
+	for _, annotationName := range annotationNames {
+		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+			if err != nil {
+				return err
+			}
+			if node.Annotations == nil {
+				return nil
+			}
+			if _, exists := node.Annotations[annotationName]; !exists {
+				return nil
+			}
+
+			return RemoveAnnotationFromNode(nodeName, annotationName, client)
+		}); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// RemoveScaleDownDisabledAnnotationsFromNode removes the scale-down-disabled annotation
+// and the Cyclops marker annotation from a node.
+func RemoveScaleDownDisabledAnnotationsFromNode(nodeName string, client kubernetes.Interface) error {
+	return RemoveAnnotationsFromNode(
+		nodeName,
+		client,
+		ClusterAutoscalerScaleDownDisabledAnnotation,
+		CyclopsManagedAnnotation,
+	)
 }
 
 // RemoveLabelFromNode performs a patch operation on a node to remove a label from the node

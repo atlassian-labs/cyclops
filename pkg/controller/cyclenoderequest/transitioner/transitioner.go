@@ -6,6 +6,7 @@ import (
 
 	v1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
 	"github.com/atlassian-labs/cyclops/pkg/controller"
+	"github.com/atlassian-labs/cyclops/pkg/k8s"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -17,18 +18,14 @@ type transitionFunc func() (reconcile.Result, error)
 // different request types.
 const cycleNodeLabel = "cyclops.atlassian.com/terminate"
 
-// cyclopsManagedAnnotation marks nodes where Cyclops added the scale-down-disabled annotation.
-// Used to track which annotations we added vs pre-existing ones (for safe cleanup).
-// Only remove the cluster-autoscaler annotation if this marker annotation also exists.
-const cyclopsManagedAnnotation = "cyclops.atlassian.com/annotation-managed"
+const (
+	// cyclopsManagedAnnotation marks nodes where Cyclops added the scale-down-disabled annotation.
+	cyclopsManagedAnnotation = k8s.CyclopsManagedAnnotation
 
-// clusterAutoscalerScaleDownDisabledAnnotation is the annotation key used to prevent
-// Cluster Autoscaler from scaling down a node. This is used to protect new nodes
-// during the cycling process from being removed by Cluster Autoscaler before
-// the corresponding old nodes are fully terminated.
-// See: https://github.com/kubernetes/autoscaler/blob/master/cluster-autoscaler/FAQ.md#how-can-i-prevent-cluster-autoscaler-from-scaling-down-a-particular-node
-const clusterAutoscalerScaleDownDisabledAnnotation = "cluster-autoscaler.kubernetes.io/scale-down-disabled"
-const clusterAutoscalerScaleDownDisabledValue = "true"
+	// clusterAutoscalerScaleDownDisabledAnnotation protects new nodes during cycling.
+	clusterAutoscalerScaleDownDisabledAnnotation = k8s.ClusterAutoscalerScaleDownDisabledAnnotation
+	clusterAutoscalerScaleDownDisabledValue      = "true"
+)
 
 // nodeGroupAnnotationKey is the annotation key on NodeGroup resources that controls whether
 // Cluster Autoscaler annotation management is enabled or disabled.

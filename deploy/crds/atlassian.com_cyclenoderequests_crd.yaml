@@ -365,6 +365,15 @@ spec:
                   when it last checked for progress in the cycle operation.
                 format: int64
                 type: integer
+              annotatedNodes:
+                description: |-
+                  AnnotatedNodes tracks the names of nodes that Cyclops added the
+                  scale-down-disabled annotation to during cycling. Used for deterministic
+                  cleanup such that only these nodes have their annotations removed during the
+                  Successful or Healing phase. Cleared after cleanup completes.
+                items:
+                  type: string
+                type: array
               currentNodes:
                 description: |-
                   CurrentNodes stores the current nodes that are being "worked on". Used to batch operations

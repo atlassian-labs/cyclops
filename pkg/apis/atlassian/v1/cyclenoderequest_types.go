@@ -93,6 +93,12 @@ type CycleNodeRequestStatus struct {
 
 	// PreTerminationChecks keeps track of the instance pre termination check information
 	PreTerminationChecks map[string]PreTerminationCheckStatusList `json:"preTerminationChecks,omitempty"`
+
+	// AnnotatedNodes tracks the names of nodes that Cyclops added the
+	// scale-down-disabled annotation to during cycling. Used for deterministic
+	// cleanup such that only these nodes have their annotations removed during the
+	// Successful or Healing phase. Cleared after cleanup completes.
+	AnnotatedNodes []string `json:"annotatedNodes,omitempty"`
 }
 
 // CycleNodeRequestNode stores a current node that is being worked on
