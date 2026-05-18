@@ -109,7 +109,7 @@ func TestSuccessfulCleansUpAnnotatedNodes(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "cnr-cleanup",
 			Namespace:         "kube-system",
-			CreationTimestamp:  metav1.Now(),
+			CreationTimestamp: metav1.Now(),
 		},
 		Spec: v1.CycleNodeRequestSpec{
 			NodeGroupName: "ng-1",
@@ -120,13 +120,13 @@ func TestSuccessfulCleansUpAnnotatedNodes(t *testing.T) {
 			},
 		},
 		Status: v1.CycleNodeRequestStatus{
-			Phase:              v1.CycleNodeRequestInitialised,
-			ActiveChildren:     0,
-			NumNodesCycled:     3,
-			NodesToTerminate:   []v1.CycleNodeRequestNode{},
-			AnnotatedNodes:     []string{"node-1", "node-2", "node-3"},
-			CurrentNodes:       []v1.CycleNodeRequestNode{},
-			ScaleUpStarted:     &metav1.Time{Time: time.Now().Add(-10 * time.Minute)},
+			Phase:            v1.CycleNodeRequestInitialised,
+			ActiveChildren:   0,
+			NumNodesCycled:   3,
+			NodesToTerminate: []v1.CycleNodeRequestNode{},
+			AnnotatedNodes:   []string{"node-1", "node-2", "node-3"},
+			CurrentNodes:     []v1.CycleNodeRequestNode{},
+			ScaleUpStarted:   &metav1.Time{Time: time.Now().Add(-10 * time.Minute)},
 		},
 	}
 
@@ -154,7 +154,7 @@ func TestSuccessfulCleansUpAnnotatedNodes(t *testing.T) {
 
 	// Verify AnnotatedNodes was persisted as empty to the API server
 	persistedCNR := &v1.CycleNodeRequest{}
-	err = fakeTransitioner.Client.K8sClient.Get(context.TODO(),
+	err = fakeTransitioner.K8sClient.Get(context.TODO(),
 		types.NamespacedName{Name: "cnr-cleanup", Namespace: "kube-system"}, persistedCNR)
 	require.NoError(t, err, "should be able to read CNR back from API server")
 	assert.Empty(t, persistedCNR.Status.AnnotatedNodes,
@@ -193,7 +193,7 @@ func TestSuccessfulCleanupIsNoOpWhenAnnotatedNodesEmpty(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "cnr-old-successful",
 			Namespace:         "kube-system",
-			CreationTimestamp:  metav1.NewTime(time.Now().Add(-6 * 24 * time.Hour)),
+			CreationTimestamp: metav1.NewTime(time.Now().Add(-6 * 24 * time.Hour)),
 		},
 		Spec: v1.CycleNodeRequestSpec{
 			NodeGroupName: "ng-1",
@@ -276,8 +276,8 @@ func TestWaitingTerminationCleansUpAnnotationsPerBatch(t *testing.T) {
 	// CNR is in WaitingTermination with 1 node still available to cycle.
 	cnr := &v1.CycleNodeRequest{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:             "cnr-perbatch",
-			Namespace:        "kube-system",
+			Name:              "cnr-perbatch",
+			Namespace:         "kube-system",
 			CreationTimestamp: metav1.Now(),
 		},
 		Spec: v1.CycleNodeRequestSpec{
@@ -295,10 +295,10 @@ func TestWaitingTerminationCleansUpAnnotationsPerBatch(t *testing.T) {
 			NodesAvailable: []v1.CycleNodeRequestNode{
 				{Name: "pending-1", ProviderID: "i-pending1"},
 			},
-			NodesToTerminate:   []v1.CycleNodeRequestNode{},
-			AnnotatedNodes:     []string{"replacement-1"},
-			CurrentNodes:       []v1.CycleNodeRequestNode{},
-			ScaleUpStarted:     &metav1.Time{Time: time.Now().Add(-5 * time.Minute)},
+			NodesToTerminate: []v1.CycleNodeRequestNode{},
+			AnnotatedNodes:   []string{"replacement-1"},
+			CurrentNodes:     []v1.CycleNodeRequestNode{},
+			ScaleUpStarted:   &metav1.Time{Time: time.Now().Add(-5 * time.Minute)},
 		},
 	}
 
@@ -326,7 +326,7 @@ func TestWaitingTerminationCleansUpAnnotationsPerBatch(t *testing.T) {
 
 	// Verify AnnotatedNodes was cleared (persisted via UpdateObject in transitionWaitingTermination)
 	persistedCNR := &v1.CycleNodeRequest{}
-	err = fakeTransitioner.Client.K8sClient.Get(context.TODO(),
+	err = fakeTransitioner.K8sClient.Get(context.TODO(),
 		types.NamespacedName{Name: "cnr-perbatch", Namespace: "kube-system"}, persistedCNR)
 	require.NoError(t, err)
 	assert.Empty(t, persistedCNR.Status.AnnotatedNodes,
@@ -640,8 +640,8 @@ func TestSuccessfulPartialCleanupFailurePreservesFailedNodes(t *testing.T) {
 
 	cnr := &v1.CycleNodeRequest{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:             "cnr-partial-fail",
-			Namespace:        "kube-system",
+			Name:              "cnr-partial-fail",
+			Namespace:         "kube-system",
 			CreationTimestamp: metav1.Now(),
 		},
 		Spec: v1.CycleNodeRequestSpec{
@@ -670,7 +670,7 @@ func TestSuccessfulPartialCleanupFailurePreservesFailedNodes(t *testing.T) {
 	)
 
 	// Inject a reactor that makes patch calls fail for "node-fail".
-	rawClient := fakeTransitioner.Client.RawClient.(*fakerawclient.Clientset)
+	rawClient := fakeTransitioner.RawClient.(*fakerawclient.Clientset)
 	rawClient.PrependReactor("patch", "nodes", func(action k8stesting.Action) (bool, runtime.Object, error) {
 		patchAction := action.(k8stesting.PatchAction)
 		if patchAction.GetName() == "node-fail" {
@@ -693,7 +693,7 @@ func TestSuccessfulPartialCleanupFailurePreservesFailedNodes(t *testing.T) {
 
 	// AnnotatedNodes should contain only the failed node, NOT be nil.
 	persistedCNR := &v1.CycleNodeRequest{}
-	err = fakeTransitioner.Client.K8sClient.Get(context.TODO(),
+	err = fakeTransitioner.K8sClient.Get(context.TODO(),
 		types.NamespacedName{Name: "cnr-partial-fail", Namespace: "kube-system"}, persistedCNR)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"node-fail"}, persistedCNR.Status.AnnotatedNodes,
@@ -724,8 +724,8 @@ func TestTransitionToUnsuccessfulNilsAnnotatedNodesWithoutCleanup(t *testing.T) 
 
 	cnr := &v1.CycleNodeRequest{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:             "cnr-healing",
-			Namespace:        "kube-system",
+			Name:              "cnr-healing",
+			Namespace:         "kube-system",
 			CreationTimestamp: metav1.Now(),
 		},
 		Spec: v1.CycleNodeRequestSpec{
@@ -753,14 +753,14 @@ func TestTransitionToUnsuccessfulNilsAnnotatedNodesWithoutCleanup(t *testing.T) 
 
 	// Verify AnnotatedNodes was nil'd out.
 	persistedCNR := &v1.CycleNodeRequest{}
-	err := fakeTransitioner.Client.K8sClient.Get(context.TODO(),
+	err := fakeTransitioner.K8sClient.Get(context.TODO(),
 		types.NamespacedName{Name: "cnr-healing", Namespace: "kube-system"}, persistedCNR)
 	require.NoError(t, err)
 	assert.Nil(t, persistedCNR.Status.AnnotatedNodes,
 		"AnnotatedNodes should be nil on failure path (no cleanup attempted)")
 
 	// Verify the annotation is still on the node — it was NOT removed.
-	rawClient := fakeTransitioner.Client.RawClient.(*fakerawclient.Clientset)
+	rawClient := fakeTransitioner.RawClient.(*fakerawclient.Clientset)
 	node, err := rawClient.CoreV1().Nodes().Get(context.TODO(), "node-annotated", metav1.GetOptions{})
 	require.NoError(t, err)
 	_, hasAnnotation := node.Annotations[clusterAutoscalerScaleDownDisabledAnnotation]
@@ -822,8 +822,8 @@ func TestWaitingTerminationPartialCleanupFailurePreservesForRetry(t *testing.T) 
 
 	cnr := &v1.CycleNodeRequest{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:             "cnr-retry",
-			Namespace:        "kube-system",
+			Name:              "cnr-retry",
+			Namespace:         "kube-system",
 			CreationTimestamp: metav1.Now(),
 		},
 		Spec: v1.CycleNodeRequestSpec{
@@ -856,7 +856,7 @@ func TestWaitingTerminationPartialCleanupFailurePreservesForRetry(t *testing.T) 
 	)
 
 	// Inject a reactor that makes patch calls fail for "replacement-fail".
-	rawClient := fakeTransitioner.Client.RawClient.(*fakerawclient.Clientset)
+	rawClient := fakeTransitioner.RawClient.(*fakerawclient.Clientset)
 	rawClient.PrependReactor("patch", "nodes", func(action k8stesting.Action) (bool, runtime.Object, error) {
 		patchAction := action.(k8stesting.PatchAction)
 		if patchAction.GetName() == "replacement-fail" {
@@ -879,7 +879,7 @@ func TestWaitingTerminationPartialCleanupFailurePreservesForRetry(t *testing.T) 
 
 	// AnnotatedNodes should retain only the failed node for retry on next pass.
 	persistedCNR := &v1.CycleNodeRequest{}
-	err = fakeTransitioner.Client.K8sClient.Get(context.TODO(),
+	err = fakeTransitioner.K8sClient.Get(context.TODO(),
 		types.NamespacedName{Name: "cnr-retry", Namespace: "kube-system"}, persistedCNR)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"replacement-fail"}, persistedCNR.Status.AnnotatedNodes,
