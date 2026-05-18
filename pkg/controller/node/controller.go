@@ -120,9 +120,6 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 	if _, ok := node.Annotations[k8s.CyclopsManagedAnnotation]; !ok {
 		return reconcile.Result{}, nil
 	}
-	if _, ok := node.Annotations[k8s.ClusterAutoscalerScaleDownDisabledAnnotation]; !ok {
-		return reconcile.Result{}, nil
-	}
 
 	nodeLabels := labels.Set(node.Labels)
 

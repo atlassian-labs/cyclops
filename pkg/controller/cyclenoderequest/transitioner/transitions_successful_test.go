@@ -2,6 +2,7 @@ package transitioner
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -11,10 +12,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	fakerawclient "k8s.io/client-go/kubernetes/fake"
+	k8stesting "k8s.io/client-go/testing"
 )
 
 // Test that if no delete options are given to the transitioner, then the CNR
@@ -599,4 +603,285 @@ func TestSuccessfulDeleteFailedSiblingCNRs(t *testing.T) {
 		Name:      cnr7.Name,
 		Namespace: cnr7.Namespace,
 	}, &cnr))
+}
+
+// Test that when some annotation removals fail during transitionToSuccessful,
+// AnnotatedNodes retains only the failed nodes so the node controller can
+// clean them up (rather than being unconditionally nil'd out).
+func TestSuccessfulPartialCleanupFailurePreservesFailedNodes(t *testing.T) {
+	nodeOK := &mock.Node{
+		Name:            "node-ok",
+		InstanceID:      "i-nodeok",
+		Nodegroup:       "ng-1",
+		NodeReady:       corev1.ConditionTrue,
+		LabelKey:        "role",
+		LabelValue:      "worker",
+		AnnotationKey:   clusterAutoscalerScaleDownDisabledAnnotation,
+		AnnotationValue: clusterAutoscalerScaleDownDisabledValue,
+	}
+	nodeFail := &mock.Node{
+		Name:            "node-fail",
+		InstanceID:      "i-nodefail",
+		Nodegroup:       "ng-1",
+		NodeReady:       corev1.ConditionTrue,
+		LabelKey:        "role",
+		LabelValue:      "worker",
+		AnnotationKey:   clusterAutoscalerScaleDownDisabledAnnotation,
+		AnnotationValue: clusterAutoscalerScaleDownDisabledValue,
+	}
+
+	nodeGroup := &v1.NodeGroup{
+		ObjectMeta: metav1.ObjectMeta{Name: "ng-1"},
+		Spec: v1.NodeGroupSpec{
+			NodeGroupName: "ng-1",
+			NodeSelector:  metav1.LabelSelector{MatchLabels: map[string]string{"role": "worker"}},
+		},
+	}
+
+	cnr := &v1.CycleNodeRequest{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:             "cnr-partial-fail",
+			Namespace:        "kube-system",
+			CreationTimestamp: metav1.Now(),
+		},
+		Spec: v1.CycleNodeRequestSpec{
+			NodeGroupName: "ng-1",
+			Selector:      metav1.LabelSelector{MatchLabels: map[string]string{"role": "worker"}},
+			CycleSettings: v1.CycleSettings{
+				Concurrency: 1,
+				Method:      v1.CycleNodeRequestMethodDrain,
+			},
+		},
+		Status: v1.CycleNodeRequestStatus{
+			Phase:            v1.CycleNodeRequestInitialised,
+			ActiveChildren:   0,
+			NumNodesCycled:   2,
+			NodesToTerminate: []v1.CycleNodeRequestNode{},
+			AnnotatedNodes:   []string{"node-ok", "node-fail"},
+			CurrentNodes:     []v1.CycleNodeRequestNode{},
+			ScaleUpStarted:   &metav1.Time{Time: time.Now().Add(-10 * time.Minute)},
+		},
+	}
+
+	fakeTransitioner := NewFakeTransitioner(cnr,
+		WithKubeNodes([]*mock.Node{nodeOK, nodeFail}),
+		WithCloudProviderInstances([]*mock.Node{nodeOK, nodeFail}),
+		WithExtraKubeObject(nodeGroup),
+	)
+
+	// Inject a reactor that makes patch calls fail for "node-fail".
+	rawClient := fakeTransitioner.Client.RawClient.(*fakerawclient.Clientset)
+	rawClient.PrependReactor("patch", "nodes", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		patchAction := action.(k8stesting.PatchAction)
+		if patchAction.GetName() == "node-fail" {
+			return true, nil, fmt.Errorf("simulated API error")
+		}
+		return false, nil, nil
+	})
+
+	_, err := fakeTransitioner.Run()
+	require.NoError(t, err)
+
+	assert.Equal(t, v1.CycleNodeRequestSuccessful, fakeTransitioner.cycleNodeRequest.Status.Phase,
+		"CNR should still transition to Successful despite partial failure")
+
+	// node-ok should have its annotation removed successfully.
+	nodeResult, err := rawClient.CoreV1().Nodes().Get(context.TODO(), "node-ok", metav1.GetOptions{})
+	require.NoError(t, err)
+	_, hasAnnotation := nodeResult.Annotations[clusterAutoscalerScaleDownDisabledAnnotation]
+	assert.False(t, hasAnnotation, "annotation should be removed from node-ok")
+
+	// AnnotatedNodes should contain only the failed node, NOT be nil.
+	persistedCNR := &v1.CycleNodeRequest{}
+	err = fakeTransitioner.Client.K8sClient.Get(context.TODO(),
+		types.NamespacedName{Name: "cnr-partial-fail", Namespace: "kube-system"}, persistedCNR)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"node-fail"}, persistedCNR.Status.AnnotatedNodes,
+		"AnnotatedNodes should retain only the node that failed cleanup")
+}
+
+// Test that transitionToUnsuccessful (Healing/Failed path) nils out AnnotatedNodes
+// without attempting removal — the node controller is the backstop for this case.
+func TestTransitionToUnsuccessfulNilsAnnotatedNodesWithoutCleanup(t *testing.T) {
+	annotatedNode := &mock.Node{
+		Name:            "node-annotated",
+		InstanceID:      "i-annotated",
+		Nodegroup:       "ng-1",
+		NodeReady:       corev1.ConditionTrue,
+		LabelKey:        "role",
+		LabelValue:      "worker",
+		AnnotationKey:   clusterAutoscalerScaleDownDisabledAnnotation,
+		AnnotationValue: clusterAutoscalerScaleDownDisabledValue,
+	}
+
+	nodeGroup := &v1.NodeGroup{
+		ObjectMeta: metav1.ObjectMeta{Name: "ng-1"},
+		Spec: v1.NodeGroupSpec{
+			NodeGroupName: "ng-1",
+			NodeSelector:  metav1.LabelSelector{MatchLabels: map[string]string{"role": "worker"}},
+		},
+	}
+
+	cnr := &v1.CycleNodeRequest{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:             "cnr-healing",
+			Namespace:        "kube-system",
+			CreationTimestamp: metav1.Now(),
+		},
+		Spec: v1.CycleNodeRequestSpec{
+			NodeGroupName: "ng-1",
+			Selector:      metav1.LabelSelector{MatchLabels: map[string]string{"role": "worker"}},
+			CycleSettings: v1.CycleSettings{
+				Concurrency: 1,
+				Method:      v1.CycleNodeRequestMethodDrain,
+			},
+		},
+		Status: v1.CycleNodeRequestStatus{
+			Phase:          v1.CycleNodeRequestScalingUp,
+			AnnotatedNodes: []string{"node-annotated"},
+		},
+	}
+
+	fakeTransitioner := NewFakeTransitioner(cnr,
+		WithKubeNodes([]*mock.Node{annotatedNode}),
+		WithCloudProviderInstances([]*mock.Node{annotatedNode}),
+		WithExtraKubeObject(nodeGroup),
+	)
+
+	// Directly call transitionToHealing to simulate the failure path.
+	_, _ = fakeTransitioner.transitionToHealing(fmt.Errorf("something went wrong"))
+
+	// Verify AnnotatedNodes was nil'd out.
+	persistedCNR := &v1.CycleNodeRequest{}
+	err := fakeTransitioner.Client.K8sClient.Get(context.TODO(),
+		types.NamespacedName{Name: "cnr-healing", Namespace: "kube-system"}, persistedCNR)
+	require.NoError(t, err)
+	assert.Nil(t, persistedCNR.Status.AnnotatedNodes,
+		"AnnotatedNodes should be nil on failure path (no cleanup attempted)")
+
+	// Verify the annotation is still on the node — it was NOT removed.
+	rawClient := fakeTransitioner.Client.RawClient.(*fakerawclient.Clientset)
+	node, err := rawClient.CoreV1().Nodes().Get(context.TODO(), "node-annotated", metav1.GetOptions{})
+	require.NoError(t, err)
+	_, hasAnnotation := node.Annotations[clusterAutoscalerScaleDownDisabledAnnotation]
+	assert.True(t, hasAnnotation,
+		"annotation should remain on node (failure path skips cleanup, node controller will handle it)")
+}
+
+// Test that the WaitingTermination → Initialised path preserves failed nodes
+// in AnnotatedNodes so they get retried on the next pass.
+func TestWaitingTerminationPartialCleanupFailurePreservesForRetry(t *testing.T) {
+	nodeOK := &mock.Node{
+		Name:            "replacement-ok",
+		InstanceID:      "i-repok",
+		Nodegroup:       "ng-1",
+		NodeReady:       corev1.ConditionTrue,
+		LabelKey:        "role",
+		LabelValue:      "worker",
+		AnnotationKey:   clusterAutoscalerScaleDownDisabledAnnotation,
+		AnnotationValue: clusterAutoscalerScaleDownDisabledValue,
+	}
+	nodeFail := &mock.Node{
+		Name:            "replacement-fail",
+		InstanceID:      "i-repfail",
+		Nodegroup:       "ng-1",
+		NodeReady:       corev1.ConditionTrue,
+		LabelKey:        "role",
+		LabelValue:      "worker",
+		AnnotationKey:   clusterAutoscalerScaleDownDisabledAnnotation,
+		AnnotationValue: clusterAutoscalerScaleDownDisabledValue,
+	}
+	pendingNode := &mock.Node{
+		Name:       "pending-1",
+		InstanceID: "i-pending1",
+		Nodegroup:  "ng-1",
+		NodeReady:  corev1.ConditionTrue,
+		LabelKey:   "role",
+		LabelValue: "worker",
+	}
+
+	nodeGroup := &v1.NodeGroup{
+		ObjectMeta: metav1.ObjectMeta{Name: "ng-1"},
+		Spec: v1.NodeGroupSpec{
+			NodeGroupName: "ng-1",
+			NodeSelector:  metav1.LabelSelector{MatchLabels: map[string]string{"role": "worker"}},
+		},
+	}
+
+	// A completed CNS so reapChildren transitions back to Initialised.
+	cns := &v1.CycleNodeStatus{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "cns-batch",
+			Namespace: "kube-system",
+			Labels:    map[string]string{"name": "cnr-retry"},
+		},
+		Status: v1.CycleNodeStatusStatus{
+			Phase: v1.CycleNodeStatusSuccessful,
+		},
+	}
+
+	cnr := &v1.CycleNodeRequest{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:             "cnr-retry",
+			Namespace:        "kube-system",
+			CreationTimestamp: metav1.Now(),
+		},
+		Spec: v1.CycleNodeRequestSpec{
+			NodeGroupName: "ng-1",
+			Selector:      metav1.LabelSelector{MatchLabels: map[string]string{"role": "worker"}},
+			CycleSettings: v1.CycleSettings{
+				Concurrency: 1,
+				Method:      v1.CycleNodeRequestMethodDrain,
+			},
+		},
+		Status: v1.CycleNodeRequestStatus{
+			Phase:          v1.CycleNodeRequestWaitingTermination,
+			ActiveChildren: 1,
+			NumNodesCycled: 2,
+			NodesAvailable: []v1.CycleNodeRequestNode{
+				{Name: "pending-1", ProviderID: "i-pending1"},
+			},
+			NodesToTerminate: []v1.CycleNodeRequestNode{},
+			AnnotatedNodes:   []string{"replacement-ok", "replacement-fail"},
+			CurrentNodes:     []v1.CycleNodeRequestNode{},
+			ScaleUpStarted:   &metav1.Time{Time: time.Now().Add(-5 * time.Minute)},
+		},
+	}
+
+	fakeTransitioner := NewFakeTransitioner(cnr,
+		WithKubeNodes([]*mock.Node{nodeOK, nodeFail, pendingNode}),
+		WithCloudProviderInstances([]*mock.Node{nodeOK, nodeFail, pendingNode}),
+		WithExtraKubeObject(nodeGroup),
+		WithExtraKubeObject(cns),
+	)
+
+	// Inject a reactor that makes patch calls fail for "replacement-fail".
+	rawClient := fakeTransitioner.Client.RawClient.(*fakerawclient.Clientset)
+	rawClient.PrependReactor("patch", "nodes", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		patchAction := action.(k8stesting.PatchAction)
+		if patchAction.GetName() == "replacement-fail" {
+			return true, nil, fmt.Errorf("simulated transient API error")
+		}
+		return false, nil, nil
+	})
+
+	_, err := fakeTransitioner.Run()
+	require.NoError(t, err)
+
+	assert.Equal(t, v1.CycleNodeRequestInitialised, fakeTransitioner.cycleNodeRequest.Status.Phase,
+		"CNR should have transitioned back to Initialised")
+
+	// replacement-ok should have its annotation removed.
+	nodeResult, err := rawClient.CoreV1().Nodes().Get(context.TODO(), "replacement-ok", metav1.GetOptions{})
+	require.NoError(t, err)
+	_, hasAnnotation := nodeResult.Annotations[clusterAutoscalerScaleDownDisabledAnnotation]
+	assert.False(t, hasAnnotation, "annotation should be removed from replacement-ok")
+
+	// AnnotatedNodes should retain only the failed node for retry on next pass.
+	persistedCNR := &v1.CycleNodeRequest{}
+	err = fakeTransitioner.Client.K8sClient.Get(context.TODO(),
+		types.NamespacedName{Name: "cnr-retry", Namespace: "kube-system"}, persistedCNR)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"replacement-fail"}, persistedCNR.Status.AnnotatedNodes,
+		"AnnotatedNodes should retain only the failed node for retry")
 }

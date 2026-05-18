@@ -195,15 +195,15 @@ func TestReconcile(t *testing.T) {
 			expectRemoved: true,
 		},
 		{
-			name: "only cyclopsManagedAnnotation present",
+			name: "only cyclopsManagedAnnotation present (partial cleanup recovery)",
 			objects: []client.Object{
 				testNode("node-1", workerLabels, map[string]string{
 					cyclopsManagedAnnotation: "true",
 				}),
 				testNodeGroup("ng-1", workerLabels),
 			},
-			nodeName:        "node-1",
-			expectUnchanged: true,
+			nodeName:      "node-1",
+			expectRemoved: true,
 		},
 		{
 			name: "only clusterAutoscalerScaleDownDisabledAnnotation present",
@@ -378,6 +378,32 @@ func TestReconcile_RequeueThenCleanup(t *testing.T) {
 	annotations = getNodeAnnotations(t, rawClient, "node-1")
 	assert.NotContains(t, annotations, cyclopsManagedAnnotation, "managed annotation should be removed")
 	assert.NotContains(t, annotations, clusterAutoscalerScaleDownDisabledAnnotation, "scale-down-disabled annotation should be removed")
+}
+
+// TestReconcile_PartialRemovalRecovery verifies the node controller cleans up
+// an orphaned marker annotation when a previous removal attempt succeeded for
+// the CA annotation but failed for the marker. This is a regression test —
+// an earlier version required both annotations to be present before acting,
+// which left the orphaned marker permanently stuck.
+func TestReconcile_PartialRemovalRecovery(t *testing.T) {
+	// Node has only the marker — simulates a prior call to
+	// RemoveScaleDownDisabledAnnotationsFromNode that removed the CA
+	// annotation but failed on the marker.
+	node := testNode("node-partial", workerLabels, map[string]string{
+		cyclopsManagedAnnotation: "true",
+	})
+	ng := testNodeGroup("ng-1", workerLabels)
+
+	r, rawClient := newTestReconciler(node, ng)
+	ctx := context.Background()
+
+	result, err := r.Reconcile(ctx, requestFor("node-partial"))
+	require.NoError(t, err)
+	assert.Equal(t, time.Duration(0), result.RequeueAfter, "should not requeue")
+
+	annotations := getNodeAnnotations(t, rawClient, "node-partial")
+	assert.NotContains(t, annotations, cyclopsManagedAnnotation,
+		"orphaned marker annotation must be cleaned up even when CA annotation is already gone")
 }
 
 func TestReconcile_MultipleNodesMixedState(t *testing.T) {

@@ -86,11 +86,6 @@ func (t *CycleNodeRequestTransitioner) transitionToSuccessful() (reconcile.Resul
 	t.rm.LogEvent(t.cycleNodeRequest, "Successful", "Successfully cycled nodes")
 	t.cycleNodeRequest.Status.Phase = v1.CycleNodeRequestSuccessful
 
-	// Clear any remaining AnnotatedNodes (including failed-to-remove ones) so
-	// subsequent requeues don't re-run cleanup. The node controller will catch
-	// any that failed to be removed here.
-	t.cycleNodeRequest.Status.AnnotatedNodes = nil
-
 	// Notify that the cycling has succeeded
 	if t.rm.Notifier != nil {
 		if err := t.rm.Notifier.PhaseTransitioned(t.cycleNodeRequest); err != nil {
