@@ -113,25 +113,6 @@ var (
 		[]string{"nodegroup", "node_name"},
 	)
 
-	// AnnotationCleanupAttempts tracks cleanup operation attempts
-	AnnotationCleanupAttempts = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: fmt.Sprintf("%v_annotation_cleanup_attempts_total", namespace),
-			Help: "Total number of annotation cleanup attempts",
-		},
-		[]string{"nodegroup", "result"}, // result: "success", "partial_failure", "failure"
-	)
-
-	// AnnotationCleanupDuration tracks cleanup operation duration
-	AnnotationCleanupDuration = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name:    fmt.Sprintf("%v_annotation_cleanup_duration_seconds", namespace),
-			Help:    "Duration of annotation cleanup operations in seconds",
-			Buckets: prometheus.ExponentialBuckets(0.1, 2, 10), // 0.1s to ~51s
-		},
-		[]string{"nodegroup"},
-	)
-
 	// --- Node controller cleanup metrics (safety-net reconciler) ---
 
 	// NodeCleanupAnnotationsRemoved tracks how many stale annotations the node
@@ -178,8 +159,6 @@ func Register(client client.Client, logger logr.Logger, namespace string) {
 		AnnotationRemoveSuccess,
 		AnnotationRemoveFailure,
 		NodesWithAnnotation,
-		AnnotationCleanupAttempts,
-		AnnotationCleanupDuration,
 		NodeCleanupAnnotationsRemoved,
 		NodeCleanupReconciles,
 	)
