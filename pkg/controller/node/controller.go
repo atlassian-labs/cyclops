@@ -127,12 +127,12 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 	nodeLabels := labels.Set(node.Labels)
 
 	// Only act on nodes that are under Cyclops management, i.e. selected by at least one NodeGroup.
-	managed, err := r.isNodeManagedByNodeGroup(ctx, nodeLabels)
+	nodegroup, err := r.nodegroupForNode(ctx, nodeLabels)
 	if err != nil {
 		logger.Error(err, "Failed to check NodeGroup membership")
 		return reconcile.Result{}, err
 	}
-	if !managed {
+	if nodegroup == "" {
 		// Defensive: this path should be unreachable. The Cyclops-managed node
 		// predicate ensures we only reconcile nodes that Cyclops annotated during
 		// cycling, and Cyclops only annotates nodes selected by a NodeGroup.
@@ -169,15 +169,16 @@ func (r *Reconciler) Reconcile(ctx context.Context, request reconcile.Request) (
 	logger.Info("Successfully removed stale annotations from node")
 	metrics.NodeCleanupAnnotationsRemoved.Inc()
 	metrics.NodeCleanupReconciles.WithLabelValues("cleaned").Inc()
+	metrics.NodesWithAnnotation.WithLabelValues(nodegroup, node.Name).Set(0)
 	return reconcile.Result{}, nil
 }
 
-// isNodeManagedByNodeGroup returns true if the node's labels match at least one
-// NodeGroup's spec.nodeSelector. NodeGroups are cluster-scoped.
-func (r *Reconciler) isNodeManagedByNodeGroup(ctx context.Context, nodeLabels labels.Set) (bool, error) {
+// nodegroupForNode returns the cloud-provider nodegroup name (for metrics) of the first
+// NodeGroup whose spec.nodeSelector matches the given node labels, or "" if none match.
+func (r *Reconciler) nodegroupForNode(ctx context.Context, nodeLabels labels.Set) (string, error) {
 	ngList := &atlassianv1.NodeGroupList{}
 	if err := r.client.List(ctx, ngList); err != nil {
-		return false, err
+		return "", err
 	}
 
 	for _, ng := range ngList.Items {
@@ -187,11 +188,15 @@ func (r *Reconciler) isNodeManagedByNodeGroup(ctx context.Context, nodeLabels la
 			continue
 		}
 		if selector.Matches(nodeLabels) {
-			return true, nil
+			names := ng.GetNodeGroupNames()
+			if len(names) > 0 {
+				return names[0], nil
+			}
+			return ng.Name, nil
 		}
 	}
 
-	return false, nil
+	return "", nil
 }
 
 // isNodeInActiveCNR returns true if the node's labels match the spec.selector of any
