@@ -1,6 +1,9 @@
+---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.14.0
   name: cyclenoderequests.atlassian.com
 spec:
   group: atlassian.com
@@ -40,16 +43,21 @@ spec:
         description: CycleNodeRequest is the Schema for the cyclenoderequests API
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           clusterName:
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
             type: object
@@ -61,20 +69,21 @@ spec:
                   the nodes.
                 properties:
                   concurrency:
-                    description: Concurrency is the number of nodes that one CycleNodeRequest
-                      will work on in parallel. Defaults to the size of the node group.
+                    description: |-
+                      Concurrency is the number of nodes that one CycleNodeRequest will work on in parallel.
+                      Defaults to the size of the node group.
                     format: int64
                     type: integer
                   cyclingTimeout:
-                    description: CyclingTimeout is a string in time duration format
-                      that defines how long a until an in-progress CNS request timeout
-                      from the time it's worked on by the controller. If no cyclingTimeout
-                      is provided, CNS will use the default controller CNS cyclingTimeout.
+                    description: |-
+                      CyclingTimeout is a string in time duration format that defines how long a until an
+                      in-progress CNS request timeout from the time it's worked on by the controller.
+                      If no cyclingTimeout is provided, CNS will use the default controller CNS cyclingTimeout.
                     type: string
                   ignoreNamespaces:
-                    description: IgnoreNamespaces is a list of namespace names in
-                      which running pods should be ignored when deciding whether a
-                      node has no more pods running.
+                    description: |-
+                      IgnoreNamespaces is a list of namespace names in which running pods should be ignored
+                      when deciding whether a node has no more pods running.
                     items:
                       type: string
                     type: array
@@ -83,17 +92,16 @@ spec:
                       items:
                         type: string
                       type: array
-                    description: 'IgnorePodLabels is a map of values for labels that
-                      describes which pods should be ignored when deciding whether
-                      a node has no more pods running. This map defines a union: any
-                      pod that matches any of the values for a given label name will
-                      be ignored.'
+                    description: |-
+                      IgnorePodLabels is a map of values for labels that describes which pods should be ignored when
+                      deciding whether a node has no more pods running. This map defines a union: any pod that
+                      matches any of the values for a given label name will be ignored.
                     type: object
                   labelsToRemove:
-                    description: LabelsToRemove is an array of labels to remove off
-                      of the pods running on the node This can be used to remove a
-                      pod from a service/endpoint before evicting/deleting it to prevent
-                      traffic being sent to it.
+                    description: |-
+                      LabelsToRemove is an array of labels to remove off of the pods running on the node
+                      This can be used to remove a pod from a service/endpoint before evicting/deleting
+                      it to prevent traffic being sent to it.
                     items:
                       type: string
                     type: array
@@ -123,19 +131,19 @@ spec:
                         the http result to should. By default no matching is done.
                       type: string
                     tls:
-                      description: TLS configuration for the http client to make requests.
-                        Can either make standard https requests or optionally forward
-                        certs signed by the root CA for mTLS.
+                      description: |-
+                        TLS configuration for the http client to make requests. Can either make standard https requests
+                        or optionally forward certs signed by the root CA for mTLS.
                       properties:
                         crt:
-                          description: Certificate is the crt given to Cyclops for
-                            mTLS. It is sent as part of the request to the upstream
-                            host.
+                          description: |-
+                            Certificate is the crt given to Cyclops for mTLS. It is sent as part
+                            of the request to the upstream host.
                           type: string
                         key:
-                          description: Key is the private key which forms a pair with
-                            the certificate. It is sent as part of the request to
-                            the upstream host for mTLS.
+                          description: |-
+                            Key is the private key which forms a pair with the certificate. It is
+                            sent as part of the request to the upstream host for mTLS.
                           type: string
                         rootCA:
                           description: RootCA is the root CA shared between Cyclops
@@ -143,16 +151,16 @@ spec:
                           type: string
                       type: object
                     validStatusCodes:
-                      description: ValidStatusCodes keeps track of the list of possible
-                        status codes returned by the endpoint denoting the service
-                        as healthy. Defaults to [200].
+                      description: |-
+                        ValidStatusCodes keeps track of the list of possible status codes returned by
+                        the endpoint denoting the service as healthy. Defaults to [200].
                       items:
                         type: integer
                       type: array
                     waitPeriod:
-                      description: WaitPeriod is the time allowed for the health check
-                        to pass before considering the service unhealthy and failing
-                        the CycleNodeRequest.
+                      description: |-
+                        WaitPeriod is the time allowed for the health check to pass before considering the
+                        service unhealthy and failing the CycleNodeRequest.
                       type: string
                   required:
                   - endpoint
@@ -160,20 +168,22 @@ spec:
                   type: object
                 type: array
               nodeGroupName:
-                description: NodeGroupName is the name of the node group in the cloud
-                  provider that will be increased to bring up replacement nodes.
+                description: |-
+                  NodeGroupName is the name of the node group in the cloud provider that will be increased to bring
+                  up replacement nodes.
                 type: string
               nodeGroupsList:
-                description: NodeGroupsList is a list of node groups in the cloud
-                  provider which includes target nodes selected by node selector
+                description: |-
+                  NodeGroupsList is a list of node groups in the cloud provider which includes target nodes
+                  selected by node selector
                 items:
                   type: string
                 type: array
               nodeNames:
-                description: NodeNames is an optional list of the names of nodes to
-                  rotate. This is used to only rotate specific nodes belonging to
-                  the NodeGroup, rather than every node in the group. If no node names
-                  are provided in NodeNames then the entire node group will be rotated.
+                description: |-
+                  NodeNames is an optional list of the names of nodes to rotate. This is used to only
+                  rotate specific nodes belonging to the NodeGroup, rather than every node in the group.
+                  If no node names are provided in NodeNames then the entire node group will be rotated.
                 items:
                   type: string
                 type: array
@@ -181,15 +191,14 @@ spec:
                 description: PreTerminationChecks stores the settings to configure
                   instance pre-termination checks
                 items:
-                  description: PreTerminationCheck defines the configuration for the
-                    check done before terminating an instance. The trigger can be
-                    considered a http sigterm and the subsequent check to know when
-                    the process has completed it's triggered action.
+                  description: |-
+                    PreTerminationCheck defines the configuration for the check done before terminating an instance. The trigger can be
+                    considered a http sigterm and the subsequent check to know when the process has completed it's triggered action.
                   properties:
                     healthCheck:
-                      description: HealthCheck denotes the configuration for performing
-                        health checks after the trigger has been sent. This works
-                        the exact same way as health check on new nodes.
+                      description: |-
+                        HealthCheck denotes the configuration for performing health checks after the trigger has been sent. This works the
+                        exact same way as health check on new nodes.
                       properties:
                         endpoint:
                           description: 'Endpoint url of the health check. Optional:
@@ -202,19 +211,19 @@ spec:
                             done.
                           type: string
                         tls:
-                          description: TLS configuration for the http client to make
-                            requests. Can either make standard https requests or optionally
-                            forward certs signed by the root CA for mTLS.
+                          description: |-
+                            TLS configuration for the http client to make requests. Can either make standard https requests
+                            or optionally forward certs signed by the root CA for mTLS.
                           properties:
                             crt:
-                              description: Certificate is the crt given to Cyclops
-                                for mTLS. It is sent as part of the request to the
-                                upstream host.
+                              description: |-
+                                Certificate is the crt given to Cyclops for mTLS. It is sent as part
+                                of the request to the upstream host.
                               type: string
                             key:
-                              description: Key is the private key which forms a pair
-                                with the certificate. It is sent as part of the request
-                                to the upstream host for mTLS.
+                              description: |-
+                                Key is the private key which forms a pair with the certificate. It is
+                                sent as part of the request to the upstream host for mTLS.
                               type: string
                             rootCA:
                               description: RootCA is the root CA shared between Cyclops
@@ -222,35 +231,35 @@ spec:
                               type: string
                           type: object
                         validStatusCodes:
-                          description: ValidStatusCodes keeps track of the list of
-                            possible status codes returned by the endpoint denoting
-                            the service as healthy. Defaults to [200].
+                          description: |-
+                            ValidStatusCodes keeps track of the list of possible status codes returned by
+                            the endpoint denoting the service as healthy. Defaults to [200].
                           items:
                             type: integer
                           type: array
                         waitPeriod:
-                          description: WaitPeriod is the time allowed for the health
-                            check to pass before considering the service unhealthy
-                            and failing the CycleNodeRequest.
+                          description: |-
+                            WaitPeriod is the time allowed for the health check to pass before considering the
+                            service unhealthy and failing the CycleNodeRequest.
                           type: string
                       required:
                       - endpoint
                       - waitPeriod
                       type: object
                     tls:
-                      description: TLS configuration for the http client to make requests.
-                        Can either make standard https requests or optionally forward
-                        certs signed by the root CA for mTLS.
+                      description: |-
+                        TLS configuration for the http client to make requests. Can either make standard https requests
+                        or optionally forward certs signed by the root CA for mTLS.
                       properties:
                         crt:
-                          description: Certificate is the crt given to Cyclops for
-                            mTLS. It is sent as part of the request to the upstream
-                            host.
+                          description: |-
+                            Certificate is the crt given to Cyclops for mTLS. It is sent as part
+                            of the request to the upstream host.
                           type: string
                         key:
-                          description: Key is the private key which forms a pair with
-                            the certificate. It is sent as part of the request to
-                            the upstream host for mTLS.
+                          description: |-
+                            Key is the private key which forms a pair with the certificate. It is
+                            sent as part of the request to the upstream host for mTLS.
                           type: string
                         rootCA:
                           description: RootCA is the root CA shared between Cyclops
@@ -263,9 +272,9 @@ spec:
                         scaled up.'
                       type: string
                     validStatusCodes:
-                      description: ValidStatusCodes keeps track of the list of possible
-                        status codes returned by the endpoint denoting the service
-                        as healthy. Defaults to [200].
+                      description: |-
+                        ValidStatusCodes keeps track of the list of possible status codes returned by
+                        the endpoint denoting the service as healthy. Defaults to [200].
                       items:
                         type: integer
                       type: array
@@ -282,64 +291,64 @@ spec:
                     description: matchExpressions is a list of label selector requirements.
                       The requirements are ANDed.
                     items:
-                      description: A label selector requirement is a selector that
-                        contains values, a key, and an operator that relates the key
-                        and values.
+                      description: |-
+                        A label selector requirement is a selector that contains values, a key, and an operator that
+                        relates the key and values.
                       properties:
                         key:
                           description: key is the label key that the selector applies
                             to.
                           type: string
                         operator:
-                          description: operator represents a key's relationship to
-                            a set of values. Valid operators are In, NotIn, Exists
-                            and DoesNotExist.
+                          description: |-
+                            operator represents a key's relationship to a set of values.
+                            Valid operators are In, NotIn, Exists and DoesNotExist.
                           type: string
                         values:
-                          description: values is an array of string values. If the
-                            operator is In or NotIn, the values array must be non-empty.
-                            If the operator is Exists or DoesNotExist, the values
-                            array must be empty. This array is replaced during a strategic
+                          description: |-
+                            values is an array of string values. If the operator is In or NotIn,
+                            the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                            the values array must be empty. This array is replaced during a strategic
                             merge patch.
                           items:
                             type: string
                           type: array
+                          x-kubernetes-list-type: atomic
                       required:
                       - key
                       - operator
                       type: object
                     type: array
+                    x-kubernetes-list-type: atomic
                   matchLabels:
                     additionalProperties:
                       type: string
-                    description: matchLabels is a map of {key,value} pairs. A single
-                      {key,value} in the matchLabels map is equivalent to an element
-                      of matchExpressions, whose key field is "key", the operator
-                      is "In", and the values array contains only "value". The requirements
-                      are ANDed.
+                    description: |-
+                      matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                      map is equivalent to an element of matchExpressions, whose key field is "key", the
+                      operator is "In", and the values array contains only "value". The requirements are ANDed.
                     type: object
                 type: object
+                x-kubernetes-map-type: atomic
               skipInitialHealthChecks:
-                description: SkipInitialHealthChecks is an optional flag to skip the
-                  initial set of node health checks before cycling begins This does
-                  not affect the health checks performed as part of the pre-termination
-                  checks.
+                description: |-
+                  SkipInitialHealthChecks is an optional flag to skip the initial set of node health checks before cycling begins
+                  This does not affect the health checks performed as part of the pre-termination checks.
                 type: boolean
               skipPreTerminationChecks:
                 description: SkipPreTerminationChecks is an optional flag to skip
                   pre-termination checks during cycling
                 type: boolean
               validationOptions:
-                description: ValidationOptions stores the settings to use for validating
-                  state of nodegroups in kube and the cloud provider for cycling the
-                  nodes.
+                description: |-
+                  ValidationOptions stores the settings to use for validating state of nodegroups
+                  in kube and the cloud provider for cycling the nodes.
                 properties:
                   skipMissingNamedNodes:
-                    description: SkipMissingNodeNames is a boolean which determines
-                      whether named nodes selected in a CNR must exist and be valid
-                      nodes before cycling can begin. If set to true named nodes which
-                      don't exist will be ignored rather than transitioning the CNR
-                      to the failed phase.
+                    description: |-
+                      SkipMissingNodeNames is a boolean which determines whether named nodes selected in a CNR must
+                      exist and be valid nodes before cycling can begin. If set to true named nodes which don't exist
+                      will be ignored rather than transitioning the CNR to the failed phase.
                     type: boolean
                 type: object
             required:
@@ -351,15 +360,15 @@ spec:
             description: CycleNodeRequestStatus defines the observed state of CycleNodeRequest
             properties:
               activeChildren:
-                description: ActiveChildren is the active number of CycleNodeStatuses
-                  that this CycleNodeRequest was aware of when it last checked for
-                  progress in the cycle operation.
+                description: |-
+                  ActiveChildren is the active number of CycleNodeStatuses that this CycleNodeRequest was aware of
+                  when it last checked for progress in the cycle operation.
                 format: int64
                 type: integer
               currentNodes:
-                description: CurrentNodes stores the current nodes that are being
-                  "worked on". Used to batch operations against the node group in
-                  the cloud provider. Once a node is passed off to a CycleNodeStatus
+                description: |-
+                  CurrentNodes stores the current nodes that are being "worked on". Used to batch operations
+                  against the node group in the cloud provider. Once a node is passed off to a CycleNodeStatus
                   CRD, it is no longer listed here.
                 items:
                   description: CycleNodeRequestNode stores a current node that is
@@ -369,8 +378,9 @@ spec:
                       description: Name of the node
                       type: string
                     nodeGroupName:
-                      description: NodeGroupName stores current cloud provider node
-                        group name which this node belongs to
+                      description: |-
+                        NodeGroupName stores current cloud provider node group name
+                        which this node belongs to
                       type: string
                     privateIp:
                       description: Private ip of the instance
@@ -385,11 +395,10 @@ spec:
                   type: object
                 type: array
               equilibriumWaitStarted:
-                description: EquilibriumWaitStarted stores the time when we started
-                  waiting for equilibrium of Kube nodes and node group instances.
-                  This is used to give some leeway if we start a request at the same
-                  time as a cluster scaling event. If we breach the time limit we
-                  fail the request.
+                description: |-
+                  EquilibriumWaitStarted stores the time when we started waiting for equilibrium of Kube nodes and node group instances.
+                  This is used to give some leeway if we start a request at the same time as a cluster scaling event.
+                  If we breach the time limit we fail the request.
                 format: date-time
                 type: string
               healthChecks:
@@ -409,10 +418,9 @@ spec:
                       format: date-time
                       type: string
                     skip:
-                      description: Skip denotes whether a node is part of a nodegroup
-                        before cycling has begun. If this is the case, health checks
-                        on the instance are skipped, like this only new instances
-                        are checked.
+                      description: |-
+                        Skip denotes whether a node is part of a nodegroup before cycling has begun. If this is the case,
+                        health checks on the instance are skipped, like this only new instances are checked.
                       type: boolean
                   type: object
                 description: HealthChecks keeps track of instance health check information
@@ -432,8 +440,9 @@ spec:
                       description: Name of the node
                       type: string
                     nodeGroupName:
-                      description: NodeGroupName stores current cloud provider node
-                        group name which this node belongs to
+                      description: |-
+                        NodeGroupName stores current cloud provider node group name
+                        which this node belongs to
                       type: string
                     privateIp:
                       description: Private ip of the instance
@@ -448,9 +457,9 @@ spec:
                   type: object
                 type: array
               nodesToTerminate:
-                description: NodesToTerminate stores the old nodes that will be terminated.
-                  The cycling of nodes is considered successful when all of these
-                  nodes no longer exist in the cluster.
+                description: |-
+                  NodesToTerminate stores the old nodes that will be terminated.
+                  The cycling of nodes is considered successful when all of these nodes no longer exist in the cluster.
                 items:
                   description: CycleNodeRequestNode stores a current node that is
                     being worked on
@@ -459,8 +468,9 @@ spec:
                       description: Name of the node
                       type: string
                     nodeGroupName:
-                      description: NodeGroupName stores current cloud provider node
-                        group name which this node belongs to
+                      description: |-
+                        NodeGroupName stores current cloud provider node group name
+                        which this node belongs to
                       type: string
                     privateIp:
                       description: Private ip of the instance
@@ -488,8 +498,9 @@ spec:
                   properties:
                     checks:
                       items:
-                        description: PreTerminationCheckStatus groups all status information
-                          for the pre-termination trigger and ensuing heath checks
+                        description: |-
+                          PreTerminationCheckStatus groups all status information for the pre-termination trigger
+                          and ensuing heath checks
                         properties:
                           check:
                             description: Check keeps track of health check result
@@ -507,9 +518,10 @@ spec:
                   termination check information
                 type: object
               scaleUpStarted:
-                description: ScaleUpStarted stores the time when the scale up started
-                  This is used to track the time limit of the scale up. If we breach
-                  the time limit we fail the request.
+                description: |-
+                  ScaleUpStarted stores the time when the scale up started
+                  This is used to track the time limit of the scale up. If we breach the time limit
+                  we fail the request.
                 format: date-time
                 type: string
               selectedNodes:

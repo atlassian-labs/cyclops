@@ -7,7 +7,7 @@
 
 Cyclops is a Kubernetes Operator that is able to terminate and create replacement nodes for a set of nodes in a cloud provider node group, e.g. AWS's Auto Scaling Group.
 
-It is built using the [operator-sdk](https://github.com/operator-framework/operator-sdk) and uses custom resources called `CycleNodeRequest` and `CycleNodeStatus` to manage state.
+It uses custom resources called `CycleNodeRequest` and `CycleNodeStatus` to manage state.
 It also has a custom resource called `NodeGroup`- which is used to define groups of nodes that can be cycled.
 
 It also contains optional controller Cyclops Observer for full automation of rotating outdated nodes, and a CLI for easy on demand scaling. This combination is great for large scale production clusters and immutable infrastructure.
