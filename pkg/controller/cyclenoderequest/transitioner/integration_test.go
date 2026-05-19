@@ -34,7 +34,7 @@ func TestOriginalIssue_IOTimeoutCausesHealing(t *testing.T) {
 		}
 
 		rm := createTestResourceManager(t, cnr, node, mockCP)
-		transitioner := NewCycleNodeRequestTransitioner(cnr, rm, Options{})
+		transitioner := NewCycleNodeRequestTransitioner(cnr, rm, defaultTestTransitionerOptions())
 
 		// Execute
 		_, err := transitioner.transitionPending()
@@ -58,7 +58,7 @@ func TestOriginalIssue_IOTimeoutCausesHealing(t *testing.T) {
 		}
 
 		rm := createTestResourceManager(t, cnr, node, mockCP)
-		transitioner := NewCycleNodeRequestTransitioner(cnr, rm, Options{})
+		transitioner := NewCycleNodeRequestTransitioner(cnr, rm, defaultTestTransitionerOptions())
 
 		// Execute
 		result, err := transitioner.transitionPending()
@@ -139,7 +139,7 @@ func TestEndToEnd_TransientErrorRecovery(t *testing.T) {
 			recovered := false
 
 			for attempt := 1; attempt <= maxAttempts; attempt++ {
-				transitioner := NewCycleNodeRequestTransitioner(cnr, rm, Options{})
+				transitioner := NewCycleNodeRequestTransitioner(cnr, rm, defaultTestTransitionerOptions())
 				result, err := transitioner.transitionPending()
 
 				t.Logf("Attempt %d: Phase=%s, Requeue=%v, Error=%v",
@@ -209,7 +209,7 @@ func TestEndToEnd_PermanentErrorsStillFail(t *testing.T) {
 			}
 
 			rm := createTestResourceManager(t, cnr, node, mockCP)
-			transitioner := NewCycleNodeRequestTransitioner(cnr, rm, Options{})
+			transitioner := NewCycleNodeRequestTransitioner(cnr, rm, defaultTestTransitionerOptions())
 
 			// Execute
 			result, err := transitioner.transitionPending()
@@ -246,7 +246,7 @@ func TestEndToEnd_EquilibriumTimeout(t *testing.T) {
 		}
 
 		rm := createTestResourceManager(t, cnr, node, mockCP)
-		transitioner := NewCycleNodeRequestTransitioner(cnr, rm, Options{})
+		transitioner := NewCycleNodeRequestTransitioner(cnr, rm, defaultTestTransitionerOptions())
 
 		// Execute
 		_, err := transitioner.transitionPending()
@@ -279,7 +279,7 @@ func TestEndToEnd_CompareBeforeAndAfter(t *testing.T) {
 		node := createTestNode("test-node-1", "aws:///us-west-2a/i-1234567890abcdef0")
 		mockCP := &mockCloudProviderAlwaysFails{error: testError}
 		rm := createTestResourceManager(t, cnr, node, mockCP)
-		transitioner := NewCycleNodeRequestTransitioner(cnr, rm, Options{})
+		transitioner := NewCycleNodeRequestTransitioner(cnr, rm, defaultTestTransitionerOptions())
 
 		result, err := transitioner.transitionPending()
 

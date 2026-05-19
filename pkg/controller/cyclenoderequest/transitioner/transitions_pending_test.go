@@ -537,7 +537,7 @@ func TestPendingTimeoutReached(t *testing.T) {
 
 	// Simulate waiting for 1s more than the wait limit
 	cnr.Status.EquilibriumWaitStarted = &metav1.Time{
-		Time: time.Now().Add(-nodeEquilibriumWaitLimit - time.Second),
+		Time: time.Now().Add(-(5 * time.Minute) - time.Second),
 	}
 
 	// This time should transition to the healing phase
@@ -593,7 +593,7 @@ func TestPendingReattachedCloudProviderNode(t *testing.T) {
 
 	// Simulate waiting for 1s less than the wait limit
 	cnr.Status.EquilibriumWaitStarted = &metav1.Time{
-		Time: time.Now().Add(-nodeEquilibriumWaitLimit + time.Second),
+		Time: time.Now().Add(-(5 * time.Minute) + time.Second),
 	}
 
 	_, err = fakeTransitioner.Autoscaling.AttachInstances(&autoscaling.AttachInstancesInput{
@@ -661,7 +661,7 @@ func TestPendingReattachedCloudProviderNodeTooLate(t *testing.T) {
 
 	// Simulate waiting for 1s more than the wait limit
 	cnr.Status.EquilibriumWaitStarted = &metav1.Time{
-		Time: time.Now().Add(-nodeEquilibriumWaitLimit - time.Second),
+		Time: time.Now().Add(-(5 * time.Minute) - time.Second),
 	}
 
 	_, err = fakeTransitioner.Autoscaling.AttachInstances(&autoscaling.AttachInstancesInput{

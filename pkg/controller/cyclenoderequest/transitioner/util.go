@@ -113,7 +113,7 @@ func (t *CycleNodeRequestTransitioner) transitionObject(desiredPhase v1.CycleNod
 
 	return reconcile.Result{
 		Requeue:      true,
-		RequeueAfter: transitionDuration,
+		RequeueAfter: t.options.TransitionDuration,
 	}, nil
 }
 
@@ -132,7 +132,7 @@ func (t *CycleNodeRequestTransitioner) equilibriumWaitTimedOut() (bool, error) {
 		}
 	}
 
-	return time.Now().After(t.cycleNodeRequest.Status.EquilibriumWaitStarted.Add(nodeEquilibriumWaitLimit)), nil
+	return time.Now().After(t.cycleNodeRequest.Status.EquilibriumWaitStarted.Add(t.options.NodeEquilibriumWaitLimit)), nil
 }
 
 // reapChildren reaps CycleNodeStatus children. It returns the state that should be
@@ -481,7 +481,7 @@ func (t *CycleNodeRequestTransitioner) errorIfEquilibriumTimeoutReached() error 
 	if timedOut {
 		return fmt.Errorf(
 			"node count mismatch, number of kubernetes nodes does not match number of cloud provider instances after %v",
-			nodeEquilibriumWaitLimit,
+			t.options.NodeEquilibriumWaitLimit,
 		)
 	}
 

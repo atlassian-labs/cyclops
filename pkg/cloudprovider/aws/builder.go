@@ -4,11 +4,12 @@ import (
 	"fmt"
 
 	"github.com/atlassian-labs/cyclops/pkg/cloudprovider"
-	fakeaws "github.com/atlassian-labs/cyclops/pkg/cloudprovider/aws/fake"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
+	"github.com/aws/aws-sdk-go/service/autoscaling/autoscalingiface"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
 	"github.com/go-logr/logr"
 )
 
@@ -52,10 +53,13 @@ func NewCloudProvider(logger logr.Logger) (cloudprovider.CloudProvider, error) {
 	return p, nil
 }
 
-// NewGenericCloudProvider returns a new mock AWS cloud provider
-func NewGenericCloudProvider(autoscalingiface *fakeaws.Autoscaling, ec2iface *fakeaws.Ec2) cloudprovider.CloudProvider {
+// NewGenericCloudProvider returns a cloud provider built around the supplied
+// Autoscaling and EC2 clients. Production code uses NewCloudProvider; this
+// constructor lets tests inject fakes (or instrumented decorators around the
+// real clients).
+func NewGenericCloudProvider(asg autoscalingiface.AutoScalingAPI, ec2c ec2iface.EC2API) cloudprovider.CloudProvider {
 	return &provider{
-		autoScalingService: autoscalingiface,
-		ec2Service:         ec2iface,
+		autoScalingService: asg,
+		ec2Service:         ec2c,
 	}
 }

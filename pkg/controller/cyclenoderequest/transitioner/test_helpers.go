@@ -2,6 +2,7 @@ package transitioner
 
 import (
 	"net/http"
+	"time"
 
 	v1 "github.com/atlassian-labs/cyclops/pkg/apis/atlassian/v1"
 	"github.com/atlassian-labs/cyclops/pkg/controller"
@@ -9,6 +10,20 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+// defaultTestTransitionerOptions mirrors the production defaults declared
+// in cmd/manager/main.go so unit tests using NewFakeTransitioner behave
+// the same way as the running operator. Individual tests can replace any
+// field via WithTransitionerOptions.
+func defaultTestTransitionerOptions() Options {
+	return Options{
+		ScaleUpWait:              1 * time.Minute,
+		ScaleUpLimit:             20 * time.Minute,
+		NodeEquilibriumWaitLimit: 5 * time.Minute,
+		TransitionDuration:       10 * time.Second,
+		RequeueDuration:          30 * time.Second,
+	}
+}
 
 type Option func(t *Transitioner)
 
@@ -57,7 +72,7 @@ func NewFakeTransitioner(cnr *v1.CycleNodeRequest, opts ...Option) *Transitioner
 		CloudProviderInstances: make([]*mock.Node, 0),
 		KubeNodes:              make([]*mock.Node, 0),
 		extraKubeObjects:       []client.Object{cnr},
-		transitionerOptions:    Options{},
+		transitionerOptions:    defaultTestTransitionerOptions(),
 	}
 
 	for _, opt := range opts {
