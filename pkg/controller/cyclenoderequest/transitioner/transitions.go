@@ -18,12 +18,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-const (
-	scaleUpWait              = 1 * time.Minute
-	scaleUpLimit             = 20 * time.Minute
-	nodeEquilibriumWaitLimit = 5 * time.Minute
-)
-
 // transitionUndefined transitions any CycleNodeRequests in the undefined phase to the pending phase
 // It checks to ensure that a valid selector has been provided.
 func (t *CycleNodeRequestTransitioner) transitionUndefined() (reconcile.Result, error) {
@@ -81,7 +75,7 @@ func (t *CycleNodeRequestTransitioner) transitionPending() (reconcile.Result, er
 			// Requeue with backoff instead of transitioning to Healing
 			return reconcile.Result{
 				Requeue:      true,
-				RequeueAfter: requeueDuration,
+				RequeueAfter: t.options.RequeueDuration,
 			}, nil
 		}
 		// Non-retryable error, transition to Healing
@@ -123,7 +117,7 @@ func (t *CycleNodeRequestTransitioner) transitionPending() (reconcile.Result, er
 		// After working through these attempts, requeue to run through the Pending phase from the
 		// beginning to check the full state of nodes again. If there are any problem nodes we should
 		// not proceed and keep requeuing until the state is fixed or the timeout has been reached.
-		return reconcile.Result{Requeue: true, RequeueAfter: requeueDuration}, nil
+		return reconcile.Result{Requeue: true, RequeueAfter: t.options.RequeueDuration}, nil
 	}
 
 	valid, err := t.validateInstanceState(validNodeGroupInstances)
@@ -133,7 +127,7 @@ func (t *CycleNodeRequestTransitioner) transitionPending() (reconcile.Result, er
 
 	if !valid {
 		t.rm.Logger.Info("instance state not valid, requeuing")
-		return reconcile.Result{Requeue: true, RequeueAfter: requeueDuration}, nil
+		return reconcile.Result{Requeue: true, RequeueAfter: t.options.RequeueDuration}, nil
 	}
 
 	t.rm.Logger.Info("instance state valid, proceeding")
@@ -319,9 +313,9 @@ func (t *CycleNodeRequestTransitioner) transitionScalingUp() (reconcile.Result, 
 	scaleUpStarted := t.cycleNodeRequest.Status.ScaleUpStarted
 
 	// Check we have waited long enough - give the node some time to start up
-	if time.Since(scaleUpStarted.Time) <= scaleUpWait {
+	if time.Since(scaleUpStarted.Time) <= t.options.ScaleUpWait {
 		t.rm.LogEvent(t.cycleNodeRequest, "ScalingUpWaiting", "Waiting for new nodes to be warmed up")
-		return reconcile.Result{Requeue: true, RequeueAfter: scaleUpWait}, nil
+		return reconcile.Result{Requeue: true, RequeueAfter: t.options.ScaleUpWait}, nil
 	}
 
 	nodeGroups, err := t.rm.CloudProvider.GetNodeGroups(t.cycleNodeRequest.GetNodeGroupNames())
@@ -329,7 +323,7 @@ func (t *CycleNodeRequestTransitioner) transitionScalingUp() (reconcile.Result, 
 		return t.transitionToHealing(err)
 	}
 	// If we have exceeded the max scale up time, then fail
-	if scaleUpStarted.Add(scaleUpLimit).Before(time.Now()) {
+	if scaleUpStarted.Add(t.options.ScaleUpLimit).Before(time.Now()) {
 		return t.transitionToHealing(
 			fmt.Errorf("all nodes failed to come up in time - instances not ready in cloud provider: %+v",
 				nodeGroups.NotReadyInstances()))
@@ -376,7 +370,7 @@ func (t *CycleNodeRequestTransitioner) transitionScalingUp() (reconcile.Result, 
 	// also check if at least one Ready node was created after the scaleUpStarted time
 	if !allInstancesReady || !allKubernetesNodesReady || numNodesCreatedAfterScaleUpStarted <= 0 {
 		t.rm.LogEvent(t.cycleNodeRequest, "ScalingUpWaiting", "Waiting for new nodes to be ready")
-		return reconcile.Result{Requeue: true, RequeueAfter: requeueDuration}, nil
+		return reconcile.Result{Requeue: true, RequeueAfter: t.options.RequeueDuration}, nil
 	}
 
 	// Remove any nodes from the CNR object which are found to have been removed prematurely due to a race condition
@@ -404,7 +398,7 @@ func (t *CycleNodeRequestTransitioner) transitionScalingUp() (reconcile.Result, 
 				return t.transitionToHealing(err)
 			}
 
-			return reconcile.Result{Requeue: true, RequeueAfter: requeueDuration}, nil
+			return reconcile.Result{Requeue: true, RequeueAfter: t.options.RequeueDuration}, nil
 		}
 	}
 
@@ -508,7 +502,7 @@ func (t *CycleNodeRequestTransitioner) transitionCordoning() (reconcile.Result, 
 			return t.transitionToHealing(err)
 		}
 
-		return reconcile.Result{Requeue: true, RequeueAfter: requeueDuration}, nil
+		return reconcile.Result{Requeue: true, RequeueAfter: t.options.RequeueDuration}, nil
 	}
 
 	// The scale up + cordon is finished, we no longer need this list of nodes
@@ -617,7 +611,7 @@ func (t *CycleNodeRequestTransitioner) transitionFailed() (reconcile.Result, err
 		return t.transitionToFailed(err)
 	}
 	if shouldRequeue {
-		return reconcile.Result{Requeue: true, RequeueAfter: transitionDuration}, nil
+		return reconcile.Result{Requeue: true, RequeueAfter: t.options.TransitionDuration}, nil
 	}
 
 	return reconcile.Result{}, nil
@@ -631,7 +625,7 @@ func (t *CycleNodeRequestTransitioner) transitionSuccessful() (reconcile.Result,
 	}
 
 	if shouldRequeue {
-		return reconcile.Result{Requeue: true, RequeueAfter: transitionDuration}, nil
+		return reconcile.Result{Requeue: true, RequeueAfter: t.options.TransitionDuration}, nil
 	}
 
 	// Delete failed sibling CNRs regardless of whether the CNR for the

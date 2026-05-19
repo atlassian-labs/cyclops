@@ -11,10 +11,6 @@ import (
 
 type transitionFunc func() (reconcile.Result, error)
 
-var (
-	transitionDuration = 10 * time.Second
-)
-
 // CycleNodeStatusTransitioner takes a cycleNodeStatus and attempts to transition it to the next phase
 type CycleNodeStatusTransitioner struct {
 	cycleNodeStatus *v1.CycleNodeStatus
@@ -22,7 +18,7 @@ type CycleNodeStatusTransitioner struct {
 	options         Options
 }
 
-// NewCycleNodeStatusTransitioner returns a new cycleNodeStatus transitioner
+// NewCycleNodeStatusTransitioner returns a new cycleNodeStatus transitioner.
 func NewCycleNodeStatusTransitioner(
 	cycleNodeStatus *v1.CycleNodeStatus,
 	rm *controller.ResourceManager,
@@ -35,13 +31,37 @@ func NewCycleNodeStatusTransitioner(
 	}
 }
 
-// Options stores configurable options for the NewCycleNodeStatusTransitioner
+// Options stores configurable options for the CycleNodeStatusTransitioner.
+//
+// All fields are required to be set by the caller. The cyclops manager
+// (cmd/manager/main.go) provides defaults via kingpin CLI flags; tests
+// construct Options directly with whatever values they need.
 type Options struct {
 	// DefaultCNScyclingExpiry controls how long until the CycleNodeStatus will timeout
 	DefaultCNScyclingExpiry time.Duration
 	// UnhealthyPodTerminationThreshold controls how long we tolerate a pod being unhealthy and holding up the
 	// CycleNodeStatus before forcibly removing it
 	UnhealthyPodTerminationThreshold time.Duration
+
+	// TransitionDuration is the RequeueAfter used when moving the CNS
+	// between phases.
+	TransitionDuration time.Duration
+
+	// WaitingPodsRequeue is the RequeueAfter used while waiting for pods
+	// on the cycling node to finish naturally (Method=Wait).
+	WaitingPodsRequeue time.Duration
+
+	// RemovingLabelsPodsRequeue is the RequeueAfter used while removing
+	// labels from pods on the cycling node.
+	RemovingLabelsPodsRequeue time.Duration
+
+	// DrainingRetryRequeue is the RequeueAfter used after the apiserver
+	// returns 429 TooManyRequests (typically PDB-blocked) during drain.
+	DrainingRetryRequeue time.Duration
+
+	// DrainingPodsRequeue is the RequeueAfter used while waiting for the
+	// in-flight drain to finish.
+	DrainingPodsRequeue time.Duration
 }
 
 // Run runs the CycleNodeStatusTransitioner and returns a reconcile result and an error

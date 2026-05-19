@@ -98,7 +98,7 @@ func (t *CycleNodeStatusTransitioner) transitionWaitingPods() (reconcile.Result,
 		if t.timedOut() {
 			return t.transitionToFailed(fmt.Errorf("timed out waiting for pods to finish"))
 		}
-		return reconcile.Result{Requeue: true, RequeueAfter: 60 * time.Second}, nil
+		return reconcile.Result{Requeue: true, RequeueAfter: t.options.WaitingPodsRequeue}, nil
 	}
 
 	return t.transitionObject(v1.CycleNodeStatusRemovingLabelsFromPods)
@@ -115,7 +115,7 @@ func (t *CycleNodeStatusTransitioner) transitionRemovingLabelsFromPods() (reconc
 		return t.transitionToFailed(err)
 	}
 	if !finished {
-		return reconcile.Result{Requeue: true, RequeueAfter: 1 * time.Second}, nil
+		return reconcile.Result{Requeue: true, RequeueAfter: t.options.RemovingLabelsPodsRequeue}, nil
 	}
 
 	return t.transitionObject(v1.CycleNodeStatusDrainingPods)
@@ -166,10 +166,10 @@ func (t *CycleNodeStatusTransitioner) transitionDraining() (reconcile.Result, er
 	}
 	// The API says we should retry (likely due to currently undisruptable pods)
 	if tooManyRequests {
-		return reconcile.Result{Requeue: true, RequeueAfter: 15 * time.Second}, nil
+		return reconcile.Result{Requeue: true, RequeueAfter: t.options.DrainingRetryRequeue}, nil
 	}
 	// If all the pods aren't finished draining, try again a while later to avoid spamming the API server.
-	return reconcile.Result{Requeue: true, RequeueAfter: 30 * time.Second}, nil
+	return reconcile.Result{Requeue: true, RequeueAfter: t.options.DrainingPodsRequeue}, nil
 }
 
 // transitionDeleting transitions any CycleNodeStatuses in the Deleting phase to the Terminating phase

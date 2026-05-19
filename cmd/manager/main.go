@@ -49,6 +49,18 @@ var (
 	defaultCNScyclingExpiry          = app.Flag("default-cns-cycling-expiry", "Fail the CNS if it has been cycling for this long").Default("3h").Duration()
 	unhealthyPodTerminationThreshold = app.Flag("unhealthy-pod-termination-after", "How long to tolerate an un-evictable yet unhealthy pod before forcefully removing it").Default("5m").Duration()
 
+	cnrScaleUpWait              = app.Flag("cnr-scale-up-wait", "Minimum time to wait after scaling up before checking if replacement nodes are Ready").Default("1m").Duration()
+	cnrScaleUpLimit             = app.Flag("cnr-scale-up-limit", "Maximum total time to wait for replacement nodes to come up before failing the CNR").Default("20m").Duration()
+	cnrNodeEquilibriumWaitLimit = app.Flag("cnr-node-equilibrium-wait-limit", "Maximum time to wait for the kube-node-set and cloud-provider-instance-set to converge during the Initialised phase").Default("5m").Duration()
+	cnrTransitionDuration       = app.Flag("cnr-transition-duration", "RequeueAfter used when moving the CNR between phases").Default("10s").Duration()
+	cnrRequeueDuration          = app.Flag("cnr-requeue-duration", "RequeueAfter used while the CNR is waiting on an external condition within a phase").Default("30s").Duration()
+
+	cnsTransitionDuration        = app.Flag("cns-transition-duration", "RequeueAfter used when moving the CNS between phases").Default("10s").Duration()
+	cnsWaitingPodsRequeue        = app.Flag("cns-waiting-pods-requeue", "RequeueAfter used while waiting for pods on the cycling node to finish naturally (Method=Wait)").Default("60s").Duration()
+	cnsRemovingLabelsPodsRequeue = app.Flag("cns-removing-labels-pods-requeue", "RequeueAfter used while removing labels from pods on the cycling node").Default("1s").Duration()
+	cnsDrainingRetryRequeue      = app.Flag("cns-draining-retry-requeue", "RequeueAfter used when the apiserver returns 429 TooManyRequests (PDB-blocked) during drain").Default("15s").Duration()
+	cnsDrainingPodsRequeue       = app.Flag("cns-draining-pods-requeue", "RequeueAfter used while waiting for the in-flight drain to finish").Default("30s").Duration()
+
 	nodeControllerReconcileConcurrency = app.Flag("node-controller-reconcile-concurrency", "Maximum number of concurrent node controller reconciles").Default("1").Int()
 	nodeControllerRequeueAfter         = app.Flag("node-controller-requeue-after", "How often the node controller rechecks annotated nodes that are still covered by an active CNR").Default("5m").Duration()
 )
@@ -120,16 +132,26 @@ func main() {
 
 	// Configure the CNR transitioner options
 	cnrOptions := cnrTransitioner.Options{
-		DeleteCNR:          *deleteCNR,
-		DeleteCNRExpiry:    *deleteCNRExpiry,
-		DeleteCNRRequeue:   *deleteCNRRequeue,
-		HealthCheckTimeout: *healthCheckTimeout,
+		DeleteCNR:                *deleteCNR,
+		DeleteCNRExpiry:          *deleteCNRExpiry,
+		DeleteCNRRequeue:         *deleteCNRRequeue,
+		HealthCheckTimeout:       *healthCheckTimeout,
+		ScaleUpWait:              *cnrScaleUpWait,
+		ScaleUpLimit:             *cnrScaleUpLimit,
+		NodeEquilibriumWaitLimit: *cnrNodeEquilibriumWaitLimit,
+		TransitionDuration:       *cnrTransitionDuration,
+		RequeueDuration:          *cnrRequeueDuration,
 	}
 
 	// Configure the CNS transitioner options
 	cnsOptions := cnsTransitioner.Options{
 		DefaultCNScyclingExpiry:          *defaultCNScyclingExpiry,
 		UnhealthyPodTerminationThreshold: *unhealthyPodTerminationThreshold,
+		TransitionDuration:               *cnsTransitionDuration,
+		WaitingPodsRequeue:               *cnsWaitingPodsRequeue,
+		RemovingLabelsPodsRequeue:        *cnsRemovingLabelsPodsRequeue,
+		DrainingRetryRequeue:             *cnsDrainingRetryRequeue,
+		DrainingPodsRequeue:              *cnsDrainingPodsRequeue,
 	}
 
 	// Configure the node controller options
