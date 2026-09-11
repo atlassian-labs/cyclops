@@ -33,11 +33,6 @@ const (
 // Value: "false" or missing/empty → default enabled (annotation management enabled)
 const nodeGroupAnnotationKey = "cyclops.atlassian.com/disable-annotation-management"
 
-var (
-	transitionDuration = 10 * time.Second
-	requeueDuration    = 30 * time.Second
-)
-
 // CycleNodeRequestTransitioner takes a cycleNodeRequest and attempts to transition it to the next phase
 type CycleNodeRequestTransitioner struct {
 	cycleNodeRequest *v1.CycleNodeRequest
@@ -45,7 +40,11 @@ type CycleNodeRequestTransitioner struct {
 	options          Options
 }
 
-// Options stores configurable options for the CycleNodeRequestTransitioner
+// Options stores configurable options for the CycleNodeRequestTransitioner.
+//
+// All fields are required to be set by the caller. The cyclops manager
+// (cmd/manager/main.go) provides defaults via kingpin CLI flags; tests
+// construct Options directly with whatever values they need.
 type Options struct {
 	// DeleteCNR enables/disables deleting successful CycleNodeRequests after a certain amount of time
 	DeleteCNR bool
@@ -58,9 +57,32 @@ type Options struct {
 
 	// HealthCheckTimeout controls the duration of the timeout period for health checks performed on nodes
 	HealthCheckTimeout time.Duration
+
+	// ScaleUpWait is the minimum time the transitioner waits after detaching
+	// instances before checking whether replacement Kubernetes nodes have
+	// become Ready.
+	ScaleUpWait time.Duration
+
+	// ScaleUpLimit is the maximum total time spent waiting for replacement
+	// nodes to come up before the CNR transitions to Healing.
+	ScaleUpLimit time.Duration
+
+	// NodeEquilibriumWaitLimit caps how long the transitioner will wait for
+	// the kube-node-set and cloud-provider-instance-set to converge during
+	// the Initialised phase.
+	NodeEquilibriumWaitLimit time.Duration
+
+	// TransitionDuration is the RequeueAfter used when moving the CNR
+	// between phases.
+	TransitionDuration time.Duration
+
+	// RequeueDuration is the RequeueAfter used while the CNR is waiting on
+	// an external condition within a phase (e.g. ScalingUp readiness,
+	// WaitingTermination).
+	RequeueDuration time.Duration
 }
 
-// NewCycleNodeRequestTransitioner returns a new cycleNodeRequest transitioner
+// NewCycleNodeRequestTransitioner returns a new cycleNodeRequest transitioner.
 func NewCycleNodeRequestTransitioner(
 	cycleNodeRequest *v1.CycleNodeRequest,
 	rm *controller.ResourceManager,

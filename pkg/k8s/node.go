@@ -59,28 +59,24 @@ func IsCordoned(name string, client kubernetes.Interface) (bool, error) {
 
 // AddLabelToNode performs a patch operation on a node to add a label to the node
 func AddLabelToNode(nodeName string, labelName string, labelValue string, client kubernetes.Interface) error {
-	patches := []Patch{
-		{
-			Op: "add",
-			// json patch spec maps "~1" to "/" as an escape sequence, so we do the translation here...
-			Path:  fmt.Sprintf("/metadata/labels/%s", strings.ReplaceAll(labelName, "/", "~1")),
-			Value: labelValue,
+	return MergePatchNode(nodeName, map[string]interface{}{
+		"metadata": map[string]interface{}{
+			"labels": map[string]string{labelName: labelValue},
 		},
-	}
-	return PatchNode(nodeName, patches, client)
+	}, client)
 }
 
-// AddAnnotationToNode performs a patch operation on a node to add an annotation to the node
+// AddAnnotationToNode performs a merge patch on a node to add an annotation.
+// A merge patch is used rather than a JSON Patch "add" operation because the
+// latter fails when the node's annotations map is nil (which can happen in
+// envtest and occasionally in real clusters before the kubelet has written
+// its own annotations).
 func AddAnnotationToNode(nodeName string, annotationName string, annotationValue string, client kubernetes.Interface) error {
-	patches := []Patch{
-		{
-			Op: "add",
-			// json patch spec maps "~1" to "/" as an escape sequence, so we do the translation here...
-			Path:  fmt.Sprintf("/metadata/annotations/%s", strings.ReplaceAll(annotationName, "/", "~1")),
-			Value: annotationValue,
+	return MergePatchNode(nodeName, map[string]interface{}{
+		"metadata": map[string]interface{}{
+			"annotations": map[string]string{annotationName: annotationValue},
 		},
-	}
-	return PatchNode(nodeName, patches, client)
+	}, client)
 }
 
 // RemoveAnnotationFromNode performs a patch operation on a node to remove an annotation from the node
@@ -132,17 +128,6 @@ func RemoveScaleDownDisabledAnnotationsFromNode(nodeName string, client kubernet
 		ClusterAutoscalerScaleDownDisabledAnnotation,
 		CyclopsManagedAnnotation,
 	)
-}
-
-// RemoveLabelFromNode performs a patch operation on a node to remove a label from the node
-func RemoveLabelFromNode(nodeName string, labelName string, client kubernetes.Interface) error {
-	patches := []Patch{
-		{
-			Op:   "remove",
-			Path: fmt.Sprintf("/metadata/labels/%s", strings.ReplaceAll(labelName, "/", "~1")),
-		},
-	}
-	return PatchNode(nodeName, patches, client)
 }
 
 // AddFinalizerToNode updates a node to add a finalizer to it

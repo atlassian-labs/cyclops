@@ -32,7 +32,7 @@ func (t *CycleNodeStatusTransitioner) transitionObject(desiredPhase v1.CycleNode
 	}
 	return reconcile.Result{
 		Requeue:      true,
-		RequeueAfter: transitionDuration,
+		RequeueAfter: t.options.TransitionDuration,
 	}, nil
 }
 

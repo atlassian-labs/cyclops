@@ -7,14 +7,11 @@ import (
 	"runtime"
 
 	"github.com/alecthomas/kingpin/v2"
-	"github.com/atlassian-labs/cyclops/pkg/apis"
 	"github.com/atlassian-labs/cyclops/pkg/cloudprovider/builder"
-	"github.com/atlassian-labs/cyclops/pkg/controller/cyclenoderequest"
+	cyclopsmanager "github.com/atlassian-labs/cyclops/pkg/manager"
 	cnrTransitioner "github.com/atlassian-labs/cyclops/pkg/controller/cyclenoderequest/transitioner"
-	"github.com/atlassian-labs/cyclops/pkg/controller/cyclenodestatus"
 	cnsTransitioner "github.com/atlassian-labs/cyclops/pkg/controller/cyclenodestatus/transitioner"
 	nodecontroller "github.com/atlassian-labs/cyclops/pkg/controller/node"
-	"github.com/atlassian-labs/cyclops/pkg/metrics"
 	"github.com/atlassian-labs/cyclops/pkg/notifications"
 	"github.com/atlassian-labs/cyclops/pkg/notifications/notifierbuilder"
 	"github.com/operator-framework/operator-lib/leader"
@@ -48,6 +45,18 @@ var (
 	deleteCNRRequeue                 = app.Flag("delete-cnr-requeue", "How often to check if a CNR can be deleted").Default("24h").Duration()
 	defaultCNScyclingExpiry          = app.Flag("default-cns-cycling-expiry", "Fail the CNS if it has been cycling for this long").Default("3h").Duration()
 	unhealthyPodTerminationThreshold = app.Flag("unhealthy-pod-termination-after", "How long to tolerate an un-evictable yet unhealthy pod before forcefully removing it").Default("5m").Duration()
+
+	cnrScaleUpWait              = app.Flag("cnr-scale-up-wait", "Minimum time to wait after scaling up before checking if replacement nodes are Ready").Default("1m").Duration()
+	cnrScaleUpLimit             = app.Flag("cnr-scale-up-limit", "Maximum total time to wait for replacement nodes to come up before failing the CNR").Default("20m").Duration()
+	cnrNodeEquilibriumWaitLimit = app.Flag("cnr-node-equilibrium-wait-limit", "Maximum time to wait for the kube-node-set and cloud-provider-instance-set to converge during the Initialised phase").Default("5m").Duration()
+	cnrTransitionDuration       = app.Flag("cnr-transition-duration", "RequeueAfter used when moving the CNR between phases").Default("10s").Duration()
+	cnrRequeueDuration          = app.Flag("cnr-requeue-duration", "RequeueAfter used while the CNR is waiting on an external condition within a phase").Default("30s").Duration()
+
+	cnsTransitionDuration        = app.Flag("cns-transition-duration", "RequeueAfter used when moving the CNS between phases").Default("10s").Duration()
+	cnsWaitingPodsRequeue        = app.Flag("cns-waiting-pods-requeue", "RequeueAfter used while waiting for pods on the cycling node to finish naturally (Method=Wait)").Default("60s").Duration()
+	cnsRemovingLabelsPodsRequeue = app.Flag("cns-removing-labels-pods-requeue", "RequeueAfter used while removing labels from pods on the cycling node").Default("1s").Duration()
+	cnsDrainingRetryRequeue      = app.Flag("cns-draining-retry-requeue", "RequeueAfter used when the apiserver returns 429 TooManyRequests (PDB-blocked) during drain").Default("15s").Duration()
+	cnsDrainingPodsRequeue       = app.Flag("cns-draining-pods-requeue", "RequeueAfter used while waiting for the in-flight drain to finish").Default("30s").Duration()
 
 	nodeControllerReconcileConcurrency = app.Flag("node-controller-reconcile-concurrency", "Maximum number of concurrent node controller reconciles").Default("1").Int()
 	nodeControllerRequeueAfter         = app.Flag("node-controller-requeue-after", "How often the node controller rechecks annotated nodes that are still covered by an active CNR").Default("5m").Duration()
@@ -88,17 +97,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	log.Info("Registering Components.")
-
-	// Setup Scheme for all resources
-	if err := apis.AddToScheme(mgr.GetScheme()); err != nil {
-		log.Error(err, "Unable to setup scheme")
-		os.Exit(1)
-	}
-
-	// Register the custom metrics
-	metrics.Register(mgr.GetClient(), log, *namespace)
-
 	// Setup the cloud provider
 	// Uses AWS SDK's built-in retry behavior
 	cloudProvider, err := builder.BuildCloudProvider(*cloudProviderName, logger)
@@ -118,47 +116,37 @@ func main() {
 		}
 	}
 
-	// Configure the CNR transitioner options
-	cnrOptions := cnrTransitioner.Options{
-		DeleteCNR:          *deleteCNR,
-		DeleteCNRExpiry:    *deleteCNRExpiry,
-		DeleteCNRRequeue:   *deleteCNRRequeue,
-		HealthCheckTimeout: *healthCheckTimeout,
-	}
-
-	// Configure the CNS transitioner options
-	cnsOptions := cnsTransitioner.Options{
-		DefaultCNScyclingExpiry:          *defaultCNScyclingExpiry,
-		UnhealthyPodTerminationThreshold: *unhealthyPodTerminationThreshold,
-	}
-
-	// Configure the node controller options
-	nodeOptions := nodecontroller.Options{
-		ReconcileConcurrency: *nodeControllerReconcileConcurrency,
-		RequeueAfter:         *nodeControllerRequeueAfter,
-	}
-
-	// Set up and register the controllers that will share resources between them
-	_, err = cyclenoderequest.NewReconciler(mgr, cloudProvider, notifier, *namespace, cnrOptions)
-	if err != nil {
-		log.Error(err, "Unable to add cycleNodeRequest controller")
-		os.Exit(1)
-	}
-	_, err = cyclenodestatus.NewReconciler(mgr, cloudProvider, notifier, *namespace, cnsOptions)
-	if err != nil {
-		log.Error(err, "Unable to add cycleNodeStatus controller")
-		os.Exit(1)
-	}
-	_, err = nodecontroller.NewReconciler(mgr, *namespace, nodeOptions)
-	if err != nil {
-		log.Error(err, "Unable to add node controller")
-		os.Exit(1)
-	}
-
 	log.Info("Starting the Cmd.")
 
-	// Start the Cmd
-	if err := mgr.Start(signals.SetupSignalHandler()); err != nil {
+	if err := cyclopsmanager.Run(signals.SetupSignalHandler(), mgr, cyclopsmanager.Dependencies{
+		CloudProvider: cloudProvider,
+		Notifier:      notifier,
+		Namespace:     *namespace,
+		CNROptions: cnrTransitioner.Options{
+			DeleteCNR:                *deleteCNR,
+			DeleteCNRExpiry:          *deleteCNRExpiry,
+			DeleteCNRRequeue:         *deleteCNRRequeue,
+			HealthCheckTimeout:       *healthCheckTimeout,
+			ScaleUpWait:              *cnrScaleUpWait,
+			ScaleUpLimit:             *cnrScaleUpLimit,
+			NodeEquilibriumWaitLimit: *cnrNodeEquilibriumWaitLimit,
+			TransitionDuration:       *cnrTransitionDuration,
+			RequeueDuration:          *cnrRequeueDuration,
+		},
+		CNSOptions: cnsTransitioner.Options{
+			DefaultCNScyclingExpiry:          *defaultCNScyclingExpiry,
+			UnhealthyPodTerminationThreshold: *unhealthyPodTerminationThreshold,
+			TransitionDuration:               *cnsTransitionDuration,
+			WaitingPodsRequeue:               *cnsWaitingPodsRequeue,
+			RemovingLabelsPodsRequeue:        *cnsRemovingLabelsPodsRequeue,
+			DrainingRetryRequeue:             *cnsDrainingRetryRequeue,
+			DrainingPodsRequeue:              *cnsDrainingPodsRequeue,
+		},
+		NodeOptions: nodecontroller.Options{
+			ReconcileConcurrency: *nodeControllerReconcileConcurrency,
+			RequeueAfter:         *nodeControllerRequeueAfter,
+		},
+	}); err != nil {
 		log.Error(err, "Manager exited non-zero")
 		os.Exit(1)
 	}
