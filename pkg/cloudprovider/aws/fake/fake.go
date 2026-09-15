@@ -177,3 +177,7 @@ func (m *Ec2) TerminateInstances(input *ec2.TerminateInstancesInput) (*ec2.Termi
 
 	return &ec2.TerminateInstancesOutput{}, nil
 }
+
+func (m *Ec2) CreateTags(input *ec2.CreateTagsInput) (*ec2.CreateTagsOutput, error) {
+	return &ec2.CreateTagsOutput{}, nil
+}
