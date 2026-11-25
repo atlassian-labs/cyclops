@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/ec2"
 
@@ -151,13 +152,36 @@ func (m *Autoscaling) DetachInstances(input *autoscaling.DetachInstancesInput) (
 func (m *Ec2) DescribeInstances(input *ec2.DescribeInstancesInput) (*ec2.DescribeInstancesOutput, error) {
 	var instances = make([]*ec2.Instance, 0)
 	var instanceIds = make(map[string]interface{})
+	var filterIds map[string]interface{}
 
+	// Like EC2, fail the whole call when an explicitly requested instance ID is unknown.
 	for _, instanceId := range input.InstanceIds {
+		if _, exists := m.Instances[*instanceId]; !exists {
+			return nil, awserr.New("InvalidInstanceID.NotFound",
+				fmt.Sprintf("The instance ID '%s' does not exist", *instanceId), nil)
+		}
 		instanceIds[*instanceId] = nil
+	}
+
+	for _, filter := range input.Filters {
+		if aws.StringValue(filter.Name) != "instance-id" {
+			return nil, fmt.Errorf("fake ec2 does not support filter %q", aws.StringValue(filter.Name))
+		}
+		if len(filter.Values) > 200 {
+			return nil, awserr.New("FilterLimitExceeded", "The maximum number of filter values specified on a single call is 200", nil)
+		}
+		filterIds = make(map[string]interface{})
+		for _, value := range filter.Values {
+			filterIds[*value] = nil
+		}
 	}
 
 	for _, instance := range m.Instances {
 		if _, ok := instanceIds[instance.InstanceID]; input.InstanceIds != nil && !ok {
+			continue
+		}
+
+		if _, ok := filterIds[instance.InstanceID]; filterIds != nil && !ok {
 			continue
 		}
 

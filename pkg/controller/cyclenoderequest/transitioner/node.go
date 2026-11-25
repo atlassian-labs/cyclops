@@ -50,20 +50,21 @@ func (t *CycleNodeRequestTransitioner) listReadyNodes(includeInProgress bool) (m
 	}
 
 	for providerID, node := range nodes {
-		nodeReady := false
-
-		for _, cond := range node.Status.Conditions {
-			if cond.Type == corev1.NodeReady && cond.Status == corev1.ConditionTrue {
-				nodeReady = true
-			}
-		}
-
-		if !nodeReady {
+		if !isNodeReady(node) {
 			delete(nodes, providerID)
 		}
 	}
 
 	return nodes, nil
+}
+
+func isNodeReady(node corev1.Node) bool {
+	for _, cond := range node.Status.Conditions {
+		if cond.Type == corev1.NodeReady && cond.Status == corev1.ConditionTrue {
+			return true
+		}
+	}
+	return false
 }
 
 // getNodesToTerminate returns a list of nodes that still need terminating and have not yet been actioned for

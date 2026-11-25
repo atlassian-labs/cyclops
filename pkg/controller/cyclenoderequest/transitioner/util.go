@@ -436,6 +436,13 @@ func (t *CycleNodeRequestTransitioner) deleteAnyOrphanedKubeNodes(nodesNotInClou
 			continue
 		}
 
+		// EC2 is eventually consistent, so a recently launched instance can be missing from the
+		// result. A Ready node still has a kubelet reporting from a live instance.
+		if isNodeReady(node) {
+			t.rm.Logger.Info("skip deleting orphaned node because it is still Ready", "node", node.Name)
+			continue
+		}
+
 		// The kube node is now established to be orphaned. Check the finalizers on the node
 		// object and ensure that only the Cyclops finalizer exists on it. If another finalizer
 		// exists then it's from another controller and it should not be deleted.
