@@ -75,6 +75,13 @@ func (t *CycleNodeStatusTransitioner) transitionPending() (reconcile.Result, err
 		return t.transitionToFailed(err)
 	}
 	if len(existingProviderIDs) == 0 {
+		// The CNS finishes here without reaching the Deleting phase, so remove the finalizer
+		// to allow the node object to be deleted. Otherwise it can outlive its instance.
+		if err := t.rm.RemoveFinalizerFromNode(node.Name); err != nil {
+			t.rm.LogEvent(t.cycleNodeStatus, "RemoveFinalizerFromNodeError", err.Error())
+			return t.transitionToFailed(err)
+		}
+
 		return t.transitionToSuccessful()
 	}
 

@@ -31,6 +31,10 @@ type Autoscaling struct {
 	autoscalingiface.AutoScalingAPI
 
 	Instances map[string]*Instance
+
+	// DetachInstancesErr, when set, is returned by DetachInstances and no instance is detached.
+	// Tests use it to simulate an instance that left InService after it was described.
+	DetachInstancesErr error
 }
 
 func GenerateProviderID(instanceID string) string {
@@ -129,6 +133,10 @@ func (m *Autoscaling) AttachInstances(input *autoscaling.AttachInstancesInput) (
 }
 
 func (m *Autoscaling) DetachInstances(input *autoscaling.DetachInstancesInput) (*autoscaling.DetachInstancesOutput, error) {
+	if m.DetachInstancesErr != nil {
+		return nil, m.DetachInstancesErr
+	}
+
 	for _, instanceId := range input.InstanceIds {
 		if instance, exists := m.Instances[*instanceId]; exists {
 			instance.AutoscalingGroupName = ""
