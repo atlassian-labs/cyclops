@@ -1,6 +1,7 @@
 package transitioner
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -11,7 +12,9 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/stretchr/testify/assert"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // Basic test to ensure the base functionality of the Pending phase works. A
@@ -303,6 +306,9 @@ func TestPendingOrphanedKubeNodes(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
+	// The kubelet of a node without an instance stops reporting
+	nodegroup[1].NodeReady = corev1.ConditionUnknown
+
 	cnr := &v1.CycleNodeRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "cnr-1",
@@ -348,6 +354,52 @@ func TestPendingOrphanedKubeNodes(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, v1.CycleNodeRequestInitialised, cnr.Status.Phase)
 	assert.Len(t, cnr.Status.NodesToTerminate, 1)
+}
+
+// Test to ensure that a Ready kube node is not deleted when its instance is
+// missing from the cloud provider, because EC2 is eventually consistent.
+func TestPendingOrphanedKubeNodeStillReady(t *testing.T) {
+	nodegroup, err := mock.NewNodegroup("ng-1", 2)
+	if err != nil {
+		assert.NoError(t, err)
+	}
+
+	cnr := &v1.CycleNodeRequest{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "cnr-1",
+			Namespace: "kube-system",
+		},
+		Spec: v1.CycleNodeRequestSpec{
+			NodeGroupsList: []string{"ng-1"},
+			CycleSettings: v1.CycleSettings{
+				Concurrency: 1,
+				Method:      v1.CycleNodeRequestMethodDrain,
+			},
+			Selector: metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"customer": "kitt",
+				},
+			},
+		},
+		Status: v1.CycleNodeRequestStatus{
+			Phase: v1.CycleNodeRequestPending,
+		},
+	}
+
+	fakeTransitioner := NewFakeTransitioner(cnr,
+		WithKubeNodes(nodegroup),
+		WithCloudProviderInstances(nodegroup[:1]),
+	)
+
+	for i := 0; i < 2; i++ {
+		_, err = fakeTransitioner.Run()
+		assert.NoError(t, err)
+		assert.Equal(t, v1.CycleNodeRequestPending, cnr.Status.Phase)
+	}
+
+	var node corev1.Node
+	assert.NoError(t, fakeTransitioner.K8sClient.Get(context.TODO(),
+		types.NamespacedName{Name: nodegroup[1].Name}, &node))
 }
 
 // Test to ensure that an instance detached from one of the CNR named cloud
