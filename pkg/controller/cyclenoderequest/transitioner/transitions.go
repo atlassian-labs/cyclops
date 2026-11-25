@@ -266,14 +266,6 @@ func (t *CycleNodeRequestTransitioner) transitionInitialised() (reconcile.Result
 	var validNodes []v1.CycleNodeRequestNode
 
 	for _, node := range t.cycleNodeRequest.Status.CurrentNodes {
-		t.rm.Logger.Info("Adding finalizer to node", "node", node.Name)
-
-		// Add the finalizer to the node before detaching it
-		if err := t.rm.AddFinalizerToNode(node.Name); err != nil {
-			t.rm.LogEvent(t.cycleNodeRequest, "AddFinalizerToNodeError", err.Error())
-			return t.transitionToHealing(err)
-		}
-
 		t.rm.Logger.Info("Adding annotation to node", "node", node.Name)
 
 		// Add the nodegroup annotation to the node before detaching it
@@ -292,6 +284,17 @@ func (t *CycleNodeRequestTransitioner) transitionInitialised() (reconcile.Result
 		// Catch any error which is not the result of the node already detaching
 		if err != nil {
 			t.rm.LogEvent(t.cycleNodeRequest, "DetachingNodeError", err.Error())
+			return t.transitionToHealing(err)
+		}
+
+		t.rm.Logger.Info("Adding finalizer to node", "node", node.Name)
+
+		// Add the finalizer to the node only after it is detached. A node which is skipped above
+		// does not get a CycleNodeStatus, so nothing would remove a finalizer added before the
+		// detach. If this fails then the instance is detached without a finalizer, and the
+		// Healing phase must re-attach it.
+		if err := t.rm.AddFinalizerToNode(node.Name); err != nil {
+			t.rm.LogEvent(t.cycleNodeRequest, "AddFinalizerToNodeError", err.Error())
 			return t.transitionToHealing(err)
 		}
 
@@ -378,6 +381,14 @@ func (t *CycleNodeRequestTransitioner) transitionScalingUp() (reconcile.Result, 
 		for i, node := range t.cycleNodeRequest.Status.CurrentNodes {
 			if nodeToRemove.Name == node.Name {
 				t.rm.LogEvent(t.cycleNodeRequest, "RaceCondition", "Node %v was prematurely terminated.", node.Name)
+
+				// The node is dropped from the cycle and does not get a CycleNodeStatus, so remove
+				// the finalizer here. Otherwise the node object can outlive its instance.
+				if err := t.rm.RemoveFinalizerFromNode(node.Name); err != nil {
+					t.rm.LogEvent(t.cycleNodeRequest, "RemoveFinalizerFromNodeError", err.Error())
+					return t.transitionToHealing(err)
+				}
+
 				t.cycleNodeRequest.Status.CurrentNodes = append(t.cycleNodeRequest.Status.CurrentNodes[:i],
 					t.cycleNodeRequest.Status.CurrentNodes[i+1:]...)
 				break
