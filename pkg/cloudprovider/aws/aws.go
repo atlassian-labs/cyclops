@@ -27,9 +27,19 @@ const (
 
 	// launchTemplateLatestVersion defines the launching of the latest version of the template.
 	launchTemplateLatestVersion = "$Latest"
+
+	// maxFilterValues is the EC2 limit on filter values in one DescribeInstances call.
+	maxFilterValues = 200
+
+	// describeInstancesPageSize keeps DescribeInstances paginated, as EC2 recommends.
+	describeInstancesPageSize = 1000
 )
 
 var providerIDRegex = regexp.MustCompile(`aws:\/\/\/[\w-]+\/([\w-]+)`)
+
+// instanceIDRegex matches EC2 instance IDs. InstancesExist rejects other IDs, because its filter
+// query would report them as missing and callers act on a missing instance.
+var instanceIDRegex = regexp.MustCompile(`^i-[0-9a-f]{8,17}$`)
 
 func providerIDToInstanceID(providerID string) (instanceID string, err error) {
 	res := providerIDRegex.FindStringSubmatch(providerID)
@@ -125,28 +135,50 @@ func (p *provider) InstancesExist(providerIDs []string) (map[string]interface{},
 			return nil, err
 		}
 
+		if !instanceIDRegex.MatchString(instanceID) {
+			return nil, fmt.Errorf("provider ID %q does not contain a valid EC2 instance ID", providerID)
+		}
+
 		instanceIDSet[instanceID] = providerID
 		instanceIDs = append(instanceIDs, instanceID)
 	}
 
-	output, err := p.ec2Service.DescribeInstances(
-		&ec2.DescribeInstancesInput{
-			InstanceIds: aws.StringSlice(instanceIDs),
-		},
-	)
-	if err != nil {
-		return nil, err
-	}
+	// Filter by instance-id instead of using InstanceIds. Once EC2 stops reporting a terminated
+	// instance, InstanceIds fails the whole call with InvalidInstanceID.NotFound, while a filter
+	// leaves the instance out of the result.
+	for start := 0; start < len(instanceIDs); start += maxFilterValues {
+		end := min(start+maxFilterValues, len(instanceIDs))
 
-	for _, reservation := range output.Reservations {
-		for _, instance := range reservation.Instances {
-			if *instance.State.Name == ec2.InstanceStateNameTerminated {
-				continue
+		input := &ec2.DescribeInstancesInput{
+			Filters: []*ec2.Filter{{
+				Name:   aws.String("instance-id"),
+				Values: aws.StringSlice(instanceIDs[start:end]),
+			}},
+			MaxResults: aws.Int64(describeInstancesPageSize),
+		}
+
+		for {
+			output, err := p.ec2Service.DescribeInstances(input)
+			if err != nil {
+				return nil, err
 			}
 
-			if providerID, ok := instanceIDSet[aws.StringValue(instance.InstanceId)]; ok {
-				validProviderIDs[providerID] = nil
+			for _, reservation := range output.Reservations {
+				for _, instance := range reservation.Instances {
+					if aws.StringValue(instance.State.Name) == ec2.InstanceStateNameTerminated {
+						continue
+					}
+
+					if providerID, ok := instanceIDSet[aws.StringValue(instance.InstanceId)]; ok {
+						validProviderIDs[providerID] = nil
+					}
+				}
 			}
+
+			if aws.StringValue(output.NextToken) == "" {
+				break
+			}
+			input.NextToken = output.NextToken
 		}
 	}
 
