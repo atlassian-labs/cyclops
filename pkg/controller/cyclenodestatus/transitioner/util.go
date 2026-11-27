@@ -39,5 +39,11 @@ func (t *CycleNodeStatusTransitioner) transitionObject(desiredPhase v1.CycleNode
 // timedOut returns true if the processing of this CycleNodeStatus has been going longer
 // than the calculated timeout timestamp
 func (t *CycleNodeStatusTransitioner) timedOut() bool {
+	if t.cycleNodeStatus.Status.TimeoutTimestamp == nil {
+		// The timeout timestamp is only set when the CycleNodeStatus is first
+		// created, so treat an unset timestamp as "not timed out yet" instead
+		// of dereferencing it.
+		return false
+	}
 	return time.Now().After(t.cycleNodeStatus.Status.TimeoutTimestamp.Time)
 }
